@@ -1,0 +1,399 @@
+/**
+ * IRONMAN TOSS BOOK - Authentication Styles (Day 3)
+ * Focused, premium, accessible styles for Login, Register, Forgot Password, and Reset Password.
+ */
+
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-lg, 16px);
+  background-color: var(--color-background, #F6F8FA);
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg, 16px);
+}
+
+/* ==========================================================================
+   Auth Brand Header
+   ========================================================================== */
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-xs, 4px);
+  text-decoration: none;
+  margin-bottom: var(--space-xs, 4px);
+}
+
+.auth-brand-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg, 12px);
+  background: linear-gradient(135deg, var(--color-primary, #0860BE) 0%, #1E40AF 100%);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(8, 96, 190, 0.3);
+  margin-bottom: var(--space-xs, 4px);
+}
+
+.auth-brand-badge svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.auth-brand-title {
+  font-size: 1.125rem; /* 18px */
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text, #15171A);
+  text-transform: uppercase;
+}
+
+.auth-brand-subtitle {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  color: var(--color-primary, #0860BE);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Auth Card & Form Layout
+   ========================================================================== */
+
+.auth-card {
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.08));
+  padding: var(--space-xl, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg, 16px);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+[data-theme="dark"] .auth-card {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+.auth-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs, 2px);
+}
+
+.auth-title {
+  font-size: 1.375rem; /* 22px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+  letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md, 12px);
+}
+
+/* ==========================================================================
+   Inputs & Password Visibility Controls
+   ========================================================================== */
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input-wrapper .form-control {
+  padding-right: 2.75rem; /* Space for the visibility toggle */
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #737B87);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--transition-fast);
+}
+
+.password-toggle-btn:hover {
+  color: var(--color-text, #15171A);
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #0860BE);
+  color: var(--color-primary, #0860BE);
+}
+
+.password-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Input validation states */
+.form-control.is-invalid {
+  border-color: var(--color-danger, #D62828);
+  background-color: var(--color-danger-bg, #FEE2E2);
+}
+
+[data-theme="dark"] .form-control.is-invalid {
+  background-color: rgba(214, 40, 40, 0.15);
+}
+
+.field-error {
+  display: none;
+  font-size: 0.75rem; /* 12px */
+  color: var(--color-danger, #D62828);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.field-error.visible {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-hint {
+  font-size: 0.6875rem; /* 11px */
+  color: var(--color-text-muted, #737B87);
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   Password Strength Meter
+   ========================================================================== */
+
+.password-strength-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.strength-bars {
+  display: flex;
+  gap: 4px;
+  height: 4px;
+  width: 100%;
+}
+
+.strength-bar-segment {
+  flex: 1;
+  height: 100%;
+  border-radius: 2px;
+  background-color: var(--color-border, #E5E7EB);
+  transition: background-color var(--transition-normal);
+}
+
+[data-theme="dark"] .strength-bar-segment {
+  background-color: var(--color-border, #243042);
+}
+
+.strength-bar-segment.active-weak {
+  background-color: var(--color-danger, #D62828);
+}
+
+.strength-bar-segment.active-fair {
+  background-color: var(--color-warning, #F59E0B);
+}
+
+.strength-bar-segment.active-good {
+  background-color: var(--color-info, #0284C7);
+}
+
+.strength-bar-segment.active-strong {
+  background-color: var(--color-success, #16A34A);
+}
+
+.strength-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.6875rem; /* 11px */
+}
+
+.strength-text {
+  font-weight: 600;
+  color: var(--color-text-muted, #737B87);
+}
+
+/* ==========================================================================
+   Checkbox & Inline Controls
+   ========================================================================== */
+
+.checkbox-group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm, 8px);
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--color-primary, #0860BE);
+  cursor: pointer;
+}
+
+.auth-links-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8125rem; /* 13px */
+}
+
+/* ==========================================================================
+   Alerts & Notice Banners
+   ========================================================================== */
+
+.auth-alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.4;
+  display: none;
+}
+
+.auth-alert.visible {
+  display: block;
+}
+
+.auth-alert-dev {
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  border: 1px solid rgba(8, 96, 190, 0.2);
+  color: var(--color-primary, #0860BE);
+}
+
+[data-theme="dark"] .auth-alert-dev {
+  background-color: #1E293B;
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93C5FD;
+}
+
+.auth-alert-error {
+  background-color: var(--color-danger-bg, #FEE2E2);
+  border: 1px solid rgba(214, 40, 40, 0.2);
+  color: var(--color-danger-text, #7F1D1D);
+}
+
+.auth-alert-success {
+  background-color: var(--color-success-bg, #DCFCE7);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  color: var(--color-success-text, #14532D);
+}
+
+/* ==========================================================================
+   Button Loading Spinner
+   ========================================================================== */
+
+.btn-spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #FFFFFF;
+  animation: spin 0.7s linear infinite;
+}
+
+.btn.is-submitting .btn-spinner {
+  display: inline-block;
+}
+
+.btn.is-submitting .btn-text {
+  opacity: 0.8;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Auth Card Footer Navigation
+   ========================================================================== */
+
+.auth-card-footer {
+  text-align: center;
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+  border-top: 1px solid var(--color-border-subtle, #EEF0F2);
+  padding-top: var(--space-md, 12px);
+  margin-top: var(--space-xs, 4px);
+}
+
+.auth-card-footer a {
+  font-weight: 600;
+  color: var(--color-primary, #0860BE);
+}
+
+.auth-back-home {
+  text-align: center;
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-muted, #737B87);
+}
+
+.auth-back-home a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary, #4B5563);
+  font-weight: 500;
+}
+
+.auth-back-home a:hover {
+  color: var(--color-primary, #0860BE);
+}
+
+/* Small mobile responsiveness */
+@media (max-width: 360px) {
+  .auth-card {
+    padding: var(--space-lg, 16px);
+  }
+
+  .auth-title {
+    font-size: 1.1875rem; /* 19px */
+  }
+}

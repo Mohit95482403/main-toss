@@ -37,12 +37,12 @@
         <section class="card card-elevated" aria-labelledby="welcome-heading">
           <div class="card-body flex flex-col gap-sm">
             <div class="flex items-center justify-between">
-              <span class="badge badge-success badge-pill">Day 2 Active</span>
+              <span class="badge badge-success badge-pill">Day 3 Active</span>
               <span class="text-sm text-muted">Home Dashboard View</span>
             </div>
-            <h1 id="welcome-heading" style="font-size: var(--font-size-xl);">Shared Interface Active</h1>
+            <h1 id="welcome-heading" style="font-size: var(--font-size-xl);">Authentication Suite Active</h1>
             <p>
-              The shared header with account indicators (<strong>Available Balance</strong> in blue and <strong>Exposure</strong> in red), continuous announcement ticker, and 4-tab mobile bottom navigation are now operational.
+              The shared interface and new authentication frontend (<strong>Login</strong>, <strong>Register</strong>, <strong>Forgot Password</strong>, and <strong>Reset Password</strong>) are now operational.
             </p>
             <div class="flex items-center gap-sm" style="margin-top: var(--space-xs); flex-wrap: wrap;">
               <button type="button" class="btn btn-secondary btn-sm" id="theme-toggle-btn">
@@ -51,6 +51,24 @@
               <button type="button" class="btn btn-outline btn-sm" id="test-balance-btn">
                 Simulate Balance Update
               </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Authentication Quick Navigation Card (Day 3) -->
+        <section class="card" aria-labelledby="auth-nav-heading">
+          <header class="card-header flex items-center justify-between">
+            <h2 id="auth-nav-heading" class="h4">Authentication Suite (Day 3)</h2>
+            <span class="badge badge-primary badge-pill">Ready</span>
+          </header>
+          <div class="card-body flex flex-col gap-sm">
+            <p class="text-sm">
+              Explore the client-validated authentication flows with real-time password strength and visibility controls:
+            </p>
+            <div class="flex items-center gap-sm" style="flex-wrap: wrap; margin-top: var(--space-xs);">
+              <a href="pages/login.html" class="btn btn-primary btn-sm">Sign In Page</a>
+              <a href="pages/register.html" class="btn btn-secondary btn-sm">Create Account Page</a>
+              <a href="pages/forgot-password.html" class="btn btn-outline btn-sm">Forgot Password</a>
             </div>
           </div>
         </section>
@@ -106,15 +124,15 @@
             </div>
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 2:</strong> Shared Header, Ticker &amp; Navigation</span>
-              <span class="badge badge-success badge-pill">Active / Verified</span>
+              <span class="badge badge-success badge-pill">Completed</span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 3:</strong> Auth &amp; Registration UI</span>
-              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
+              <span class="badge badge-success badge-pill">Active / Verified</span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 4:</strong> Bets Page UI</span>
-              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 5:</strong> Passbook Page UI</span>

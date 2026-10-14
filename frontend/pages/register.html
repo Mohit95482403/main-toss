@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Create Account | IRONMAN TOSS BOOK</title>
+  <meta name="description" content="Register for a new IRONMAN TOSS BOOK player account. Fast, secure registration for toss sports wagering.">
+
+  <!-- Core Design System CSS -->
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+
+  <!-- Authentication CSS -->
+  <link rel="stylesheet" href="../css/auth.css">
+</head>
+<body data-page="auth-register">
+  <div class="auth-wrapper">
+    <div class="auth-container">
+      
+      <!-- Brand Logo / Identity Header -->
+      <a href="../index.html" class="auth-brand" aria-label="IRONMAN TOSS BOOK - Return to Home">
+        <div class="auth-brand-badge">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"></path>
+          </svg>
+        </div>
+        <span class="auth-brand-title">IRONMAN</span>
+        <span class="auth-brand-subtitle">TOSS BOOK</span>
+      </a>
+
+      <!-- Registration Card -->
+      <main class="auth-card" id="register-card">
+        <header class="auth-card-header">
+          <h1 class="auth-title">Create Account</h1>
+          <p class="auth-subtitle">Join the premier sports toss book platform today.</p>
+        </header>
+
+        <!-- Development Notice / Honest Boundary Banner -->
+        <div id="register-dev-alert" class="auth-alert auth-alert-dev" role="status" aria-live="polite"></div>
+
+        <!-- Registration Form -->
+        <form class="auth-form" id="register-form" novalidate>
+          
+          <!-- Full Name -->
+          <div class="form-group">
+            <label for="register-name" class="form-label">Full Name</label>
+            <input 
+              type="text" 
+              id="register-name" 
+              name="fullName" 
+              class="form-control" 
+              placeholder="e.g. John Doe"
+              autocomplete="name"
+              required
+              aria-describedby="name-error"
+            />
+            <div id="name-error" class="field-error" role="alert"></div>
+          </div>
+
+          <!-- Username -->
+          <div class="form-group">
+            <label for="register-username" class="form-label">Username</label>
+            <input 
+              type="text" 
+              id="register-username" 
+              name="username" 
+              class="form-control" 
+              placeholder="e.g. ironman_player"
+              autocomplete="username"
+              required
+              aria-describedby="username-error username-hint"
+            />
+            <div id="username-hint" class="field-hint">3–20 characters, starting with a letter. Letters, numbers, and underscores only.</div>
+            <div id="username-error" class="field-error" role="alert"></div>
+          </div>
+
+          <!-- Email Address -->
+          <div class="form-group">
+            <label for="register-email" class="form-label">Email Address</label>
+            <input 
+              type="email" 
+              id="register-email" 
+              name="email" 
+              class="form-control" 
+              placeholder="e.g. player@example.com"
+              autocomplete="email"
+              inputmode="email"
+              required
+              aria-describedby="email-error"
+            />
+            <div id="email-error" class="field-error" role="alert"></div>
+          </div>
+
+          <!-- Account Type (Fixed to Player/Customer - No public admin registration) -->
+          <div class="form-group">
+            <label for="register-account-type" class="form-label">Account Role</label>
+            <input 
+              type="text" 
+              id="register-account-type" 
+              name="accountType" 
+              class="form-control" 
+              value="Player / Standard Customer" 
+              readonly 
+              disabled
+              title="Public registration is restricted to standard customer accounts."
+            />
+            <div class="field-hint">Public registration grants standard wagering and passbook access. Administrative roles require verified provisioning.</div>
+          </div>
+
+          <!-- Password with Visibility Toggle & Strength Meter -->
+          <div class="form-group">
+            <label for="register-password" class="form-label">Password</label>
+            <div class="input-wrapper">
+              <input 
+                type="password" 
+                id="register-password" 
+                name="password" 
+                class="form-control" 
+                placeholder="Minimum 12 characters"
+                autocomplete="new-password"
+                required
+                aria-describedby="password-error password-policy"
+              />
+              <button 
+                type="button" 
+                id="password-toggle-btn" 
+                class="password-toggle-btn" 
+                title="Show password in plain text">
+              </button>
+            </div>
+            
+            <!-- Real-time Strength Meter -->
+            <div class="password-strength-container" aria-live="polite">
+              <div class="strength-bars" aria-hidden="true">
+                <span class="strength-bar-segment"></span>
+                <span class="strength-bar-segment"></span>
+                <span class="strength-bar-segment"></span>
+                <span class="strength-bar-segment"></span>
+              </div>
+              <div class="strength-label-row">
+                <span class="field-hint" id="password-policy">Platform Policy: Minimum 12 characters</span>
+                <span class="strength-text" id="strength-label">Enter a password</span>
+              </div>
+            </div>
+            <div id="password-error" class="field-error" role="alert"></div>
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="form-group">
+            <label for="register-confirm" class="form-label">Confirm Password</label>
+            <div class="input-wrapper">
+              <input 
+                type="password" 
+                id="register-confirm" 
+                name="confirmPassword" 
+                class="form-control" 
+                placeholder="Re-enter your password"
+                autocomplete="new-password"
+                required
+                aria-describedby="confirm-error"
+              />
+              <button 
+                type="button" 
+                id="confirm-toggle-btn" 
+                class="password-toggle-btn" 
+                title="Show confirm password in plain text">
+              </button>
+            </div>
+            <div id="confirm-error" class="field-error" role="alert"></div>
+          </div>
+
+          <!-- Terms and Conditions Acknowledgement -->
+          <div class="form-group" style="margin-top: var(--space-xs);">
+            <label class="checkbox-group">
+              <input type="checkbox" id="register-terms" name="terms" required />
+              <span>I confirm I am 18+ and agree to the <a href="profile.html" target="_blank">App Rules &amp; Wagering Terms</a>.</span>
+            </label>
+            <div id="terms-error" class="field-error" role="alert"></div>
+          </div>
+
+          <!-- Primary Submit Button -->
+          <button type="submit" class="btn btn-primary btn-block" id="register-submit-btn" style="margin-top: var(--space-xs);">
+            <span class="btn-spinner" aria-hidden="true"></span>
+            <span class="btn-text">Create Account</span>
+          </button>
+        </form>
+
+        <!-- Card Footer Navigation -->
+        <footer class="auth-card-footer">
+          <p>
+            Already have an account? 
+            <a href="login.html">Sign In</a>
+          </p>
+        </footer>
+      </main>
+
+      <!-- Return to Home Link -->
+      <div class="auth-back-home">
+        <a href="../index.html">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          Back to Home
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="../js/config.js"></script>
+  <script src="../js/auth/validation.js"></script>
+  <script src="../js/auth/register.js"></script>
+</body>
+</html>

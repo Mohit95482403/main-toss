@@ -30,7 +30,11 @@ toss/
 │   ├── pages/                    # Sub-pages
 │   │   ├── bets.html             # Bets view shell (active tab test)
 │   │   ├── passbook.html         # Passbook ledger shell (active tab test)
-│   │   └── profile.html          # Profile settings shell (active tab test)
+│   │   ├── profile.html          # Profile settings shell (active tab test)
+│   │   ├── login.html            # [Day 3] Sign in with validation & toggle
+│   │   ├── register.html         # [Day 3] Registration with strength meter
+│   │   ├── forgot-password.html  # [Day 3] Password recovery instructions
+│   │   └── reset-password.html   # [Day 3] Password reset & matching
 │   ├── css/
 │   │   ├── variables.css         # Design tokens, color palette, spacing, typography
 │   │   ├── reset.css             # Cross-browser CSS normalization
@@ -40,8 +44,15 @@ toss/
 │   │   ├── responsive.css        # Breakpoints & accessibility (prefers-reduced-motion)
 │   │   ├── header.css            # Shared header, logo fallback, balance pills
 │   │   ├── announcement-ticker.css # Ticker continuous marquee & dual tracks
-│   │   └── bottom-navigation.css # 4-tab fixed bottom navigation bar
+│   │   ├── bottom-navigation.css # 4-tab fixed bottom navigation bar
+│   │   └── auth.css              # [Day 3] Authentication forms, strength meter & cards
 │   ├── js/
+│   │   ├── auth/                 # [Day 3] Client-side authentication logic
+│   │   │   ├── validation.js     # Field validation, password toggles & strength checker
+│   │   │   ├── login.js          # Login submission & accessible error handling
+│   │   │   ├── register.js       # Register submission, strength meter & matching
+│   │   │   ├── forgot-password.js# Email syntax validation & reset simulation
+│   │   │   └── reset-password.js # Token status notice & password update simulation
 │   │   ├── config.js             # API base URL, mock balances, announcements config
 │   │   ├── shared-layout.js      # Shared Header, Ticker & Nav rendering engine
 │   │   ├── navigation.js         # Tab active states & accessibility controller
@@ -191,7 +202,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 2 of 20)
+## 9. Current Implementation Status (Day 3 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -204,15 +215,17 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Shared Header | Completed (Day 2) | Brand logo fallback, Available balance (blue), Exposure (red) |
 | Announcement Ticker | Completed (Day 2) | Continuous marquee with dual track loop, English & Hindi, pause on hover |
 | Bottom Navigation | Completed (Day 2) | 4 tabs (Home, Bets, Passbook, Profile) with SVGs, active states, safe-area support |
+| Authentication Suite | Completed (Day 3) | Login, Register, Forgot Password, Reset Password, validation, strength meter |
 | MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 9 |
+| Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 11 |
 | Bets / Wagers | Out of Scope | Shell created for navigation; full UI scheduled for Day 4 |
 | Wallet / Passbook | Out of Scope | Shell created for navigation; full UI scheduled for Day 5 |
 | Profile & Settings | Out of Scope | Shell created for navigation; full UI scheduled for Day 6 |
-| Auth & Admin Area | Out of Scope | Scheduled for Days 3, 11, 16, 17 |
+| Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
 > [!WARNING]
-> **Financial & Betting Transactions are Strictly Out of Scope for Days 1 & 2**:
-> No real or fake wallet transactions, balance modifications, deposits, withdrawals, or wager settlements are active on Day 2. All financial elements displayed on the header are purely demonstrative mock indicators.
+> **Authentication Backend & Database Accounts are Strictly Out of Scope for Day 3**:
+> Day 3 implements client-side validation, password visibility toggles, real-time password strength, and accessible submission states. No real user accounts or fake sessions are created. Authoritative password hashing, database user persistence, and session tokens will be implemented on **Day 11**.
 
 ---
 
