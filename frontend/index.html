@@ -43,15 +43,15 @@
         <header class="home-intro-section" aria-labelledby="home-heading">
           <div class="flex items-center justify-between">
             <h1 id="home-heading" class="home-title">Toss Markets</h1>
-            <span class="badge badge-success text-xs">Day 7 Active</span>
+            <span class="badge badge-success text-xs">Day 8 Active</span>
           </div>
           <p class="text-sm text-secondary">
             Explore active cricket coin tosses, market rates, and match fixtures.
           </p>
         </header>
 
-        <!-- Featured / Highlighted Live Match Card -->
-        <section class="featured-match-card" id="featured-match" data-match-id="MATCH-2026-001" role="button" tabindex="0" aria-label="Featured Match: India vs Australia, Status: Live Toss">
+        <!-- Featured / Highlighted Live Match Card (Navigates to Match Details Page) -->
+        <a href="pages/match-details.html?id=MATCH-2026-001" class="featured-match-card" id="featured-match" data-match-id="MATCH-2026-001" aria-label="Featured Match: India vs Australia, Status: Live Toss">
           <header class="featured-header">
             <span class="featured-tournament">
               🏆 ICC Men's T20 World Cup
@@ -85,7 +85,7 @@
             </div>
             <span>Melbourne Cricket Ground</span>
           </footer>
-        </section>
+        </a>
 
         <!-- Match Categories / Filter Toolbar -->
         <section aria-labelledby="fixtures-heading">
@@ -197,10 +197,14 @@
                 </div>
                 <div class="flex items-center justify-between text-xs">
                   <span><strong>Day 7:</strong> Home Dashboard &amp; Matches</span>
+                  <span class="badge badge-success badge-pill">Completed</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 8:</strong> Match Details Page UI</span>
                   <span class="badge badge-success badge-pill">Active / Verified</span>
                 </div>
                 <div class="flex items-center justify-between text-xs">
-                  <span><strong>Day 8:</strong> Responsive Polish &amp; Audit</span>
+                  <span><strong>Day 9:</strong> MySQL Schema &amp; Seed Data</span>
                   <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
                 </div>
               </div>
@@ -282,6 +286,7 @@
   <script src="js/config.js"></script>
   <script src="js/shared-layout.js"></script>
   <script src="js/navigation.js"></script>
+  <script src="js/matches-data.js"></script>
   <script src="js/home.js"></script>
   <script src="js/app.js"></script>
 </body>

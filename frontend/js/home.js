@@ -1,7 +1,7 @@
 /**
- * IRONMAN TOSS BOOK - Home Dashboard & Match Feed Controller (Day 7)
- * Handles demonstration fixtures dataset, category filtering, dynamic counters,
- * featured match interaction, and fixture overview modal.
+ * IRONMAN TOSS BOOK - Home Dashboard & Match Feed Controller (Day 7 & 8)
+ * Connects Home page match cards to the Match Details page, manages category filtering,
+ * dynamic counters, and collapsible system diagnostics.
  */
 
 (function () {
@@ -17,9 +17,9 @@
 
   /**
    * Demonstration Cricket Match Fixtures
-   * Strictly identified demonstration data matching reference competitions.
+   * Uses centralized TossBookMatches if available, else local fallback.
    */
-  const DEMO_MATCHES = [
+  const FALLBACK_MATCHES = [
     {
       id: 'MATCH-2026-001',
       featured: true,
@@ -35,7 +35,7 @@
       lockCountdown: 'Locks in 12m',
       venue: 'Melbourne Cricket Ground, Melbourne',
       captains: 'Rohit Sharma vs Pat Cummins',
-      status: 'live', // 'live' | 'upcoming' | 'completed'
+      status: 'live',
       resultSummary: 'Match in progress • Toss locked • Awaiting live declaration'
     },
     {
@@ -125,8 +125,14 @@
     }
   ];
 
+  function getMatches() {
+    if (window.TossBookMatches && typeof window.TossBookMatches.getAll === 'function') {
+      return window.TossBookMatches.getAll();
+    }
+    return FALLBACK_MATCHES;
+  }
+
   let currentCategory = 'all';
-  let lastFocusedElement = null;
 
   /**
    * Escape HTML utility
@@ -155,11 +161,13 @@
   }
 
   /**
-   * Render Match Card
+   * Render Match Card (Navigates to Match Details Page on Day 8)
    */
   function renderMatchCard(match) {
+    const detailsUrl = `pages/match-details.html?id=${encodeURIComponent(match.id)}`;
+
     return `
-      <article class="match-card" data-match-id="${escapeHtml(match.id)}" role="button" tabindex="0" aria-label="${escapeHtml(match.matchTitle)}, ${escapeHtml(match.competition)}, Status: ${escapeHtml(match.status)}">
+      <a href="${detailsUrl}" class="match-card" data-match-id="${escapeHtml(match.id)}" aria-label="${escapeHtml(match.matchTitle)}, ${escapeHtml(match.competition)}, Status: ${escapeHtml(match.status)}">
         <!-- Card Header: Tournament & Status -->
         <header class="match-card-header">
           <span class="match-tournament" title="${escapeHtml(match.competition)}">
@@ -202,7 +210,7 @@
             ${ICONS.chevronRight}
           </span>
         </footer>
-      </article>
+      </a>
     `;
   }
 
@@ -225,94 +233,6 @@
         </button>
       </section>
     `;
-  }
-
-  /**
-   * Match Detail Modal Handling
-   */
-  function setupMatchModal() {
-    const modal = document.getElementById('match-detail-modal');
-    if (!modal) return;
-
-    function openModalWithMatch(match) {
-      lastFocusedElement = document.activeElement;
-
-      const titleEl = document.getElementById('modal-match-title');
-      const compEl = document.getElementById('modal-match-comp');
-      const statusEl = document.getElementById('modal-match-status');
-      const timeEl = document.getElementById('modal-match-time');
-      const venueEl = document.getElementById('modal-match-venue');
-      const captainsEl = document.getElementById('modal-match-captains');
-      const rateOneEl = document.getElementById('modal-rate-team-one');
-      const rateTwoEl = document.getElementById('modal-rate-team-two');
-      const summaryEl = document.getElementById('modal-match-summary');
-
-      if (titleEl) titleEl.textContent = match.matchTitle;
-      if (compEl) compEl.textContent = match.competition;
-      if (statusEl) statusEl.textContent = match.status.toUpperCase();
-      if (timeEl) timeEl.textContent = match.scheduledTime;
-      if (venueEl) venueEl.textContent = match.venue || 'Stadium Venue';
-      if (captainsEl) captainsEl.textContent = match.captains || 'Team Captains';
-      if (rateOneEl) rateOneEl.textContent = `${match.teamOne}: ${match.teamOneRate.toFixed(2)}`;
-      if (rateTwoEl) rateTwoEl.textContent = `${match.teamTwo}: ${match.teamTwoRate.toFixed(2)}`;
-      if (summaryEl) summaryEl.textContent = match.resultSummary;
-
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
-
-      const closeBtn = modal.querySelector('.modal-close-btn') || modal.querySelector('.btn');
-      if (closeBtn) closeBtn.focus();
-    }
-
-    function closeModal() {
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-      document.body.style.overflow = '';
-
-      if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
-        lastFocusedElement.focus();
-      }
-    }
-
-    // Modal close listeners
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal || e.target.closest('[data-modal-close]')) {
-        closeModal();
-      }
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal.classList.contains('open')) {
-        closeModal();
-      }
-    });
-
-    // Delegate clicks from match feed and featured card
-    document.addEventListener('click', (e) => {
-      const card = e.target.closest('[data-match-id]');
-      if (!card) return;
-
-      const matchId = card.dataset.matchId;
-      const match = DEMO_MATCHES.find(m => m.id === matchId);
-      if (match) {
-        openModalWithMatch(match);
-      }
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        const card = e.target.closest('[data-match-id]');
-        if (card && card === document.activeElement) {
-          e.preventDefault();
-          const matchId = card.dataset.matchId;
-          const match = DEMO_MATCHES.find(m => m.id === matchId);
-          if (match) {
-            openModalWithMatch(match);
-          }
-        }
-      }
-    });
   }
 
   /**
@@ -341,13 +261,15 @@
 
     if (!feedContainer) return;
 
+    const allMatches = getMatches();
+
     // Update Category Counts dynamically
     function updateCounts() {
       const counts = {
-        all: DEMO_MATCHES.length,
-        live: DEMO_MATCHES.filter(m => m.status === 'live').length,
-        upcoming: DEMO_MATCHES.filter(m => m.status === 'upcoming').length,
-        completed: DEMO_MATCHES.filter(m => m.status === 'completed').length
+        all: allMatches.length,
+        live: allMatches.filter(m => m.status === 'live').length,
+        upcoming: allMatches.filter(m => m.status === 'upcoming').length,
+        completed: allMatches.filter(m => m.status === 'completed').length
       };
 
       filterButtons.forEach(btn => {
@@ -361,9 +283,9 @@
 
     // Render Match List
     function renderFeed() {
-      let filtered = DEMO_MATCHES;
+      let filtered = allMatches;
       if (currentCategory !== 'all') {
-        filtered = DEMO_MATCHES.filter(m => m.status === currentCategory);
+        filtered = allMatches.filter(m => m.status === currentCategory);
       }
 
       if (filtered.length === 0) {
@@ -400,8 +322,7 @@
       });
     });
 
-    // Setup Modals & Diagnostics
-    setupMatchModal();
+    // Setup Diagnostics
     setupDiagnostics();
 
     // Initial render
@@ -419,6 +340,6 @@
   // Export controller for automated testing
   window.HomeController = {
     init: initHomePage,
-    getDemoMatches: () => DEMO_MATCHES
+    getDemoMatches: () => getMatches()
   };
 })();

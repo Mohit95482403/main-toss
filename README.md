@@ -31,6 +31,7 @@ toss/
 │   │   ├── bets.html             # Bets view shell (active tab test)
 │   │   ├── passbook.html         # Passbook ledger shell (active tab test)
 │   │   ├── profile.html          # Profile settings shell (active tab test)
+│   │   ├── match-details.html    # [Day 8] Detailed match overview & toss rates
 │   │   ├── login.html            # [Day 3] Sign in with validation & toggle
 │   │   ├── register.html         # [Day 3] Registration with strength meter
 │   │   ├── forgot-password.html  # [Day 3] Password recovery instructions
@@ -49,7 +50,8 @@ toss/
 │   │   ├── bets.css              # [Day 4] Bets filters, cards, and date groups
 │   │   ├── passbook.css          # [Day 5] Hero balance card, search, filters, modals
 │   │   ├── profile.css           # [Day 6] Profile card, settings list, switch toggles & modals
-│   │   └── home.css              # [Day 7] Featured match card, category filters & fixture cards
+│   │   ├── home.css              # [Day 7] Featured match card, category filters & fixture cards
+│   │   └── match-details.css     # [Day 8] Match summary hero, toss rates grid & metadata
 │   ├── js/
 │   │   ├── auth/                 # [Day 3] Client-side authentication logic
 │   │   │   ├── validation.js     # Field validation, password toggles & strength checker
@@ -60,7 +62,9 @@ toss/
 │   │   ├── bets.js               # [Day 4] Bets dataset, date grouping & status filters
 │   │   ├── passbook.js           # [Day 5] Ledger dataset, search, filters & modals
 │   │   ├── profile.js            # [Day 6] Profile state, edit form, password dialog & modals
-│   │   ├── home.js               # [Day 7] Fixtures dataset, category filters & match modal
+│   │   ├── matches-data.js       # [Day 8] Centralized cricket fixtures dataset & lookup
+│   │   ├── home.js               # [Day 7] Fixtures feed, category filters & diagnostics
+│   │   ├── match-details.js      # [Day 8] Match details controller, param resolver & rules
 │   │   ├── config.js             # API base URL, mock balances, announcements config
 │   │   ├── shared-layout.js      # Shared Header, Ticker & Nav rendering engine
 │   │   ├── navigation.js         # Tab active states & accessibility controller
@@ -210,7 +214,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 7 of 20)
+## 9. Current Implementation Status (Day 8 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -227,8 +231,8 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Bets Page UI | Completed (Day 4) | Status filters (All, Live, Won, Lost, No Result), date grouping, bet cards, empty state |
 | Passbook Page UI | Completed (Day 5) | Hero balance card (₹10,000), search, type/status filters, ledger cards, Deposit/Withdraw modals |
 | Profile & Settings UI | Completed (Day 6) | Hero profile card, personal info grid, interactive settings, Dark Mode switch, edit & security modals |
-| Home Dashboard & Matches | Completed (Day 7) | Featured live toss card, category filter pills, match fixture cards, rate previews, match detail modal |
-| Responsive Polish & Audit | Planned | Comprehensive responsive audit & touch polish scheduled for Day 8 |
+| Home Dashboard & Matches | Completed (Day 7) | Featured live toss card, category filter pills, match fixture cards, rate previews |
+| Match Details Page UI | Completed (Day 8) | Dynamic URL routing (`?id=`), match summary hero, toss rates preview, venue metadata, rules, and not-found state |
 | MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 9 |
 | Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 11 |
 | Profile & Preferences APIs | Planned | Real user profiles and persistent settings scheduled for Day 12 |
@@ -238,8 +242,8 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
 > [!WARNING]
-> **Match Fixtures and Rate Previews are Strictly Demonstration Data for Day 7**:
-> Day 7 delivers the primary Home dashboard presenting live and upcoming cricket match fixtures, toss rate previews, category filters (`All`, `Live`, `Upcoming`, `Completed`), and a match overview modal. All fixture data and rates are clearly identified demonstration models. Real sports API feeds, transactional bet placement, balance locking, and settlement resolution are scheduled for **Day 13**. No real-money wagering or live betting slip interactions are conducted.
+> **Match Details and Toss Rates are Strictly Demonstration Content for Day 8**:
+> Day 8 delivers the dedicated Match Details view (`pages/match-details.html?id=...`) connected seamlessly to Home page match cards. The page presents match summary headers, captains, pitch conditions, venue details, and toss rate previews. Real transactional wagering, odds locking, and automated settlement resolution are scheduled for **Day 13**. No real-money betting, live scores, or third-party sports APIs are active.
 
 ---
 
