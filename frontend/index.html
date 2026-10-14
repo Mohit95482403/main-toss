@@ -5,9 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>IRONMAN TOSS BOOK | Home &amp; Shared Navigation</title>
+  <title>IRONMAN TOSS BOOK | Home &amp; Toss Markets</title>
   <meta name="description"
-    content="IRONMAN TOSS BOOK - Responsive Sports Toss Wagering &amp; Ledger Platform. Featuring shared header, live ticker, and bottom navigation.">
+    content="IRONMAN TOSS BOOK - Premium Cricket Toss Wagering &amp; Ledger Platform. Live match fixtures, toss odds, and account management.">
 
   <!-- Core Design System CSS -->
   <link rel="stylesheet" href="css/variables.css">
@@ -17,10 +17,13 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/responsive.css">
 
-  <!-- Shared Layout Component CSS (Day 2) -->
+  <!-- Shared Layout Component CSS -->
   <link rel="stylesheet" href="css/header.css">
   <link rel="stylesheet" href="css/announcement-ticker.css">
   <link rel="stylesheet" href="css/bottom-navigation.css">
+
+  <!-- Home Page CSS (Day 7) -->
+  <link rel="stylesheet" href="css/home.css">
 </head>
 
 <body data-page="home">
@@ -33,122 +36,176 @@
       <!-- Shared Announcement Ticker Mounting Container -->
       <div id="shared-ticker"></div>
 
-      <!-- Main Home & Verification Body -->
-      <div class="main-content">
+      <!-- Main Home Content Body -->
+      <div class="main-content flex flex-col gap-md">
 
-        <!-- Welcome Hero -->
-        <section class="card card-elevated" aria-labelledby="welcome-heading">
-          <div class="card-body flex flex-col gap-sm">
-            <div class="flex items-center justify-between">
-              <span class="badge badge-success badge-pill">Day 3 Active</span>
-              <span class="text-sm text-muted">Home Dashboard View</span>
+        <!-- Page Heading & Subtitle -->
+        <header class="home-intro-section" aria-labelledby="home-heading">
+          <div class="flex items-center justify-between">
+            <h1 id="home-heading" class="home-title">Toss Markets</h1>
+            <span class="badge badge-success text-xs">Day 7 Active</span>
+          </div>
+          <p class="text-sm text-secondary">
+            Explore active cricket coin tosses, market rates, and match fixtures.
+          </p>
+        </header>
+
+        <!-- Featured / Highlighted Live Match Card -->
+        <section class="featured-match-card" id="featured-match" data-match-id="MATCH-2026-001" role="button" tabindex="0" aria-label="Featured Match: India vs Australia, Status: Live Toss">
+          <header class="featured-header">
+            <span class="featured-tournament">
+              🏆 ICC Men's T20 World Cup
+            </span>
+            <span class="featured-live-pill">
+              <span class="live-pulse-dot" aria-hidden="true"></span>
+              Live Toss
+            </span>
+          </header>
+
+          <div class="featured-teams-row">
+            <div class="featured-team">
+              <div class="featured-crest" aria-hidden="true">IND</div>
+              <span class="featured-team-name">India</span>
+              <span class="featured-team-rate">Rate 1.95</span>
             </div>
-            <h1 id="welcome-heading" style="font-size: var(--font-size-xl);">Authentication Suite Active</h1>
-            <p>
-              The shared interface and new authentication frontend (<strong>Login</strong>, <strong>Register</strong>,
-              <strong>Forgot Password</strong>, and <strong>Reset Password</strong>) are now operational.
-            </p>
-            <div class="flex items-center gap-sm" style="margin-top: var(--space-xs); flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary btn-sm" id="theme-toggle-btn">
-                🌙 Switch to Dark Mode
-              </button>
-              <button type="button" class="btn btn-outline btn-sm" id="test-balance-btn">
-                Simulate Balance Update
-              </button>
+
+            <div class="featured-vs-badge" aria-hidden="true">VS</div>
+
+            <div class="featured-team">
+              <div class="featured-crest" aria-hidden="true">AUS</div>
+              <span class="featured-team-name">Australia</span>
+              <span class="featured-team-rate">Rate 1.90</span>
             </div>
+          </div>
+
+          <footer class="featured-footer">
+            <div class="featured-lock-notice">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>Locks in 12m &bull; Match 24</span>
+            </div>
+            <span>Melbourne Cricket Ground</span>
+          </footer>
+        </section>
+
+        <!-- Match Categories / Filter Toolbar -->
+        <section aria-labelledby="fixtures-heading">
+          <div class="flex items-center justify-between" style="margin-bottom: var(--space-xs);">
+            <h2 id="fixtures-heading" class="h4">Match Fixtures</h2>
+            <span class="text-xs text-muted">Demo Odds Preview</span>
+          </div>
+
+          <div class="match-filter-strip" role="toolbar" aria-label="Match Category Filters">
+            <button type="button" class="match-filter-btn active" data-category="all" aria-pressed="true">
+              <span>All</span>
+              <span class="match-filter-count">6</span>
+            </button>
+            <button type="button" class="match-filter-btn" data-category="live" aria-pressed="false">
+              <span>Live Toss</span>
+              <span class="match-filter-count">1</span>
+            </button>
+            <button type="button" class="match-filter-btn" data-category="upcoming" aria-pressed="false">
+              <span>Upcoming</span>
+              <span class="match-filter-count">3</span>
+            </button>
+            <button type="button" class="match-filter-btn" data-category="completed" aria-pressed="false">
+              <span>Completed</span>
+              <span class="match-filter-count">2</span>
+            </button>
           </div>
         </section>
 
-        <!-- Authentication Quick Navigation Card (Day 3) -->
-        <section class="card" aria-labelledby="auth-nav-heading">
-          <header class="card-header flex items-center justify-between">
-            <h2 id="auth-nav-heading" class="h4">Authentication Suite (Day 3)</h2>
-            <span class="badge badge-primary badge-pill">Ready</span>
-          </header>
-          <div class="card-body flex flex-col gap-sm">
-            <p class="text-sm">
-              Explore the client-validated authentication flows with real-time password strength and visibility
-              controls:
-            </p>
-            <div class="flex items-center gap-sm" style="flex-wrap: wrap; margin-top: var(--space-xs);">
-              <a href="pages/login.html" class="btn btn-primary btn-sm">Sign In Page</a>
-              <a href="pages/register.html" class="btn btn-secondary btn-sm">Create Account Page</a>
-              <a href="pages/forgot-password.html" class="btn btn-outline btn-sm">Forgot Password</a>
-            </div>
-          </div>
-        </section>
+        <!-- Main Match Feed Container -->
+        <div id="match-feed-container" class="match-feed-container" role="feed" aria-label="Match Listings Feed">
+          <!-- Populated dynamically by home.js -->
+        </div>
 
-        <!-- Balance Indicator Demonstration Notice -->
-        <section class="card" aria-labelledby="balance-info-heading">
-          <header class="card-header flex items-center justify-between">
-            <h2 id="balance-info-heading" class="h4">Header Balance Indicators</h2>
-            <span class="badge badge-primary badge-pill">Verified</span>
-          </header>
-          <div class="card-body flex flex-col gap-sm">
-            <p class="text-sm">
-              The header displays two real-time indicators matching the reference screenshots:
-            </p>
-            <ul class="flex flex-col gap-xs text-sm" style="padding-left: var(--space-md);">
-              <li><strong style="color: var(--color-primary);">&#9632; Available Balance (Bal):</strong> Formatted in
-                Rupee currency. Dynamically reactive to account events.</li>
-              <li><strong style="color: var(--color-danger);">&#9632; Active Exposure (Exp):</strong> Reflects committed
-                funds in open toss markets.</li>
-            </ul>
-            <small class="text-muted">
-              Note: Current values are development mock presentations. Real financial accounts are integrated on Day 14.
-            </small>
-          </div>
-        </section>
+        <!-- Collapsible Diagnostics & Roadmap Section -->
+        <section class="diagnostics-accordion" aria-labelledby="diagnostics-toggle-btn">
+          <button type="button" class="diagnostics-toggle-btn" id="diagnostics-toggle-btn" aria-expanded="false" aria-controls="diagnostics-content">
+            <span>⚙️ System Diagnostics &amp; Roadmap</span>
+            <span class="diagnostics-arrow">▼ Show Diagnostics &amp; Roadmap</span>
+          </button>
 
-        <!-- Backend Diagnostic Verification Card -->
-        <section class="card" aria-labelledby="diagnostic-heading">
-          <header class="card-header flex items-center justify-between">
-            <h2 id="diagnostic-heading" class="h4">Backend Health Diagnostic</h2>
-            <span id="api-status-badge" class="badge badge-warning badge-pill">Pending</span>
-          </header>
-          <div class="card-body flex flex-col gap-md">
-            <p id="api-status-text" class="text-secondary">
-              Probing Express health endpoint (<code>GET /api/health</code>)...
-            </p>
-            <div class="flex items-center justify-between">
-              <span class="text-sm">Target: <code>http://localhost:5000/api/health</code></span>
-              <button type="button" class="btn btn-outline btn-sm" id="api-check-btn">
-                Test Health Probe
-              </button>
+          <div class="diagnostics-content" id="diagnostics-content">
+            
+            <!-- Quick Authentication Links -->
+            <div class="card">
+              <header class="card-header flex items-center justify-between">
+                <h3 class="h4">Authentication Suite (Day 3)</h3>
+                <span class="badge badge-primary badge-pill">Verified</span>
+              </header>
+              <div class="card-body flex flex-col gap-sm">
+                <p class="text-xs text-secondary">
+                  Access client-validated authentication flows:
+                </p>
+                <div class="flex items-center gap-sm" style="flex-wrap: wrap;">
+                  <a href="pages/login.html" class="btn btn-primary btn-sm">Sign In</a>
+                  <a href="pages/register.html" class="btn btn-secondary btn-sm">Create Account</a>
+                  <a href="pages/forgot-password.html" class="btn btn-outline btn-sm">Forgot Password</a>
+                </div>
+              </div>
             </div>
-          </div>
-        </section>
 
-        <!-- 20-Day Roadmap Summary -->
-        <section class="card" aria-labelledby="roadmap-heading">
-          <header class="card-header">
-            <h2 id="roadmap-heading" class="h4">20-Day Roadmap Progress</h2>
-          </header>
-          <div class="card-body flex flex-col gap-sm">
-            <div class="flex items-center justify-between text-sm">
-              <span><strong>Day 1:</strong> Initialization &amp; Foundation</span>
-              <span class="badge badge-success badge-pill">Completed</span>
+            <!-- Backend Health Diagnostic Card -->
+            <div class="card" aria-labelledby="diagnostic-heading">
+              <header class="card-header flex items-center justify-between">
+                <h3 id="diagnostic-heading" class="h4">Backend Health Diagnostic</h3>
+                <span id="api-status-badge" class="badge badge-warning badge-pill">Pending</span>
+              </header>
+              <div class="card-body flex flex-col gap-md">
+                <p id="api-status-text" class="text-secondary text-xs">
+                  Probing Express health endpoint (<code>GET /api/health</code>)...
+                </p>
+                <div class="flex items-center justify-between text-xs">
+                  <span>Target: <code>http://localhost:5000/api/health</code></span>
+                  <button type="button" class="btn btn-outline btn-sm" id="api-check-btn">
+                    Test Health Probe
+                  </button>
+                </div>
+              </div>
             </div>
-            <div class="flex items-center justify-between text-sm">
-              <span><strong>Day 2:</strong> Shared Header, Ticker &amp; Navigation</span>
-              <span class="badge badge-success badge-pill">Completed</span>
+
+            <!-- 20-Day Roadmap Summary -->
+            <div class="card" aria-labelledby="roadmap-heading">
+              <header class="card-header">
+                <h3 id="roadmap-heading" class="h4">20-Day Roadmap Progress</h3>
+              </header>
+              <div class="card-body flex flex-col gap-xs">
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 1:</strong> Initialization &amp; Foundation</span>
+                  <span class="badge badge-success badge-pill">Completed</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 2:</strong> Shared Header, Ticker &amp; Navigation</span>
+                  <span class="badge badge-success badge-pill">Completed</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 3:</strong> Auth &amp; Registration UI</span>
+                  <span class="badge badge-success badge-pill">Completed</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 4:</strong> Bets Page UI</span>
+                  <span class="badge badge-success badge-pill">Completed</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 5:</strong> Passbook Page UI</span>
+                  <span class="badge badge-success badge-pill">Completed</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 6:</strong> Profile Page &amp; Settings</span>
+                  <span class="badge badge-success badge-pill">Completed</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 7:</strong> Home Dashboard &amp; Matches</span>
+                  <span class="badge badge-success badge-pill">Active / Verified</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                  <span><strong>Day 8:</strong> Responsive Polish &amp; Audit</span>
+                  <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
+                </div>
+              </div>
             </div>
-            <div class="flex items-center justify-between text-sm">
-              <span><strong>Day 3:</strong> Auth &amp; Registration UI</span>
-              <span class="badge badge-success badge-pill">Completed</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-              <span><strong>Day 4:</strong> Bets Page UI</span>
-              <span class="badge badge-success badge-pill">Completed</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-              <span><strong>Day 5:</strong> Passbook Page UI</span>
-              <span class="badge badge-success badge-pill">Active / Verified</span>
-            </div>
-            <div class="flex items-center justify-between text-sm">
-              <span><strong>Day 6:</strong> Profile Page &amp; Settings</span>
-              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
-            </div>
+
           </div>
         </section>
 
@@ -163,30 +220,70 @@
     </main>
   </div>
 
+  <!-- Match Overview Modal (Informational Only) -->
+  <div id="match-detail-modal" class="match-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-match-title" aria-hidden="true">
+    <div class="match-modal-card">
+      <header class="match-modal-header">
+        <h3 id="modal-match-title" class="match-modal-title">Match Overview</h3>
+        <button type="button" class="btn btn-outline btn-sm modal-close-btn" data-modal-close aria-label="Close match overview dialog">
+          ✕
+        </button>
+      </header>
+      <div class="match-modal-body">
+        <div class="badge badge-primary" id="modal-match-comp">ICC Men's T20 World Cup</div>
+
+        <div class="match-detail-grid">
+          <div class="match-detail-cell">
+            <span class="detail-cell-label">Status</span>
+            <span class="detail-cell-val" id="modal-match-status">UPCOMING</span>
+          </div>
+          <div class="match-detail-cell">
+            <span class="detail-cell-label">Scheduled Time</span>
+            <span class="detail-cell-val" id="modal-match-time">Today, 03:00 PM</span>
+          </div>
+          <div class="match-detail-cell">
+            <span class="detail-cell-label">Venue</span>
+            <span class="detail-cell-val" id="modal-match-venue">Melbourne Cricket Ground</span>
+          </div>
+          <div class="match-detail-cell">
+            <span class="detail-cell-label">Captains</span>
+            <span class="detail-cell-val" id="modal-match-captains">Team Captains</span>
+          </div>
+        </div>
+
+        <div>
+          <span class="detail-cell-label">Toss Rate Previews</span>
+          <div class="flex items-center gap-sm" style="margin-top: 4px;">
+            <span class="badge badge-neutral" id="modal-rate-team-one">Team 1: 1.95</span>
+            <span class="badge badge-neutral" id="modal-rate-team-two">Team 2: 1.90</span>
+          </div>
+        </div>
+
+        <div style="background-color: var(--color-surface-subtle); padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--color-border-subtle);">
+          <span class="detail-cell-label">Match Note</span>
+          <p class="text-xs text-secondary" id="modal-match-summary" style="margin-top: 2px;">
+            Official coin toss preview.
+          </p>
+        </div>
+
+        <p class="text-xs text-muted">
+          Notice: Toss market bet placement, balance locking, and settlement resolution are scheduled for <strong>Day 13</strong>. No real-money wagering is conducted in this preview.
+        </p>
+      </div>
+      <footer class="match-modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-modal-close>
+          Understood
+        </button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Application Logic Scripts -->
   <script src="js/config.js"></script>
   <script src="js/shared-layout.js"></script>
   <script src="js/navigation.js"></script>
+  <script src="js/home.js"></script>
   <script src="js/app.js"></script>
-  <script>
-    // Day 2 Interactive Balance Simulator
-    document.addEventListener('DOMContentLoaded', function () {
-      var isToggled = false;
-      var testBtn = document.getElementById('test-balance-btn');
-      if (testBtn) {
-        testBtn.addEventListener('click', function () {
-          isToggled = !isToggled;
-          if (isToggled) {
-            window.SharedLayout.updateBalances('1,250.00', '250.00');
-            testBtn.textContent = 'Reset Mock Balances';
-          } else {
-            window.SharedLayout.updateBalances('0.00', '0.00');
-            testBtn.textContent = 'Simulate Balance Update';
-          }
-        });
-      }
-    });
-  </script>
 </body>
 
 </html>

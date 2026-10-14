@@ -48,7 +48,8 @@ toss/
 │   │   ├── auth.css              # [Day 3] Authentication forms, strength meter & cards
 │   │   ├── bets.css              # [Day 4] Bets filters, cards, and date groups
 │   │   ├── passbook.css          # [Day 5] Hero balance card, search, filters, modals
-│   │   └── profile.css           # [Day 6] Profile card, settings list, switch toggles & modals
+│   │   ├── profile.css           # [Day 6] Profile card, settings list, switch toggles & modals
+│   │   └── home.css              # [Day 7] Featured match card, category filters & fixture cards
 │   ├── js/
 │   │   ├── auth/                 # [Day 3] Client-side authentication logic
 │   │   │   ├── validation.js     # Field validation, password toggles & strength checker
@@ -59,6 +60,7 @@ toss/
 │   │   ├── bets.js               # [Day 4] Bets dataset, date grouping & status filters
 │   │   ├── passbook.js           # [Day 5] Ledger dataset, search, filters & modals
 │   │   ├── profile.js            # [Day 6] Profile state, edit form, password dialog & modals
+│   │   ├── home.js               # [Day 7] Fixtures dataset, category filters & match modal
 │   │   ├── config.js             # API base URL, mock balances, announcements config
 │   │   ├── shared-layout.js      # Shared Header, Ticker & Nav rendering engine
 │   │   ├── navigation.js         # Tab active states & accessibility controller
@@ -208,7 +210,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 6 of 20)
+## 9. Current Implementation Status (Day 7 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -225,7 +227,8 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Bets Page UI | Completed (Day 4) | Status filters (All, Live, Won, Lost, No Result), date grouping, bet cards, empty state |
 | Passbook Page UI | Completed (Day 5) | Hero balance card (₹10,000), search, type/status filters, ledger cards, Deposit/Withdraw modals |
 | Profile & Settings UI | Completed (Day 6) | Hero profile card, personal info grid, interactive settings, Dark Mode switch, edit & security modals |
-| Home Dashboard & Matches | Planned | Full live match cards & toss rate odds scheduled for Day 7 |
+| Home Dashboard & Matches | Completed (Day 7) | Featured live toss card, category filter pills, match fixture cards, rate previews, match detail modal |
+| Responsive Polish & Audit | Planned | Comprehensive responsive audit & touch polish scheduled for Day 8 |
 | MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 9 |
 | Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 11 |
 | Profile & Preferences APIs | Planned | Real user profiles and persistent settings scheduled for Day 12 |
@@ -235,8 +238,8 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
 > [!WARNING]
-> **User Profile and Settings are Strictly Local Demonstration States for Day 6**:
-> Day 6 delivers the frontend user profile overview, personal information grid, and interactive settings menu (Dark Mode switcher, Edit Profile, Change Password, Notification Preferences, App Rules, Privacy Policy, Customer Support, and Logout). User data is maintained as an explicit demonstration account in browser memory/localStorage. Persistent database synchronization, OTP email workflows, and backend password hashing are scheduled for **Days 11 & 12**. No real user credentials, plain-text passwords, or private data are stored or exposed.
+> **Match Fixtures and Rate Previews are Strictly Demonstration Data for Day 7**:
+> Day 7 delivers the primary Home dashboard presenting live and upcoming cricket match fixtures, toss rate previews, category filters (`All`, `Live`, `Upcoming`, `Completed`), and a match overview modal. All fixture data and rates are clearly identified demonstration models. Real sports API feeds, transactional bet placement, balance locking, and settlement resolution are scheduled for **Day 13**. No real-money wagering or live betting slip interactions are conducted.
 
 ---
 
