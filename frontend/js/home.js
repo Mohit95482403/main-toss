@@ -220,7 +220,7 @@
   function renderEmptyState(category) {
     let categoryName = category.toUpperCase();
     return `
-      <section class="match-empty-state" aria-live="polite">
+      <section class="match-empty-state empty-state" aria-live="polite">
         <div class="empty-state-icon" aria-hidden="true">
           ${ICONS.empty}
         </div>

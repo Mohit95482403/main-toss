@@ -47,7 +47,7 @@
 }
 
 .bottom-nav-spacer {
-  height: var(--bottom-nav-height);
+  height: calc(var(--bottom-nav-height, 60px) + env(safe-area-inset-bottom, 0px) + var(--space-xs));
   flex-shrink: 0;
 }
 

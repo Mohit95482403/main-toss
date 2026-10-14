@@ -214,7 +214,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 11 of 20)
+## 9. Current Implementation Status (Day 12 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -235,17 +235,18 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Match Details Page UI | Completed (Day 8) | Dynamic URL routing (`?id=`), match summary hero, toss rates preview, venue metadata, rules, and not-found state |
 | Bets Page Enhancement | Completed (Day 9) | Dynamic summary metrics cards, search input with clear button, status filter strip with counter badges, enhanced cards with bet ID & financial breakdown, accessible Bet Details modal, and empty state reset |
 | Passbook Page Enhancement | Completed (Day 10) | Dynamic ledger balance derivation (`calculateLedgerSummary()`), enriched transaction metadata (category, method, reference code, remarks), interactive Transaction Details modal dialog, synchronized header balances, unified search, and empty state reset |
-| Profile & Account Settings Enhancement | Completed (Day 11) | Dynamic avatar initials badge (`#hero-avatar-initials`), real-time error clearing, button loading states ("Saving...", "Updating..."), password policy validation (min 8 chars, mismatch prevention, rejection of same password), notification preference switches with toast feedback, and session clearance on logout |
-| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 12 |
-| Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 12 |
+| Profile & Account Settings Enhancement | Completed (Day 11) | Dynamic avatar initials badge (`#hero-avatar-initials`), real-time error clearing, button loading states ("Saving...", "Updating..."), password policy validation, notification switches with toast feedback, and session clearance on logout |
+| UI Consistency & Shared Components | Completed (Day 12) | Standardized status badges (.badge-live, .badge-won, .badge-lost, etc.), skeleton loaders (.skeleton, .skeleton-text), inline alerts (.alert), standardized empty states across all feeds (.empty-state), reusable toast notification engine (SharedLayout.showToast), INR currency & date formatters, button loading states (.btn-loading, .btn-spinner), safe-area bottom navigation, and global modal Escape listener |
+| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 13 |
+| Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 13 |
 | Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 13 |
 | Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 14 |
 | Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5 & 10; real payment flow scheduled for Days 15 & 16 |
 | Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
-> [!WARNING]
-> **Profile & Settings State are Strictly Demonstration Content for Day 11**:
-> Day 11 enhances the Profile page (`pages/profile.html`) with dynamic avatar initials derived from full name, interactive client-side form validation with real-time error clearing, submit button loading states, strict password rules (minimum 8 chars, mismatch detection, difference verification), notification preferences persistence in localStorage, and session token clearing upon logout confirmation. Real server-side MySQL user storage, secure bcrypt/argon2 hashing, and JWT session tokens will be connected in subsequent backend integration days.
+> [!NOTE]
+> **Application-Wide Consistency & UI Foundations (Day 12)**:
+> Day 12 establishes application-wide UI consistency across all pages (Home, Match Details, Bets, Passbook, Profile, and Authentication). Reusable components include a standardized toast notification system (`SharedLayout.showToast`), skeleton loaders (`.skeleton`), unified status badges, centralized empty state pattern (`.empty-state`), formatters (`formatCurrency`, `formatDate`), button loading controllers (`setButtonLoading`), and mobile safe-area insets (`env(safe-area-inset-bottom)`). Real backend database persistence and betting business APIs continue on **Day 13**.
 
 ---
 

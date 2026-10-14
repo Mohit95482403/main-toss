@@ -33,14 +33,19 @@
   }
 
   // 2. Backend Health Diagnostic Probe
-  async function checkBackendHealth() {
+  async function checkBackendHealth(isManual = false) {
     const statusBadge = document.getElementById('api-status-badge');
     const statusText = document.getElementById('api-status-text');
     const refreshBtn = document.getElementById('api-check-btn');
 
     if (!statusBadge || !statusText) return;
 
-    if (refreshBtn) refreshBtn.disabled = true;
+    if (refreshBtn && window.SharedLayout && typeof window.SharedLayout.setButtonLoading === 'function') {
+      window.SharedLayout.setButtonLoading(refreshBtn, true, 'Checking...');
+    } else if (refreshBtn) {
+      refreshBtn.disabled = true;
+    }
+
     statusBadge.className = 'badge badge-warning badge-pill';
     statusBadge.textContent = 'Checking...';
     statusText.textContent = 'Connecting to backend API...';
@@ -63,6 +68,9 @@
         statusBadge.className = 'badge badge-success badge-pill';
         statusBadge.textContent = 'Online';
         statusText.innerHTML = `<strong>${escapeHtml(data.message)}</strong> &bull; Service: <code>${escapeHtml(data.service || 'ironman-toss-book-api')}</code> &bull; Uptime: ${Math.floor(data.uptime || 0)}s`;
+        if (isManual && window.SharedLayout && typeof window.SharedLayout.showToast === 'function') {
+          window.SharedLayout.showToast('Backend API is online and healthy', 'success');
+        }
       } else {
         throw new Error('Unexpected response format');
       }
@@ -70,8 +78,15 @@
       statusBadge.className = 'badge badge-danger badge-pill';
       statusBadge.textContent = 'Offline';
       statusText.innerHTML = `Unable to connect to <code>${escapeHtml(healthUrl)}</code>. Ensure the backend server is running (<code>npm start</code> in backend).`;
+      if (isManual && window.SharedLayout && typeof window.SharedLayout.showToast === 'function') {
+        window.SharedLayout.showToast('Backend API connection failed. Ensure server is running on port 5000.', 'error');
+      }
     } finally {
-      if (refreshBtn) refreshBtn.disabled = false;
+      if (refreshBtn && window.SharedLayout && typeof window.SharedLayout.setButtonLoading === 'function') {
+        window.SharedLayout.setButtonLoading(refreshBtn, false);
+      } else if (refreshBtn) {
+        refreshBtn.disabled = false;
+      }
     }
   }
 
@@ -92,10 +107,10 @@
 
     const checkBtn = document.getElementById('api-check-btn');
     if (checkBtn) {
-      checkBtn.addEventListener('click', checkBackendHealth);
+      checkBtn.addEventListener('click', () => checkBackendHealth(true));
     }
 
     // Attempt initial passive health probe
-    checkBackendHealth();
+    checkBackendHealth(false);
   });
 })();

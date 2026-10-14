@@ -163,6 +163,86 @@
   color: var(--color-primary);
 }
 
+.badge-neutral {
+  background-color: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+/* Domain-Specific Status Badges */
+.badge-live {
+  background-color: var(--color-danger);
+  color: #FFFFFF;
+  position: relative;
+  padding-left: 1.15rem;
+}
+
+.badge-live::before {
+  content: '';
+  position: absolute;
+  left: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0% { transform: translateY(-50%) scale(0.9); opacity: 0.8; }
+  50% { transform: translateY(-50%) scale(1.3); opacity: 1; }
+  100% { transform: translateY(-50%) scale(0.9); opacity: 0.8; }
+}
+
+.badge-won {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+.badge-lost {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border: 1px solid rgba(214, 40, 40, 0.25);
+}
+
+.badge-no-result {
+  background-color: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.badge-pending {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-completed {
+  background-color: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.badge-upcoming {
+  background-color: var(--color-info-bg);
+  color: var(--color-info-text);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+.badge-credit {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.badge-debit {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
 /* ==========================================================================
    Form Controls
    ========================================================================== */
@@ -213,3 +293,289 @@
 }
 .status-dot-active { background-color: var(--color-success); }
 .status-dot-inactive { background-color: var(--color-text-muted); }
+
+/* ==========================================================================
+   Loading Indicators & Skeleton Loaders (Day 12)
+   ========================================================================== */
+
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: itb-spin 0.65s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes itb-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.btn.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.82;
+}
+
+/* Skeleton Screens */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-subtle) 25%,
+    var(--color-border-subtle) 37%,
+    var(--color-surface-subtle) 63%
+  );
+  background-size: 400% 100%;
+  animation: itb-skeleton 1.4s ease infinite;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+@keyframes itb-skeleton {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.skeleton-text {
+  height: 12px;
+  width: 100%;
+  margin-bottom: 6px;
+  border-radius: var(--radius-xs);
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 65%;
+  margin-bottom: 10px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-card {
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.skeleton-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+}
+
+/* ==========================================================================
+   Inline Alerts (Day 12)
+   ========================================================================== */
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  border: 1px solid var(--color-border);
+}
+
+.alert-danger {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-color: rgba(214, 40, 40, 0.25);
+}
+
+.alert-warning {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.alert-info {
+  background-color: var(--color-info-bg);
+  color: var(--color-info-text);
+  border-color: rgba(2, 132, 199, 0.25);
+}
+
+.alert-success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: rgba(22, 163, 74, 0.25);
+}
+
+/* ==========================================================================
+   Standardized Empty States (Day 12)
+   ========================================================================== */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-2xl) var(--space-lg);
+  background-color: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  margin: var(--space-sm) 0;
+}
+
+.empty-state-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.empty-state-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.empty-state-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-2xs);
+}
+
+.empty-state-desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  max-width: 300px;
+  line-height: var(--line-height-normal);
+  margin-bottom: var(--space-md);
+}
+
+/* ==========================================================================
+   Reusable Toast Notifications (Day 12)
+   ========================================================================== */
+
+.app-toast-container {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast, 300);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-width: calc(100vw - 2rem);
+  width: 380px;
+  pointer-events: none;
+}
+
+.app-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-toast-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+}
+
+.app-toast-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+}
+
+.app-toast-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.app-toast-success {
+  border-left: 3px solid var(--color-success);
+}
+.app-toast-success .app-toast-icon {
+  color: var(--color-success);
+}
+
+.app-toast-error {
+  border-left: 3px solid var(--color-danger);
+}
+.app-toast-error .app-toast-icon {
+  color: var(--color-danger);
+}
+
+.app-toast-warning {
+  border-left: 3px solid var(--color-warning);
+}
+.app-toast-warning .app-toast-icon {
+  color: var(--color-warning);
+}
+
+.app-toast-info {
+  border-left: 3px solid var(--color-info);
+}
+.app-toast-info .app-toast-icon {
+  color: var(--color-info);
+}
+
+.app-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  transition: color var(--transition-fast);
+}
+
+.app-toast-close:hover {
+  color: var(--color-text);
+}
+
+/* Reduced Motion Preference Override */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-color: var(--color-surface-subtle);
+  }
+  .btn-spinner {
+    animation: none;
+  }
+  .badge-live::before {
+    animation: none;
+  }
+  .app-toast {
+    transition: none;
+  }
+}

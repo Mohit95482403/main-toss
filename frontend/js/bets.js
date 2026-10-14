@@ -338,7 +338,7 @@
     }
 
     return `
-      <section class="bets-empty-state" aria-live="polite">
+      <section class="bets-empty-state empty-state" aria-live="polite">
         <div class="empty-state-icon" aria-hidden="true">
           ${ICONS.empty}
         </div>

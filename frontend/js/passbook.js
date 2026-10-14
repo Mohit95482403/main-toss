@@ -285,7 +285,7 @@
     }
 
     return `
-      <section class="passbook-empty-state" aria-live="polite">
+      <section class="passbook-empty-state empty-state" aria-live="polite">
         <div class="empty-state-icon" aria-hidden="true">
           ${ICONS.empty}
         </div>

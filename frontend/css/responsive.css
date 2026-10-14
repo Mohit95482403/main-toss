@@ -32,7 +32,6 @@
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-lg);
     min-height: calc(100vh - 3rem);
-    max-height: 900px;
   }
 }
 

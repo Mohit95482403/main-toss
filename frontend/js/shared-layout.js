@@ -185,9 +185,159 @@
   }
 
   function escapeHtml(str) {
+    if (typeof str !== 'string') return '';
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  /**
+   * Toast Icons SVG Mapping
+   */
+  const TOAST_ICONS = {
+    success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+    error: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`,
+    warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+    info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`,
+    close: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
+  };
+
+  /**
+   * Reusable Toast Notification System (Day 12)
+   */
+  function showToast(message, type = 'success', duration = 3500) {
+    if (!message) return null;
+
+    let container = document.getElementById('app-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'app-toast-container';
+      container.className = 'app-toast-container';
+      container.setAttribute('role', 'status');
+      container.setAttribute('aria-live', 'polite');
+      container.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    const safeType = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+    toast.className = `app-toast app-toast-${safeType}`;
+
+    const iconSvg = TOAST_ICONS[safeType] || TOAST_ICONS.info;
+    toast.innerHTML = `
+      <div class="app-toast-content">
+        <span class="app-toast-icon" aria-hidden="true">${iconSvg}</span>
+        <span class="app-toast-msg">${escapeHtml(message)}</span>
+      </div>
+      <button type="button" class="app-toast-close" aria-label="Dismiss notification">
+        ${TOAST_ICONS.close}
+      </button>
+    `;
+
+    container.appendChild(toast);
+
+    // Trigger entrance animation
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    function dismiss() {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 250);
+    }
+
+    const closeBtn = toast.querySelector('.app-toast-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', dismiss);
+    }
+
+    if (duration > 0) {
+      setTimeout(dismiss, duration);
+    }
+
+    return toast;
+  }
+
+  /**
+   * Standard Currency Formatter (INR Presentation)
+   */
+  function formatCurrency(amount, symbol = '₹') {
+    const num = Number(amount);
+    if (isNaN(num)) return `${symbol}0.00`;
+    return `${symbol}${num.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
+  }
+
+  /**
+   * Standard Date & Time Formatter
+   */
+  function formatDate(dateInput, includeTime = true) {
+    if (!dateInput) return '—';
+    try {
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return String(dateInput);
+
+      const day = d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+
+      if (!includeTime) return day;
+
+      const time = d.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      return `${day}, ${time}`;
+    } catch (e) {
+      return String(dateInput);
+    }
+  }
+
+  /**
+   * Button Loading State Helper
+   */
+  function setButtonLoading(btn, isLoading, loadingText = '') {
+    if (!btn) return;
+
+    if (isLoading) {
+      btn.dataset.origHtml = btn.innerHTML;
+      btn.classList.add('btn-loading');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span> <span>${escapeHtml(loadingText || 'Please wait...')}</span>`;
+    } else {
+      if (btn.dataset.origHtml) {
+        btn.innerHTML = btn.dataset.origHtml;
+        delete btn.dataset.origHtml;
+      }
+      btn.classList.remove('btn-loading');
+      btn.disabled = false;
+    }
+  }
+
+  /**
+   * Global Modal Accessibility Listeners (Escape key and backdrop dismissal)
+   */
+  function setupGlobalModalAccessibility() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const openModals = document.querySelectorAll('.modal-overlay.open, .profile-modal-overlay.open, .modal-backdrop.open');
+        openModals.forEach(m => {
+          m.classList.remove('open');
+          m.setAttribute('aria-hidden', 'true');
+          document.body.style.overflow = '';
+        });
+      }
+    });
   }
 
   /**
@@ -216,6 +366,8 @@
     if (headerContainer) renderHeader(headerContainer);
     if (tickerContainer) renderTicker(tickerContainer);
     if (bottomNavContainer) renderBottomNav(bottomNavContainer);
+
+    setupGlobalModalAccessibility();
   }
 
   // Export to global window object
@@ -224,7 +376,20 @@
     updateBalances,
     renderHeader,
     renderTicker,
-    renderBottomNav
+    renderBottomNav,
+    showToast,
+    formatCurrency,
+    formatDate,
+    setButtonLoading,
+    setupGlobalModalAccessibility,
+    escapeHtml
+  };
+
+  // Expose global convenience aliases
+  window.showAppToast = showToast;
+  window.ITB_FORMATTERS = {
+    currency: formatCurrency,
+    date: formatDate
   };
 
   // Auto-initialize when DOM is ready
