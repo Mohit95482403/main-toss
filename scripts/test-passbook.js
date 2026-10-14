@@ -53,6 +53,22 @@ assert(htmlContent.includes('id="deposit-modal"'), 'Deposit placeholder modal pr
 assert(htmlContent.includes('id="withdraw-modal"'), 'Withdraw placeholder modal present');
 assert(htmlContent.includes('role="dialog"') && htmlContent.includes('aria-modal="true"'), 'Modal dialog accessibility attributes present');
 
+// Day 10 Enhancement: Transaction Details Modal
+assert(htmlContent.includes('id="txn-detail-modal"'), 'Transaction details modal present');
+assert(htmlContent.includes('id="modal-txn-title"'), 'Modal title element present');
+assert(htmlContent.includes('id="modal-txn-status-badge"'), 'Modal status badge element present');
+assert(htmlContent.includes('id="modal-txn-close-btn"'), 'Modal close button present');
+assert(htmlContent.includes('id="modal-txn-amount"'), 'Modal amount highlight element present');
+assert(htmlContent.includes('id="modal-txn-type-label"'), 'Modal type label element present');
+assert(htmlContent.includes('id="modal-txn-id"'), 'Modal transaction ID element present');
+assert(htmlContent.includes('id="modal-txn-ref-code"'), 'Modal reference code element present');
+assert(htmlContent.includes('id="modal-txn-category"'), 'Modal category element present');
+assert(htmlContent.includes('id="modal-txn-method"'), 'Modal payment method element present');
+assert(htmlContent.includes('id="modal-txn-datetime"'), 'Modal date & time element present');
+assert(htmlContent.includes('id="modal-txn-closing"'), 'Modal closing balance element present');
+assert(htmlContent.includes('id="modal-txn-remarks"'), 'Modal remarks box element present');
+assert(htmlContent.includes('id="modal-txn-footer-close-btn"'), 'Modal footer close button present');
+
 // 3. Mathematical Consistency Tests on Ledger Data in passbook.js
 const jsContent = fs.readFileSync(passbookJsPath, 'utf8');
 
@@ -60,9 +76,9 @@ const jsContent = fs.readFileSync(passbookJsPath, 'utf8');
 const jsonMatch = jsContent.match(/const DEMO_TRANSACTIONS = (\[[\s\S]*?\]);/);
 assert(jsonMatch !== null, 'DEMO_TRANSACTIONS array found in passbook.js');
 
+let demoTransactions = [];
 if (jsonMatch) {
-  // Parse using eval in safe sandbox
-  const demoTransactions = eval(jsonMatch[1]);
+  demoTransactions = eval(jsonMatch[1]);
   assert(demoTransactions.length >= 5, `Demo transactions count is ${demoTransactions.length} (>= 5)`);
 
   let totalCredits = 0;
@@ -92,7 +108,42 @@ if (jsonMatch) {
   const hasPending = demoTransactions.some(t => t.status === 'pending');
   assert(hasCompleted, 'Dataset contains Completed transactions');
   assert(hasPending, 'Dataset contains Pending transactions');
+
+  // Verify Day 10 enriched fields
+  const allHaveMetadata = demoTransactions.every(t => t.category && t.paymentMethod && t.referenceCode && t.remarks);
+  assert(allHaveMetadata, 'All transactions contain enriched Day 10 metadata (category, paymentMethod, referenceCode, remarks)');
 }
+
+// Day 10 Search & Filter Logic Verification
+function filterAndSearch(txns, filter, query) {
+  return txns.filter(t => {
+    if (filter !== 'all') {
+      if (filter === 'credit' || filter === 'debit') {
+        if (t.type !== filter) return false;
+      } else if (filter === 'completed' || filter === 'pending') {
+        if (t.status !== filter) return false;
+      }
+    }
+    if (query) {
+      const q = query.toLowerCase();
+      const match = (t.title && t.title.toLowerCase().includes(q)) ||
+                    (t.id && t.id.toLowerCase().includes(q)) ||
+                    (t.category && t.category.toLowerCase().includes(q)) ||
+                    (t.paymentMethod && t.paymentMethod.toLowerCase().includes(q)) ||
+                    (t.referenceCode && t.referenceCode.toLowerCase().includes(q)) ||
+                    (t.subtitle && t.subtitle.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+    return true;
+  });
+}
+
+assert(filterAndSearch(demoTransactions, 'all', 'UPI').length >= 1, 'Search for "UPI" returns matching transaction records');
+assert(filterAndSearch(demoTransactions, 'all', 'DEMO-TXN-002').length === 1, 'Search for "DEMO-TXN-002" returns exactly 1 record');
+assert(filterAndSearch(demoTransactions, 'credit', '').length === 4, 'Filter "credit" returns exactly 4 records');
+assert(filterAndSearch(demoTransactions, 'debit', '').length === 3, 'Filter "debit" returns exactly 3 records');
+assert(filterAndSearch(demoTransactions, 'credit', 'Bonus').length === 1, 'Combined filter "credit" + search "Bonus" returns 1 record');
+assert(filterAndSearch(demoTransactions, 'all', 'xyzunknown').length === 0, 'Search for non-existent query returns 0 records');
 
 // 4. CSS Token & Responsive Verification
 const cssContent = fs.readFileSync(passbookCssPath, 'utf8');
@@ -104,6 +155,10 @@ assert(cssContent.includes('.txn-amount.credit'), 'Positive credit amount stylin
 assert(cssContent.includes('.txn-amount.debit'), 'Negative debit amount styling defined');
 assert(cssContent.includes('.modal-overlay'), 'modal-overlay class defined in CSS');
 assert(cssContent.includes('.passbook-empty-state'), 'passbook-empty-state class defined in CSS');
+assert(cssContent.includes('.btn-txn-details'), 'btn-txn-details class defined in CSS');
+assert(cssContent.includes('.modal-financial-highlight'), 'modal-financial-highlight class defined in CSS');
+assert(cssContent.includes('.modal-detail-grid'), 'modal-detail-grid class defined in CSS');
+assert(cssContent.includes('.modal-remarks-box'), 'modal-remarks-box class defined in CSS');
 assert(cssContent.includes('@media (max-width: 360px)'), 'Small mobile responsive breakpoint defined');
 
 // 5. Check No Fake Payment Processing / Financial Settlement
@@ -120,3 +175,4 @@ if (passedTests === totalTests) {
 } else {
   process.exit(1);
 }
+

@@ -214,7 +214,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 9 of 20)
+## 9. Current Implementation Status (Day 10 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -229,22 +229,23 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Bottom Navigation | Completed (Day 2) | 4 tabs (Home, Bets, Passbook, Profile) with SVGs, active states, safe-area support |
 | Authentication Suite | Completed (Day 3) | Login, Register, Forgot Password, Reset Password, validation, strength meter |
 | Bets Page UI (Baseline) | Completed (Day 4) | Status filters (All, Live, Won, Lost, No Result), date grouping, bet cards, empty state |
-| Passbook Page UI | Completed (Day 5) | Hero balance card (₹10,000), search, type/status filters, ledger cards, Deposit/Withdraw modals |
+| Passbook Page UI (Baseline) | Completed (Day 5) | Hero balance card (₹10,000), search, type/status filters, ledger cards, Deposit/Withdraw modals |
 | Profile & Settings UI | Completed (Day 6) | Hero profile card, personal info grid, interactive settings, Dark Mode switch, edit & security modals |
 | Home Dashboard & Matches | Completed (Day 7) | Featured live toss card, category filter pills, match fixture cards, rate previews |
 | Match Details Page UI | Completed (Day 8) | Dynamic URL routing (`?id=`), match summary hero, toss rates preview, venue metadata, rules, and not-found state |
 | Bets Page Enhancement | Completed (Day 9) | Dynamic summary metrics cards, search input with clear button, status filter strip with counter badges, enhanced cards with bet ID & financial breakdown, accessible Bet Details modal, and empty state reset |
-| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 10 |
+| Passbook Page Enhancement | Completed (Day 10) | Dynamic ledger balance derivation (`calculateLedgerSummary()`), enriched transaction metadata (category, method, reference code, remarks), interactive Transaction Details modal dialog, synchronized header balances, unified search, and empty state reset |
+| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 11 |
 | Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 11 |
 | Profile & Preferences APIs | Planned | Real user profiles and persistent settings scheduled for Day 12 |
 | Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 13 |
 | Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 14 |
-| Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5; real payment flow scheduled for Days 15 & 16 |
+| Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5 & 10; real payment flow scheduled for Days 15 & 16 |
 | Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
 > [!WARNING]
-> **Bets Records and Summary Metrics are Strictly Demonstration Content for Day 9**:
-> Day 9 delivers the enhanced Bets view (`pages/bets.html`) with dynamic summary metric calculation (total, live, won, lost), unified search, category filtering, and an accessible Bet Details modal. Real transactional wagering, odds locking, and automated settlement resolution connect in **Day 13**. No real-money betting, live balance deductions, or third-party sports APIs are active.
+> **Ledger Records and Balance Totals are Strictly Demonstration Content for Day 10**:
+> Day 10 enhances the Passbook view (`pages/passbook.html`) with dynamic balance calculation (available balance, total credits, total debits derived from ledger history), enriched audit metadata, unified search, credit/debit filters, and an accessible Transaction Details modal. Real double-entry wallet deductions, banking gateway deposits, and IMPS withdrawals connect in **Days 14–16**. No real-money transactions, payment credentials, or third-party banking APIs are active.
 
 ---
 

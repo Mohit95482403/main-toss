@@ -210,6 +210,75 @@
     </div>
   </div>
 
+  <!-- Transaction Details Modal Dialog (Day 10 Enhancement) -->
+  <div id="txn-detail-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-txn-title" aria-hidden="true">
+    <div class="modal-card">
+      <header class="modal-header">
+        <div class="flex items-center gap-xs">
+          <h3 id="modal-txn-title" class="modal-title">Transaction Details</h3>
+          <span id="modal-txn-status-badge"></span>
+        </div>
+        <button type="button" class="modal-close-btn" id="modal-txn-close-btn" aria-label="Close transaction details dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="modal-body">
+        <!-- Demo Notice Banner -->
+        <div class="modal-notice-banner" role="note">
+          <strong>DEMO RECORD:</strong> Fictional ledger transaction for interface preview. Real wallet transactions connect in Days 14–16.
+        </div>
+
+        <!-- Key Financial Highlight -->
+        <div class="modal-financial-highlight">
+          <span class="detail-label">Transaction Amount</span>
+          <div class="modal-highlight-amount" id="modal-txn-amount">₹0.00</div>
+          <span class="detail-sublabel" id="modal-txn-type-label">Credit</span>
+        </div>
+
+        <!-- Metadata Grid -->
+        <div class="modal-detail-grid">
+          <div class="modal-detail-item">
+            <span class="detail-label">Transaction ID</span>
+            <span class="detail-val font-mono" id="modal-txn-id">—</span>
+          </div>
+          <div class="modal-detail-item text-right">
+            <span class="detail-label">Reference Code</span>
+            <span class="detail-val font-mono text-xs" id="modal-txn-ref-code">—</span>
+          </div>
+
+          <div class="modal-detail-item">
+            <span class="detail-label">Category</span>
+            <span class="detail-val font-semibold" id="modal-txn-category">—</span>
+          </div>
+          <div class="modal-detail-item text-right">
+            <span class="detail-label">Payment Channel</span>
+            <span class="detail-val" id="modal-txn-method">—</span>
+          </div>
+
+          <div class="modal-detail-item">
+            <span class="detail-label">Date & Time</span>
+            <span class="detail-val" id="modal-txn-datetime">—</span>
+          </div>
+          <div class="modal-detail-item text-right">
+            <span class="detail-label">Closing Balance</span>
+            <span class="detail-val font-mono font-bold" id="modal-txn-closing">—</span>
+          </div>
+        </div>
+
+        <!-- Description & Remarks -->
+        <div class="modal-detail-group">
+          <span class="detail-label">Description / Remarks</span>
+          <p class="modal-remarks-box" id="modal-txn-remarks">—</p>
+        </div>
+      </div>
+      <footer class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" id="modal-txn-footer-close-btn">
+          Close
+        </button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Application Logic Scripts -->
   <script src="../js/config.js"></script>
   <script src="../js/shared-layout.js"></script>

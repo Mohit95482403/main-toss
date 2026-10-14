@@ -667,6 +667,139 @@
   max-width: 280px;
 }
 
+/* ==========================================================================
+   Transaction Details Modal & Button (Day 10 Enhancement)
+   ========================================================================== */
+
+.btn-txn-details {
+  background: transparent;
+  border: 1px solid var(--color-border, #E5E7EB);
+  color: var(--color-primary, #0860BE);
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 3px;
+  transition: all var(--transition-fast);
+}
+
+.btn-txn-details:hover {
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  border-color: var(--color-primary, #0860BE);
+}
+
+.btn-txn-details:focus-visible {
+  outline: 2px solid var(--color-primary, #0860BE);
+  outline-offset: 1px;
+}
+
+[data-theme="dark"] .btn-txn-details {
+  border-color: #243042;
+  color: #93C5FD;
+}
+
+[data-theme="dark"] .btn-txn-details:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: #3B82F6;
+}
+
+.modal-financial-highlight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  border: 1px solid var(--color-border-subtle, #EEF0F2);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 14px;
+  text-align: center;
+}
+
+[data-theme="dark"] .modal-financial-highlight {
+  background-color: #121824;
+  border-color: #243042;
+}
+
+.modal-highlight-amount {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 1.5rem; /* 24px */
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.modal-highlight-amount.credit {
+  color: var(--color-success, #16A34A);
+}
+
+.modal-highlight-amount.debit {
+  color: var(--color-danger, #D62828);
+}
+
+.detail-sublabel {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted, #737B87);
+  margin-top: 2px;
+}
+
+.modal-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm, 8px);
+  padding: 4px 0;
+}
+
+.modal-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted, #737B87);
+}
+
+.detail-val {
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text, #15171A);
+}
+
+[data-theme="dark"] .detail-val {
+  color: #F8FAFC;
+}
+
+.modal-detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.modal-remarks-box {
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  border-left: 3px solid var(--color-primary, #0860BE);
+  padding: 8px 10px;
+  border-radius: 0 var(--radius-sm, 4px) var(--radius-sm, 4px) 0;
+  font-size: 0.75rem; /* 12px */
+  color: var(--color-text, #15171A);
+  line-height: 1.4;
+  margin: 0;
+}
+
+[data-theme="dark"] .modal-remarks-box {
+  background-color: #121824;
+  color: #F8FAFC;
+}
+
 /* Small mobile responsiveness */
 @media (max-width: 360px) {
   .hero-balance-card {
@@ -694,3 +827,4 @@
     font-size: 0.875rem; /* 14px */
   }
 }
+

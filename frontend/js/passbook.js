@@ -1,7 +1,7 @@
 /**
- * IRONMAN TOSS BOOK - Passbook Controller & Ledger Feed (Day 5)
- * Handles client-side demonstration ledger data, search filtering, type filters,
- * date sorting, informational deposit/withdraw placeholder modals, and balance synchronization.
+ * IRONMAN TOSS BOOK - Passbook Controller & Ledger Feed (Day 10 Enhanced)
+ * Handles client-side demonstration ledger data, dynamic balance derivation, search filtering,
+ * credit/debit classification, status filtering, accessible transaction details modal, and balance sync.
  */
 
 (function () {
@@ -17,7 +17,8 @@
     deposit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
     withdraw: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
     close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
-    info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`
+    info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`,
+    arrowRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`
   };
 
   /**
@@ -39,7 +40,11 @@
       dateFormatted: '12 Oct 2026',
       timeFormatted: '10:30 AM',
       status: 'completed', // 'completed' | 'pending' | 'failed'
-      closingBalance: 10000.00
+      closingBalance: 10000.00,
+      category: 'Deposit',
+      paymentMethod: 'Instant UPI (Demo)',
+      referenceCode: 'UPI-20261012-9841',
+      remarks: 'Simulated UPI fund deposit via Axis Bank NetBanking gateway'
     },
     {
       id: 'DEMO-TXN-002',
@@ -51,7 +56,11 @@
       dateFormatted: '11 Oct 2026',
       timeFormatted: '04:15 PM',
       status: 'completed',
-      closingBalance: 5000.00
+      closingBalance: 5000.00,
+      category: 'Wager Stake',
+      paymentMethod: 'Wager Settlement',
+      referenceCode: 'TOSS-BET-1048-STAKE',
+      remarks: 'Toss winner selection stake debited for India vs Australia T20 fixture'
     },
     {
       id: 'DEMO-TXN-003',
@@ -63,7 +72,11 @@
       dateFormatted: '10 Oct 2026',
       timeFormatted: '12:20 PM',
       status: 'completed',
-      closingBalance: 6000.00
+      closingBalance: 6000.00,
+      category: 'Wager Win',
+      paymentMethod: 'Wager Settlement',
+      referenceCode: 'TOSS-BET-1048-WIN',
+      remarks: 'Settlement payout credited for Mumbai Indians toss declaration'
     },
     {
       id: 'DEMO-TXN-004',
@@ -75,7 +88,11 @@
       dateFormatted: '09 Oct 2026',
       timeFormatted: '06:45 PM',
       status: 'pending',
-      closingBalance: 4000.00
+      closingBalance: 4000.00,
+      category: 'Withdrawal',
+      paymentMethod: 'IMPS Payout (Demo)',
+      referenceCode: 'IMPS-REQ-20261009-1123',
+      remarks: 'Pending verification for demo account bank payout request'
     },
     {
       id: 'DEMO-TXN-005',
@@ -87,7 +104,11 @@
       dateFormatted: '08 Oct 2026',
       timeFormatted: '09:10 AM',
       status: 'completed',
-      closingBalance: 4500.00
+      closingBalance: 4500.00,
+      category: 'Bonus Reward',
+      paymentMethod: 'Promotional Ledger',
+      referenceCode: 'BONUS-REF-20261008',
+      remarks: 'Affiliate referral bonus credit for active community user onboarding'
     },
     {
       id: 'DEMO-TXN-007',
@@ -99,7 +120,11 @@
       dateFormatted: '07 Oct 2026',
       timeFormatted: '02:00 PM',
       status: 'completed',
-      closingBalance: 1500.00
+      closingBalance: 1500.00,
+      category: 'Wager Stake',
+      paymentMethod: 'Wager Settlement',
+      referenceCode: 'TOSS-BET-1042-STAKE',
+      remarks: 'Big Bash League toss wagering stake deduction'
     },
     {
       id: 'DEMO-TXN-006',
@@ -111,7 +136,11 @@
       dateFormatted: '07 Oct 2026',
       timeFormatted: '11:00 AM',
       status: 'completed',
-      closingBalance: 5000.00
+      closingBalance: 5000.00,
+      category: 'Promotional',
+      paymentMethod: 'Promotional Ledger',
+      referenceCode: 'PROMO-INIT-20261007',
+      remarks: 'First deposit registration matching bonus incentive'
     }
   ];
 
@@ -135,6 +164,39 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  /**
+   * Calculate Ledger Totals dynamically from transaction records
+   */
+  function calculateLedgerSummary(transactions) {
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return {
+        totalCredits: 0,
+        totalDebits: 0,
+        availableBalance: 0
+      };
+    }
+
+    let totalCredits = 0;
+    let totalDebits = 0;
+
+    transactions.forEach(txn => {
+      const amt = typeof txn.amount === 'number' && !isNaN(txn.amount) ? txn.amount : 0;
+      if (txn.type === 'credit') {
+        totalCredits += amt;
+      } else if (txn.type === 'debit') {
+        totalDebits += amt;
+      }
+    });
+
+    const availableBalance = totalCredits - totalDebits;
+
+    return {
+      totalCredits,
+      totalDebits,
+      availableBalance
+    };
   }
 
   /**
@@ -165,7 +227,13 @@
     const typeLabel = isCredit ? 'Credit' : 'Debit';
 
     return `
-      <article class="txn-card" aria-label="${escapeHtml(txn.title)}, ${escapeHtml(txn.id)}, ${typeLabel} of ${formatCurrency(txn.amount)}, Status: ${escapeHtml(txn.status)}">
+      <article 
+        class="txn-card" 
+        data-txn-id="${escapeHtml(txn.id)}"
+        tabindex="0"
+        role="button"
+        aria-label="${escapeHtml(txn.title)}, ${escapeHtml(txn.id)}, ${typeLabel} of ${formatCurrency(txn.amount)}, Status: ${escapeHtml(txn.status)}. Click for details."
+      >
         <!-- Left details: Icon, Title, ID & Date -->
         <div class="txn-left">
           <div class="txn-icon-circle ${iconClass}" aria-hidden="true" title="${typeLabel}">
@@ -184,7 +252,7 @@
           </div>
         </div>
 
-        <!-- Right metrics: Signed Amount & Closing Balance -->
+        <!-- Right metrics: Signed Amount, Closing Balance & Details CTA -->
         <div class="txn-right">
           <span class="txn-amount ${amountClass}" aria-label="Amount: ${amountSign}${formatCurrency(txn.amount)}">
             ${amountSign}${formatCurrency(txn.amount)}
@@ -192,6 +260,14 @@
           <span class="txn-closing-bal" title="Closing Ledger Balance">
             Bal: ${formatCurrency(txn.closingBalance)}
           </span>
+          <button 
+            type="button" 
+            class="btn-txn-details" 
+            data-txn-id="${escapeHtml(txn.id)}"
+            aria-label="View details for transaction ${escapeHtml(txn.id)}"
+          >
+            Details ${ICONS.arrowRight}
+          </button>
         </div>
       </article>
     `;
@@ -224,7 +300,6 @@
 
   /**
    * Informational Placeholder Modals Handler (Deposit & Withdraw)
-   * Strictly UI placeholders. No balance modification.
    */
   function setupModals() {
     const depositBtn = document.getElementById('deposit-btn');
@@ -241,7 +316,6 @@
       modal.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
 
-      // Focus first actionable button in modal
       const closeBtn = modal.querySelector('.modal-close-btn') || modal.querySelector('.modal-footer .btn');
       if (closeBtn) closeBtn.focus();
     }
@@ -257,17 +331,14 @@
       }
     }
 
-    // Deposit triggers
     if (depositBtn && depositModal) {
       depositBtn.addEventListener('click', () => openModal(depositModal, depositBtn));
     }
 
-    // Withdraw triggers
     if (withdrawBtn && withdrawModal) {
       withdrawBtn.addEventListener('click', () => openModal(withdrawModal, withdrawBtn));
     }
 
-    // Modal close buttons and backdrops
     [depositModal, withdrawModal].forEach(modal => {
       if (!modal) return;
 
@@ -278,7 +349,6 @@
       });
     });
 
-    // Global Escape key support
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (depositModal && depositModal.classList.contains('open')) {
@@ -300,15 +370,56 @@
     const searchClearBtn = document.getElementById('search-clear-btn');
     const filterButtons = document.querySelectorAll('.txn-filter-btn');
 
-    if (!feedContainer) return;
+    // Balance Elements
+    const heroAvailableBalance = document.getElementById('hero-available-balance');
+    const heroTotalCredits = document.getElementById('hero-total-credits');
+    const heroTotalDebits = document.getElementById('hero-total-debits');
 
-    // Synchronize Top Header Balances to match Hero Balance Card
-    if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
-      window.SharedLayout.updateBalances('10,000.00', '0.00');
-    }
+    // Transaction Details Modal Elements
+    const txnDetailModal = document.getElementById('txn-detail-modal');
+    const modalTxnCloseBtn = document.getElementById('modal-txn-close-btn');
+    const modalTxnFooterCloseBtn = document.getElementById('modal-txn-footer-close-btn');
+    const modalTxnTitle = document.getElementById('modal-txn-title');
+    const modalTxnStatusBadge = document.getElementById('modal-txn-status-badge');
+    const modalTxnAmount = document.getElementById('modal-txn-amount');
+    const modalTxnTypeLabel = document.getElementById('modal-txn-type-label');
+    const modalTxnId = document.getElementById('modal-txn-id');
+    const modalTxnRefCode = document.getElementById('modal-txn-ref-code');
+    const modalTxnCategory = document.getElementById('modal-txn-category');
+    const modalTxnMethod = document.getElementById('modal-txn-method');
+    const modalTxnDatetime = document.getElementById('modal-txn-datetime');
+    const modalTxnClosing = document.getElementById('modal-txn-closing');
+    const modalTxnRemarks = document.getElementById('modal-txn-remarks');
+
+    if (!feedContainer) return;
 
     let currentFilter = 'all';
     let searchQuery = '';
+    let lastActiveElement = null;
+
+    // Dynamically calculate and render balance totals from transaction data
+    function updateBalanceCards() {
+      const summary = calculateLedgerSummary(DEMO_TRANSACTIONS);
+
+      if (heroAvailableBalance) {
+        heroAvailableBalance.textContent = formatCurrency(summary.availableBalance);
+      }
+      if (heroTotalCredits) {
+        heroTotalCredits.textContent = `+${formatCurrency(summary.totalCredits)}`;
+      }
+      if (heroTotalDebits) {
+        heroTotalDebits.textContent = `-${formatCurrency(summary.totalDebits)}`;
+      }
+
+      // Synchronize Top Header Balances
+      if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
+        const balFormatted = summary.availableBalance.toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        window.SharedLayout.updateBalances(balFormatted, '0.00');
+      }
+    }
 
     // Sort transactions chronologically (newest first)
     const sortedTransactions = [...DEMO_TRANSACTIONS].sort((a, b) => {
@@ -351,13 +462,20 @@
         // 2. Search query match
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
-          const matchesTitle = txn.title.toLowerCase().includes(q) || txn.subtitle.toLowerCase().includes(q);
-          const matchesId = txn.id.toLowerCase().includes(q);
-          const matchesType = txn.type.toLowerCase().includes(q);
-          const matchesStatus = txn.status.toLowerCase().includes(q);
-          const matchesAmount = txn.amount.toString().includes(q);
+          const matchesTitle = txn.title && txn.title.toLowerCase().includes(q);
+          const matchesSubtitle = txn.subtitle && txn.subtitle.toLowerCase().includes(q);
+          const matchesId = txn.id && txn.id.toLowerCase().includes(q);
+          const matchesType = txn.type && txn.type.toLowerCase().includes(q);
+          const matchesStatus = txn.status && txn.status.toLowerCase().includes(q);
+          const matchesCategory = txn.category && txn.category.toLowerCase().includes(q);
+          const matchesMethod = txn.paymentMethod && txn.paymentMethod.toLowerCase().includes(q);
+          const matchesRef = txn.referenceCode && txn.referenceCode.toLowerCase().includes(q);
+          const matchesAmount = txn.amount && txn.amount.toString().includes(q);
+          const matchesDate = txn.dateFormatted && txn.dateFormatted.toLowerCase().includes(q);
 
-          if (!matchesTitle && !matchesId && !matchesType && !matchesStatus && !matchesAmount) {
+          if (!matchesTitle && !matchesSubtitle && !matchesId && !matchesType && 
+              !matchesStatus && !matchesCategory && !matchesMethod && !matchesRef && 
+              !matchesAmount && !matchesDate) {
             return false;
           }
         }
@@ -381,7 +499,100 @@
 
       const html = filtered.map(renderTxnCard).join('');
       feedContainer.innerHTML = html;
+
+      // Bind Details buttons and card click triggers
+      const cards = feedContainer.querySelectorAll('.txn-card');
+      cards.forEach(card => {
+        card.addEventListener('click', (e) => {
+          const txnId = card.dataset.txnId;
+          lastActiveElement = card;
+          openTxnDetailsModal(txnId);
+        });
+
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const txnId = card.dataset.txnId;
+            lastActiveElement = card;
+            openTxnDetailsModal(txnId);
+          }
+        });
+      });
     }
+
+    /**
+     * Open Transaction Details Modal
+     */
+    function openTxnDetailsModal(txnId) {
+      const txn = DEMO_TRANSACTIONS.find(t => t.id === txnId);
+      if (!txn || !txnDetailModal) return;
+
+      const isCredit = txn.type === 'credit';
+      const amountSign = isCredit ? '+' : '-';
+
+      if (modalTxnTitle) modalTxnTitle.textContent = txn.title;
+      if (modalTxnStatusBadge) modalTxnStatusBadge.innerHTML = renderStatusBadge(txn.status);
+      
+      if (modalTxnAmount) {
+        modalTxnAmount.textContent = `${amountSign}${formatCurrency(txn.amount)}`;
+        modalTxnAmount.className = `modal-highlight-amount ${txn.type}`;
+      }
+
+      if (modalTxnTypeLabel) {
+        modalTxnTypeLabel.textContent = `${isCredit ? 'CREDIT' : 'DEBIT'} • ${txn.category || 'LEDGER'}`;
+      }
+
+      if (modalTxnId) modalTxnId.textContent = txn.id;
+      if (modalTxnRefCode) modalTxnRefCode.textContent = txn.referenceCode || '—';
+      if (modalTxnCategory) modalTxnCategory.textContent = txn.category || 'General';
+      if (modalTxnMethod) modalTxnMethod.textContent = txn.paymentMethod || 'System Ledger';
+      if (modalTxnDatetime) modalTxnDatetime.textContent = `${txn.dateFormatted}, ${txn.timeFormatted}`;
+      if (modalTxnClosing) modalTxnClosing.textContent = formatCurrency(txn.closingBalance);
+      if (modalTxnRemarks) modalTxnRemarks.textContent = txn.remarks || txn.subtitle || 'Transaction recorded in demo ledger.';
+
+      txnDetailModal.classList.add('open');
+      txnDetailModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+
+      if (modalTxnCloseBtn) {
+        setTimeout(() => modalTxnCloseBtn.focus(), 50);
+      }
+    }
+
+    /**
+     * Close Transaction Details Modal
+     */
+    function closeTxnDetailsModal() {
+      if (!txnDetailModal) return;
+      txnDetailModal.classList.remove('open');
+      txnDetailModal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+
+      if (lastActiveElement && typeof lastActiveElement.focus === 'function') {
+        lastActiveElement.focus();
+      }
+    }
+
+    // Modal close bindings
+    if (modalTxnCloseBtn) {
+      modalTxnCloseBtn.addEventListener('click', closeTxnDetailsModal);
+    }
+    if (modalTxnFooterCloseBtn) {
+      modalTxnFooterCloseBtn.addEventListener('click', closeTxnDetailsModal);
+    }
+    if (txnDetailModal) {
+      txnDetailModal.addEventListener('click', (e) => {
+        if (e.target === txnDetailModal) {
+          closeTxnDetailsModal();
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && txnDetailModal && txnDetailModal.classList.contains('open')) {
+        closeTxnDetailsModal();
+      }
+    });
 
     // Set and apply filter
     function setFilter(filterKey) {
@@ -440,12 +651,24 @@
       });
     }
 
-    // Setup Modals
+    // Setup Deposit/Withdraw Informational Modals
     setupModals();
 
-    // Initial Render
+    // Initial Dynamic Calculation & Render
+    updateBalanceCards();
     updateFilterCounts();
     setFilter('all');
+
+    // Export controller methods
+    window.PassbookController = {
+      init: initPassbookPage,
+      getDemoTransactions: () => DEMO_TRANSACTIONS,
+      calculateLedgerSummary: calculateLedgerSummary,
+      getFilteredTransactions: getFilteredTransactions,
+      setFilter: setFilter,
+      openTxnDetailsModal: openTxnDetailsModal,
+      closeTxnDetailsModal: closeTxnDetailsModal
+    };
   }
 
   // Bind to DOM
@@ -454,10 +677,5 @@
   } else {
     initPassbookPage();
   }
-
-  // Export controller for programmatic testing
-  window.PassbookController = {
-    init: initPassbookPage,
-    getDemoTransactions: () => DEMO_TRANSACTIONS
-  };
 })();
+
