@@ -11,17 +11,23 @@ const express = require('express');
 const cors = require('cors');
 
 const requestLogger = require('./src/middleware/logger');
+const securityHeaders = require('./src/middleware/securityHeaders');
 const { notFoundHandler, centralErrorHandler } = require('./src/middleware/errorHandler');
 const healthRoutes = require('./src/routes/health');
+const authRoutes = require('./src/routes/auth');
+const { initializeDatabase } = require('./src/config/initDb');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// 1. Safe Request Logging
+// 1. HTTP Security Headers
+app.use(securityHeaders);
+
+// 2. Safe Request Logging
 app.use(requestLogger);
 
-// 2. CORS Configuration
+// 3. CORS Configuration
 const allowedOrigins = [
   process.env.FRONTEND_ORIGIN || 'http://localhost:5500',
   'http://127.0.0.1:5500',
@@ -31,21 +37,25 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
+    if (!origin) return callback(null, true);
+    if (NODE_ENV === 'production') {
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS policy: Access denied for this origin.'));
     }
-    return callback(null, true); // Permissive in local dev, restricted in prod
+    return callback(null, true);
   },
   credentials: true
 }));
 
-// 3. Body Parsing Middleware
+// 4. Body Parsing Middleware
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// 4. API Routes Mounting
+// 5. API Routes Mounting
 app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
 
 // Root informational endpoint
 app.get('/', (req, res) => {
@@ -56,7 +66,13 @@ app.get('/', (req, res) => {
     documentation: '/docs',
     endpoints: {
       health: '/api/health',
-      databaseDiagnostic: '/api/health/db'
+      databaseDiagnostic: '/api/health/db',
+      authRegister: 'POST /api/auth/register',
+      authLogin: 'POST /api/auth/login',
+      authMe: 'GET /api/auth/me',
+      authProfile: 'PUT /api/auth/profile',
+      authPassword: 'POST /api/auth/change-password',
+      authLogout: 'POST /api/auth/logout'
     }
   });
 });
@@ -69,6 +85,11 @@ app.use(centralErrorHandler);
 
 // 7. Start Server Listener (only if not required by a test suite)
 if (require.main === module) {
+  // Ensure tables exist
+  initializeDatabase().catch((err) => {
+    console.warn('[STARTUP] Database auto-initialization note:', err.message);
+  });
+
   const server = app.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`  IRONMAN TOSS BOOK API Server`);

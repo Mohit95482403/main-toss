@@ -237,16 +237,15 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Passbook Page Enhancement | Completed (Day 10) | Dynamic ledger balance derivation (`calculateLedgerSummary()`), enriched transaction metadata (category, method, reference code, remarks), interactive Transaction Details modal dialog, synchronized header balances, unified search, and empty state reset |
 | Profile & Account Settings Enhancement | Completed (Day 11) | Dynamic avatar initials badge (`#hero-avatar-initials`), real-time error clearing, button loading states ("Saving...", "Updating..."), password policy validation, notification switches with toast feedback, and session clearance on logout |
 | UI Consistency & Shared Components | Completed (Day 12) | Standardized status badges (.badge-live, .badge-won, .badge-lost, etc.), skeleton loaders (.skeleton, .skeleton-text), inline alerts (.alert), standardized empty states across all feeds (.empty-state), reusable toast notification engine (SharedLayout.showToast), INR currency & date formatters, button loading states (.btn-loading, .btn-spinner), safe-area bottom navigation, and global modal Escape listener |
-| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 13 |
-| Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 13 |
-| Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 13 |
-| Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 14 |
+| Auth Security & Backend API Protection | Completed (Day 13) | MySQL users & wallets relational schema DDL, scrypt password hashing with unique salts, HS256 signed JWT tokens, timing-safe equality verification, in-memory rate-limiter, security headers (nosniff, SAMEORIGIN), authentication middleware (Bearer token & role guard), sanitized user responses, IDOR protection, mass-assignment defense, and full endpoint suite (register, login, me, profile, change-password, logout) |
+| Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 14 |
+| Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 15 |
 | Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5 & 10; real payment flow scheduled for Days 15 & 16 |
 | Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
 > [!NOTE]
-> **Application-Wide Consistency & UI Foundations (Day 12)**:
-> Day 12 establishes application-wide UI consistency across all pages (Home, Match Details, Bets, Passbook, Profile, and Authentication). Reusable components include a standardized toast notification system (`SharedLayout.showToast`), skeleton loaders (`.skeleton`), unified status badges, centralized empty state pattern (`.empty-state`), formatters (`formatCurrency`, `formatDate`), button loading controllers (`setButtonLoading`), and mobile safe-area insets (`env(safe-area-inset-bottom)`). Real backend database persistence and betting business APIs continue on **Day 13**.
+> **Authentication Security & Backend API Protection (Day 13)**:
+> Day 13 activates production-grade authentication security on the Express backend and MySQL database. Core tables (`users`, `wallets`, `sessions`, `user_preferences`) are instantiated via `backend/database/schema.sql` and initialized automatically on startup. User passwords are cryptographically hashed using Node's native `scrypt` with unique 16-byte salts and verified with `crypto.timingSafeEqual`. Authenticated sessions issue signed HS256 tokens. The API suite is fully protected with in-memory rate limiting, security headers, role-based access control, IDOR defense, and mass-assignment shielding. Bet placement and wager settlement APIs continue on **Day 14**.
 
 ---
 

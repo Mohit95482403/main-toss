@@ -9,7 +9,13 @@ const APP_CONFIG = Object.freeze({
     ? 'http://localhost:5000/api'
     : '/api',
   endpoints: {
-    health: '/health'
+    health: '/health',
+    authRegister: '/auth/register',
+    authLogin: '/auth/login',
+    authMe: '/auth/me',
+    authProfile: '/auth/profile',
+    authChangePassword: '/auth/change-password',
+    authLogout: '/auth/logout'
   },
   defaultTheme: 'light',
   
