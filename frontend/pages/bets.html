@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>IRONMAN TOSS BOOK | Bets</title>
-  <meta name="description" content="IRONMAN TOSS BOOK - My Bets &amp; Toss History">
+  <title>My Bets | IRONMAN TOSS BOOK</title>
+  <meta name="description" content="View your live, won, lost, and settled toss betting history on IRONMAN TOSS BOOK.">
 
   <!-- Core Design System CSS -->
   <link rel="stylesheet" href="../css/variables.css">
@@ -19,6 +19,9 @@
   <link rel="stylesheet" href="../css/header.css">
   <link rel="stylesheet" href="../css/announcement-ticker.css">
   <link rel="stylesheet" href="../css/bottom-navigation.css">
+
+  <!-- Bets Page CSS (Day 4) -->
+  <link rel="stylesheet" href="../css/bets.css">
 </head>
 <body data-page="bets" data-in-pages="true">
   <div class="app-wrapper">
@@ -33,44 +36,42 @@
       <!-- Bets Page Content Area -->
       <div class="main-content">
         
-        <section class="card card-elevated" aria-labelledby="bets-page-heading">
-          <div class="card-body flex flex-col gap-sm">
-            <div class="flex items-center justify-between">
-              <span class="badge badge-info badge-pill">Navigation Verified</span>
-              <span class="text-sm text-muted">Tab: Bets</span>
-            </div>
-            <h1 id="bets-page-heading" class="h2">Bets Feed Shell</h1>
-            <p>
-              You are currently viewing the <strong>Bets</strong> section shell. The shared header, ticker, and bottom navigation bar have rendered seamlessly with the <strong>Bets</strong> tab active.
-            </p>
+        <!-- Page Title & Metric Row -->
+        <header class="bets-header-section">
+          <div class="bets-page-title-row">
+            <h1 class="bets-page-title">My Bets</h1>
+            <span class="bets-total-count" id="total-bets-count">6 Total Bets</span>
           </div>
-        </section>
+          <p class="text-sm text-muted">Track your live toss wagers, win/loss rates, and settlement records.</p>
+        </header>
 
-        <!-- Preview of Day 4 Specifications -->
-        <section class="card" aria-labelledby="bets-roadmap-heading">
-          <header class="card-header">
-            <h2 id="bets-roadmap-heading" class="h4">Scheduled Implementation: Day 4</h2>
-          </header>
-          <div class="card-body flex flex-col gap-md">
-            <p class="text-sm">
-              Per <code>docs/SCREENSHOT_ANALYSIS.md</code>, this view will feature:
-            </p>
-            <div class="flex items-center gap-xs" style="flex-wrap: wrap; opacity: 0.85;">
-              <span class="badge badge-primary">All</span>
-              <span class="badge badge-secondary">Live</span>
-              <span class="badge badge-success">Won</span>
-              <span class="badge badge-danger">Lost</span>
-              <span class="badge badge-warning">No Result</span>
-            </div>
-            <p class="text-sm text-muted">
-              Full card feed, odds display, and toss settlement statuses will be implemented on Day 4.
-            </p>
-          </div>
-        </section>
+        <!-- Status Filter Segmented Navigation Strip -->
+        <nav class="bets-filter-strip" aria-label="Filter Bets by Status" role="region">
+          <button type="button" class="filter-btn active" data-filter="all" aria-pressed="true">
+            All <span class="filter-count">6</span>
+          </button>
+          <button type="button" class="filter-btn" data-filter="live" aria-pressed="false">
+            Live <span class="filter-count">1</span>
+          </button>
+          <button type="button" class="filter-btn" data-filter="won" aria-pressed="false">
+            Won <span class="filter-count">2</span>
+          </button>
+          <button type="button" class="filter-btn" data-filter="lost" aria-pressed="false">
+            Lost <span class="filter-count">2</span>
+          </button>
+          <button type="button" class="filter-btn" data-filter="no_result" aria-pressed="false">
+            No Result <span class="filter-count">1</span>
+          </button>
+        </nav>
+
+        <!-- Dynamic Date-Grouped Bet Cards Feed -->
+        <div id="bets-feed-container" class="bets-feed-container" aria-live="polite">
+          <!-- Populated dynamically via bets.js -->
+        </div>
 
       </div>
 
-      <!-- Bottom Spacer -->
+      <!-- Bottom Spacer to prevent navigation overlap -->
       <div class="bottom-nav-spacer" aria-hidden="true"></div>
 
       <!-- Shared Bottom Navigation Mounting Container -->
@@ -84,5 +85,6 @@
   <script src="../js/shared-layout.js"></script>
   <script src="../js/navigation.js"></script>
   <script src="../js/app.js"></script>
+  <script src="../js/bets.js"></script>
 </body>
 </html>

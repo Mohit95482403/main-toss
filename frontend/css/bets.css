@@ -1,0 +1,460 @@
+/**
+ * IRONMAN TOSS BOOK - Bets Page Styles (Day 4)
+ * Filter strip, date grouping, bet history cards, status badges, and empty states.
+ */
+
+/* ==========================================================================
+   Page Header Title & Overview
+   ========================================================================== */
+
+.bets-header-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs, 4px);
+}
+
+.bets-page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bets-page-title {
+  font-size: 1.25rem; /* 20px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+  letter-spacing: -0.01em;
+}
+
+.bets-total-count {
+  font-size: 0.75rem; /* 12px */
+  font-weight: 600;
+  color: var(--color-primary, #0860BE);
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  padding: 3px 8px;
+  border-radius: var(--radius-full, 9999px);
+}
+
+[data-theme="dark"] .bets-total-count {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #93C5FD;
+}
+
+/* ==========================================================================
+   Status Filters Horizontal Strip
+   ========================================================================== */
+
+.bets-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  overflow-x: auto;
+  padding: 2px 0 6px 0;
+  scrollbar-width: none; /* Firefox */
+  -webkit-overflow-scrolling: touch;
+  user-select: none;
+}
+
+.bets-filter-strip::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
+
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  font-size: 0.75rem; /* 12px */
+  font-weight: 600;
+  color: var(--color-text-secondary, #4B5563);
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-full, 9999px);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.filter-btn:hover:not(.active) {
+  background-color: var(--color-surface-hover, #F8FAFC);
+  color: var(--color-text, #15171A);
+  border-color: var(--color-text-muted, #737B87);
+}
+
+.filter-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #0860BE);
+  outline-offset: 2px;
+}
+
+/* Active Filter Pill */
+.filter-btn.active {
+  background-color: var(--color-primary, #0860BE);
+  color: #FFFFFF;
+  border-color: var(--color-primary, #0860BE);
+  box-shadow: 0 2px 4px rgba(8, 96, 190, 0.25);
+}
+
+.filter-count {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-full, 9999px);
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.filter-btn.active .filter-count {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .filter-btn {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+  color: var(--color-text-secondary, #94A3B8);
+}
+
+[data-theme="dark"] .filter-btn.active {
+  background-color: var(--color-primary, #3B82F6);
+  border-color: var(--color-primary, #3B82F6);
+  color: #FFFFFF;
+}
+
+/* ==========================================================================
+   Date Grouping Sections
+   ========================================================================== */
+
+.bets-feed-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg, 16px);
+}
+
+.date-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+}
+
+.date-group-heading {
+  font-size: 0.75rem; /* 12px */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #737B87);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  padding: 0 2px;
+}
+
+.date-group-heading::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--color-border-subtle, #EEF0F2);
+}
+
+[data-theme="dark"] .date-group-heading::after {
+  background-color: var(--color-border, #243042);
+}
+
+/* ==========================================================================
+   Bet History Information Cards
+   ========================================================================== */
+
+.bet-card {
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.bet-card:hover {
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+[data-theme="dark"] .bet-card {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+/* Card Header: Tournament & Status Badge */
+.bet-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  border-bottom: 1px solid var(--color-border-subtle, #EEF0F2);
+}
+
+[data-theme="dark"] .bet-card-header {
+  background-color: #121824;
+  border-bottom-color: #243042;
+}
+
+.tournament-badge {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary, #0860BE);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+[data-theme="dark"] .tournament-badge {
+  color: #60A5FA;
+}
+
+/* Status Badges */
+.bet-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius-full, 9999px);
+}
+
+.bet-status-pill svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Status: Won */
+.status-won {
+  background-color: var(--color-success-bg, #DCFCE7);
+  color: var(--color-success-text, #14532D);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+/* Status: Lost */
+.status-lost {
+  background-color: var(--color-danger-bg, #FEE2E2);
+  color: var(--color-danger-text, #7F1D1D);
+  border: 1px solid rgba(214, 40, 40, 0.2);
+}
+
+/* Status: Live */
+.status-live {
+  background-color: var(--color-info-bg, #E0F2FE);
+  color: var(--color-info-text, #075985);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+.live-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-info, #0284C7);
+  animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+/* Status: No Result */
+.status-no-result {
+  background-color: var(--color-warning-bg, #FEF3C7);
+  color: var(--color-warning-text, #78350F);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* Card Body Content */
+.bet-card-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 6px);
+}
+
+.match-title {
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+  line-height: 1.3;
+}
+
+.selection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+}
+
+.selection-choice {
+  font-weight: 700;
+  color: var(--color-primary, #0860BE);
+}
+
+[data-theme="dark"] .selection-choice {
+  color: #93C5FD;
+}
+
+/* Financial Odds & Stake Metrics Grid */
+.metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-xs, 6px);
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  padding: 8px 10px;
+  border-radius: var(--radius-md, 8px);
+  margin-top: 4px;
+}
+
+[data-theme="dark"] .metrics-row {
+  background-color: #121824;
+}
+
+.metric-cell {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.metric-cell:last-child {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.metric-label {
+  font-size: 0.625rem; /* 10px */
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #737B87);
+}
+
+.metric-val {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+}
+
+.metric-val.payout-won {
+  color: var(--color-success, #16A34A);
+}
+
+.metric-val.payout-lost {
+  color: var(--color-danger, #D62828);
+}
+
+/* Card Footer: Settlement result explanation */
+.bet-card-footer {
+  padding: 8px 14px;
+  background-color: var(--color-surface, #FFFFFF);
+  border-top: 1px dashed var(--color-border-subtle, #EEF0F2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.6875rem; /* 11px */
+  color: var(--color-text-muted, #737B87);
+}
+
+[data-theme="dark"] .bet-card-footer {
+  background-color: var(--color-surface, #151D2A);
+  border-top-color: #243042;
+}
+
+.result-text {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.placed-time {
+  white-space: nowrap;
+  font-size: 0.625rem; /* 10px */
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.bets-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-2xl, 32px) var(--space-lg, 16px);
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px dashed var(--color-border, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  gap: var(--space-sm, 8px);
+}
+
+[data-theme="dark"] .bets-empty-state {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+.empty-state-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--color-surface-subtle, #F1F4F8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted, #737B87);
+  margin-bottom: var(--space-2xs, 2px);
+}
+
+.empty-state-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+}
+
+.empty-state-title {
+  font-size: 1rem; /* 16px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+}
+
+.empty-state-desc {
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+  max-width: 280px;
+  margin-bottom: var(--space-xs, 4px);
+}
+
+/* Small mobile responsiveness */
+@media (max-width: 360px) {
+  .bet-card-header,
+  .bet-card-body,
+  .bet-card-footer {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .match-title {
+    font-size: 0.875rem; /* 14px */
+  }
+
+  .metrics-row {
+    padding: 6px 8px;
+  }
+
+  .metric-val {
+    font-size: 0.75rem; /* 12px */
+  }
+}
