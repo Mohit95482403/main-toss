@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>IRONMAN TOSS BOOK | Project Initialization &amp; Foundation</title>
-  <meta name="description" content="IRONMAN TOSS BOOK - A clean, modern sports toss wagering and ledger platform. Currently on Day 1: Project Initialization and Foundation.">
+  <title>IRONMAN TOSS BOOK | Home &amp; Shared Navigation</title>
+  <meta name="description" content="IRONMAN TOSS BOOK - Responsive Sports Toss Wagering &amp; Ledger Platform. Featuring shared header, live ticker, and bottom navigation.">
 
   <!-- Core Design System CSS -->
   <link rel="stylesheet" href="css/variables.css">
@@ -14,38 +14,64 @@
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/responsive.css">
+
+  <!-- Shared Layout Component CSS (Day 2) -->
+  <link rel="stylesheet" href="css/header.css">
+  <link rel="stylesheet" href="css/announcement-ticker.css">
+  <link rel="stylesheet" href="css/bottom-navigation.css">
 </head>
-<body>
+<body data-page="home">
   <div class="app-wrapper">
     <main class="app-container" id="app-root">
       
-      <!-- Top Development Notice Bar -->
-      <header class="card-header flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
-        <div class="flex items-center gap-sm">
-          <span class="status-dot status-dot-active" aria-hidden="true"></span>
-          <span style="font-weight: var(--font-weight-bold); color: var(--color-primary); font-size: var(--font-size-md);">
-            IRONMAN TOSS BOOK
-          </span>
-        </div>
-        <span class="badge badge-primary badge-pill">Day 1 of 20</span>
-      </header>
+      <!-- Shared Header Mounting Container -->
+      <div id="shared-header"></div>
 
-      <!-- Main Welcome & Verification Body -->
+      <!-- Shared Announcement Ticker Mounting Container -->
+      <div id="shared-ticker"></div>
+
+      <!-- Main Home & Verification Body -->
       <div class="main-content">
         
         <!-- Welcome Hero -->
         <section class="card card-elevated" aria-labelledby="welcome-heading">
           <div class="card-body flex flex-col gap-sm">
-            <span class="badge badge-warning" style="width: fit-content;">Development In Progress</span>
-            <h1 id="welcome-heading" style="font-size: var(--font-size-xl);">Project Foundation Active</h1>
+            <div class="flex items-center justify-between">
+              <span class="badge badge-success badge-pill">Day 2 Active</span>
+              <span class="text-sm text-muted">Home Dashboard View</span>
+            </div>
+            <h1 id="welcome-heading" style="font-size: var(--font-size-xl);">Shared Interface Active</h1>
             <p>
-              Welcome to the foundation build for <strong>IRONMAN TOSS BOOK</strong>. The project architecture, CSS design system, and backend diagnostics have been initialized.
+              The shared header with account indicators (<strong>Available Balance</strong> in blue and <strong>Exposure</strong> in red), continuous announcement ticker, and 4-tab mobile bottom navigation are now operational.
             </p>
-            <div class="flex items-center gap-sm" style="margin-top: var(--space-xs);">
+            <div class="flex items-center gap-sm" style="margin-top: var(--space-xs); flex-wrap: wrap;">
               <button type="button" class="btn btn-secondary btn-sm" id="theme-toggle-btn">
                 🌙 Switch to Dark Mode
               </button>
+              <button type="button" class="btn btn-outline btn-sm" id="test-balance-btn">
+                Simulate Balance Update
+              </button>
             </div>
+          </div>
+        </section>
+
+        <!-- Balance Indicator Demonstration Notice -->
+        <section class="card" aria-labelledby="balance-info-heading">
+          <header class="card-header flex items-center justify-between">
+            <h2 id="balance-info-heading" class="h4">Header Balance Indicators</h2>
+            <span class="badge badge-primary badge-pill">Verified</span>
+          </header>
+          <div class="card-body flex flex-col gap-sm">
+            <p class="text-sm">
+              The header displays two real-time indicators matching the reference screenshots:
+            </p>
+            <ul class="flex flex-col gap-xs text-sm" style="padding-left: var(--space-md);">
+              <li><strong style="color: var(--color-primary);">&#9632; Available Balance (Bal):</strong> Formatted in Rupee currency. Dynamically reactive to account events.</li>
+              <li><strong style="color: var(--color-danger);">&#9632; Active Exposure (Exp):</strong> Reflects committed funds in open toss markets.</li>
+            </ul>
+            <small class="text-muted">
+              Note: Current values are development mock presentations. Real financial accounts are integrated on Day 14.
+            </small>
           </div>
         </section>
 
@@ -68,50 +94,23 @@
           </div>
         </section>
 
-        <!-- Foundation Design Tokens Verification -->
-        <section class="card" aria-labelledby="tokens-heading">
-          <header class="card-header">
-            <h2 id="tokens-heading" class="h4">Design System Verification</h2>
-          </header>
-          <div class="card-body flex flex-col gap-md">
-            <div>
-              <p class="text-sm" style="margin-bottom: var(--space-xs);">Semantic Status Badges:</p>
-              <div class="flex items-center gap-xs" style="flex-wrap: wrap;">
-                <span class="badge badge-success badge-pill">Won (Green)</span>
-                <span class="badge badge-danger badge-pill">Lost (Red)</span>
-                <span class="badge badge-warning badge-pill">Pending (Amber)</span>
-                <span class="badge badge-info badge-pill">Live Match</span>
-              </div>
-            </div>
-
-            <div>
-              <p class="text-sm" style="margin-bottom: var(--space-xs);">Button Hierarchy:</p>
-              <div class="flex items-center gap-sm" style="flex-wrap: wrap;">
-                <button type="button" class="btn btn-primary btn-sm">Primary Action</button>
-                <button type="button" class="btn btn-secondary btn-sm">Secondary</button>
-                <button type="button" class="btn btn-outline btn-sm">Outline</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <!-- 20-Day Roadmap Summary -->
         <section class="card" aria-labelledby="roadmap-heading">
           <header class="card-header">
-            <h2 id="roadmap-heading" class="h4">20-Day Roadmap Status</h2>
+            <h2 id="roadmap-heading" class="h4">20-Day Roadmap Progress</h2>
           </header>
           <div class="card-body flex flex-col gap-sm">
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 1:</strong> Initialization &amp; Foundation</span>
-              <span class="badge badge-success badge-pill">Active / Ready</span>
+              <span class="badge badge-success badge-pill">Completed</span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 2:</strong> Shared Header, Ticker &amp; Navigation</span>
-              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
+              <span class="badge badge-success badge-pill">Active / Verified</span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 3:</strong> Auth &amp; Registration UI</span>
-              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span><strong>Day 4:</strong> Bets Page UI</span>
@@ -125,32 +124,43 @@
               <span><strong>Day 6:</strong> Profile Page &amp; Settings</span>
               <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-              <span><strong>Days 7–20:</strong> Features, APIs, Security &amp; Deploy</span>
-              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
-            </div>
           </div>
-          <footer class="card-footer text-center">
-            <small class="text-muted">
-              Refer to <code>docs/DEVELOPMENT_ROADMAP.md</code> for full 20-day specifications.
-            </small>
-          </footer>
         </section>
 
       </div>
 
-      <!-- Footer Info -->
-      <footer style="padding: var(--space-md); text-align: center; border-top: 1px solid var(--color-border-subtle);">
-        <small class="text-muted">
-          IRONMAN TOSS BOOK &copy; 2026 &bull; Production Foundation v1.0.0
-        </small>
-      </footer>
+      <!-- Bottom Spacer to prevent fixed navigation from obscuring content -->
+      <div class="bottom-nav-spacer" aria-hidden="true"></div>
+
+      <!-- Shared Fixed Bottom Navigation Mounting Container -->
+      <div id="shared-bottom-nav"></div>
 
     </main>
   </div>
 
   <!-- Application Logic Scripts -->
   <script src="js/config.js"></script>
+  <script src="js/shared-layout.js"></script>
+  <script src="js/navigation.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    // Day 2 Interactive Balance Simulator
+    document.addEventListener('DOMContentLoaded', function () {
+      var isToggled = false;
+      var testBtn = document.getElementById('test-balance-btn');
+      if (testBtn) {
+        testBtn.addEventListener('click', function () {
+          isToggled = !isToggled;
+          if (isToggled) {
+            window.SharedLayout.updateBalances('1,250.00', '250.00');
+            testBtn.textContent = 'Reset Mock Balances';
+          } else {
+            window.SharedLayout.updateBalances('0.00', '0.00');
+            testBtn.textContent = 'Simulate Balance Update';
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>

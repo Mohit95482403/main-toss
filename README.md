@@ -26,16 +26,25 @@ The platform intentionally leverages standard, lightweight, and performant web t
 ```text
 toss/
 ├── frontend/                     # Client-side web application
-│   ├── index.html                # Entry point & foundation test page
+│   ├── index.html                # Home page with shared layout & diagnostics
+│   ├── pages/                    # Sub-pages
+│   │   ├── bets.html             # Bets view shell (active tab test)
+│   │   ├── passbook.html         # Passbook ledger shell (active tab test)
+│   │   └── profile.html          # Profile settings shell (active tab test)
 │   ├── css/
 │   │   ├── variables.css         # Design tokens, color palette, spacing, typography
 │   │   ├── reset.css             # Cross-browser CSS normalization
 │   │   ├── global.css            # Base typography, link states, focus-visible
 │   │   ├── layout.css            # Mobile-first app container & flex utilities
 │   │   ├── components.css        # Buttons, cards, form inputs, status badges
-│   │   └── responsive.css        # Breakpoints & accessibility (prefers-reduced-motion)
+│   │   ├── responsive.css        # Breakpoints & accessibility (prefers-reduced-motion)
+│   │   ├── header.css            # Shared header, logo fallback, balance pills
+│   │   ├── announcement-ticker.css # Ticker continuous marquee & dual tracks
+│   │   └── bottom-navigation.css # 4-tab fixed bottom navigation bar
 │   ├── js/
-│   │   ├── config.js             # API base URL & runtime configuration
+│   │   ├── config.js             # API base URL, mock balances, announcements config
+│   │   ├── shared-layout.js      # Shared Header, Ticker & Nav rendering engine
+│   │   ├── navigation.js         # Tab active states & accessibility controller
 │   │   └── app.js                # Theme switcher & backend health check probe
 │   └── assets/                   # Static media, icons, and fonts
 │
@@ -182,7 +191,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 1 of 20)
+## 9. Current Implementation Status (Day 2 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -192,14 +201,18 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Frontend Entry Point | Completed | Verified responsive layout, zero overflow, Dark Mode toggle |
 | Backend Server | Completed | Express server, request logger, 404 handler, central error handler |
 | API Health Endpoint | Completed | `GET /api/health` verified with 200 OK |
+| Shared Header | Completed (Day 2) | Brand logo fallback, Available balance (blue), Exposure (red) |
+| Announcement Ticker | Completed (Day 2) | Continuous marquee with dual track loop, English & Hindi, pause on hover |
+| Bottom Navigation | Completed (Day 2) | 4 tabs (Home, Bets, Passbook, Profile) with SVGs, active states, safe-area support |
 | MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 9 |
-| Bets / Wagers | Out of Scope | Scheduled for Day 4 (UI) and Day 13 (APIs) |
-| Wallet / Passbook | Out of Scope | Scheduled for Day 5 (UI) and Day 14 (APIs) |
+| Bets / Wagers | Out of Scope | Shell created for navigation; full UI scheduled for Day 4 |
+| Wallet / Passbook | Out of Scope | Shell created for navigation; full UI scheduled for Day 5 |
+| Profile & Settings | Out of Scope | Shell created for navigation; full UI scheduled for Day 6 |
 | Auth & Admin Area | Out of Scope | Scheduled for Days 3, 11, 16, 17 |
 
 > [!WARNING]
-> **Financial & Betting Transactions are Strictly Out of Scope for Day 1**:
-> No real or fake wallet transactions, balance modifications, deposits, withdrawals, or wager settlements are active on Day 1. All financial elements displayed on the welcome page are purely demonstrative design system tokens.
+> **Financial & Betting Transactions are Strictly Out of Scope for Days 1 & 2**:
+> No real or fake wallet transactions, balance modifications, deposits, withdrawals, or wager settlements are active on Day 2. All financial elements displayed on the header are purely demonstrative mock indicators.
 
 ---
 

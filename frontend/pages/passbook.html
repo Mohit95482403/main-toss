@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>IRONMAN TOSS BOOK | Passbook</title>
+  <meta name="description" content="IRONMAN TOSS BOOK - Passbook &amp; Financial Ledger">
+
+  <!-- Core Design System CSS -->
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+
+  <!-- Shared Layout Component CSS -->
+  <link rel="stylesheet" href="../css/header.css">
+  <link rel="stylesheet" href="../css/announcement-ticker.css">
+  <link rel="stylesheet" href="../css/bottom-navigation.css">
+</head>
+<body data-page="passbook" data-in-pages="true">
+  <div class="app-wrapper">
+    <main class="app-container" id="app-root">
+      
+      <!-- Shared Header Mounting Container -->
+      <div id="shared-header"></div>
+
+      <!-- Shared Announcement Ticker Mounting Container -->
+      <div id="shared-ticker"></div>
+
+      <!-- Passbook Page Content Area -->
+      <div class="main-content">
+        
+        <section class="card card-elevated" aria-labelledby="passbook-page-heading">
+          <div class="card-body flex flex-col gap-sm">
+            <div class="flex items-center justify-between">
+              <span class="badge badge-info badge-pill">Navigation Verified</span>
+              <span class="text-sm text-muted">Tab: Passbook</span>
+            </div>
+            <h1 id="passbook-page-heading" class="h2">Passbook Ledger Shell</h1>
+            <p>
+              You are currently viewing the <strong>Passbook</strong> section shell. The shared header, ticker, and bottom navigation bar have rendered seamlessly with the <strong>Passbook</strong> tab active.
+            </p>
+          </div>
+        </section>
+
+        <!-- Preview of Day 5 Specifications -->
+        <section class="card" aria-labelledby="passbook-roadmap-heading">
+          <header class="card-header">
+            <h2 id="passbook-roadmap-heading" class="h4">Scheduled Implementation: Day 5</h2>
+          </header>
+          <div class="card-body flex flex-col gap-md">
+            <p class="text-sm">
+              Per <code>docs/SCREENSHOT_ANALYSIS.md</code>, this view will feature:
+            </p>
+            <ul class="flex flex-col gap-xs text-sm" style="padding-left: var(--space-md);">
+              <li>Hero Account Balance Card with Deposit &amp; Withdraw CTAs</li>
+              <li>Transaction search field &amp; activity filters (All, Credit, Debit)</li>
+              <li>Signed transaction amounts (+₹ Credit in green, -₹ Debit in red)</li>
+            </ul>
+            <p class="text-sm text-muted">
+              Complete transaction feed and search debouncing will be built on Day 5.
+            </p>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Bottom Spacer -->
+      <div class="bottom-nav-spacer" aria-hidden="true"></div>
+
+      <!-- Shared Bottom Navigation Mounting Container -->
+      <div id="shared-bottom-nav"></div>
+
+    </main>
+  </div>
+
+  <!-- Application Logic Scripts -->
+  <script src="../js/config.js"></script>
+  <script src="../js/shared-layout.js"></script>
+  <script src="../js/navigation.js"></script>
+  <script src="../js/app.js"></script>
+</body>
+</html>

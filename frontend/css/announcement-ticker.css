@@ -1,0 +1,112 @@
+/**
+ * IRONMAN TOSS BOOK - Announcement Ticker Styles
+ * Pale blue background, deep blue text, seamless looping, pause on hover/focus, accessible.
+ */
+
+.announcement-ticker-container {
+  position: relative;
+  width: 100%;
+  height: var(--ticker-height, 32px);
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  border-bottom: 1px solid rgba(8, 96, 190, 0.12);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  user-select: none;
+  z-index: var(--z-ticker, 90);
+}
+
+[data-theme="dark"] .announcement-ticker-container {
+  background-color: var(--color-primary-subtle, #1E293B);
+  border-bottom-color: rgba(59, 130, 246, 0.2);
+}
+
+/* Left pinned announcement icon/badge */
+.ticker-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-sm, 8px);
+  height: 100%;
+  background-color: var(--color-primary, #0860BE);
+  color: #FFFFFF;
+  flex-shrink: 0;
+  z-index: 2;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+.ticker-badge svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* Ticker Marquee Viewport & Tracks */
+.ticker-viewport {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.ticker-track {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  will-change: transform;
+  animation: ticker-slide 28s linear infinite;
+}
+
+/* Pause ticker on hover or keyboard focus */
+.announcement-ticker-container:hover .ticker-track,
+.announcement-ticker-container:focus-within .ticker-track {
+  animation-play-state: paused;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  padding: 0 var(--space-lg, 16px);
+  font-size: 0.75rem; /* 12px */
+  font-weight: 600;
+  color: var(--color-primary, #0860BE);
+  letter-spacing: 0.02em;
+}
+
+[data-theme="dark"] .ticker-item {
+  color: #93C5FD;
+}
+
+.ticker-separator {
+  color: rgba(8, 96, 190, 0.4);
+  font-size: 0.625rem;
+}
+
+[data-theme="dark"] .ticker-separator {
+  color: rgba(147, 197, 253, 0.4);
+}
+
+/* Smooth continuous marquee animation */
+@keyframes ticker-slide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* ==========================================================================
+   Reduced Motion Accessibility Preference
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+    overflow-x: auto;
+    scroll-behavior: auto;
+  }
+}

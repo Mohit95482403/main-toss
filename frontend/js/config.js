@@ -4,14 +4,36 @@
 
 const APP_CONFIG = Object.freeze({
   appName: 'IRONMAN TOSS BOOK',
-  version: '1.0.0-day1',
+  version: '1.0.0-day2',
   apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5000/api'
     : '/api',
   endpoints: {
     health: '/health'
   },
-  defaultTheme: 'light'
+  defaultTheme: 'light',
+  
+  // Visual presentation initial balances (mock values for development preview)
+  initialBalances: {
+    available: '0.00',
+    exposure: '0.00',
+    currencySymbol: '₹'
+  },
+
+  // Centralized Announcement Ticker Messages (Supports English & Hindi)
+  announcements: [
+    'WELCOME TO IRONMAN TOSS BOOK',
+    '100% SECURE & LIGHTNING FAST SETTLEMENT',
+    'टॉस के बेताज बादशाह - हर मैच का लाइव टॉस उपलब्ध',
+    'ALL INTERNATIONAL & T20 LEAGUE MATCHES ACTIVE',
+    '24/7 DEDICATED CUSTOMER SUPPORT'
+  ],
+
+  // Brand Logo configuration
+  logo: {
+    src: 'assets/images/logo.png',
+    alt: 'IRONMAN TOSS BOOK Logo'
+  }
 });
 
 // Export to window namespace for vanilla script consumption

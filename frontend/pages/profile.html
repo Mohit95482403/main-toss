@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>IRONMAN TOSS BOOK | Profile</title>
+  <meta name="description" content="IRONMAN TOSS BOOK - User Profile, Settings, and Dark Mode">
+
+  <!-- Core Design System CSS -->
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+
+  <!-- Shared Layout Component CSS -->
+  <link rel="stylesheet" href="../css/header.css">
+  <link rel="stylesheet" href="../css/announcement-ticker.css">
+  <link rel="stylesheet" href="../css/bottom-navigation.css">
+</head>
+<body data-page="profile" data-in-pages="true">
+  <div class="app-wrapper">
+    <main class="app-container" id="app-root">
+      
+      <!-- Shared Header Mounting Container -->
+      <div id="shared-header"></div>
+
+      <!-- Shared Announcement Ticker Mounting Container -->
+      <div id="shared-ticker"></div>
+
+      <!-- Profile Page Content Area -->
+      <div class="main-content">
+        
+        <section class="card card-elevated" aria-labelledby="profile-page-heading">
+          <div class="card-body flex flex-col gap-sm">
+            <div class="flex items-center justify-between">
+              <span class="badge badge-info badge-pill">Navigation Verified</span>
+              <span class="text-sm text-muted">Tab: Profile</span>
+            </div>
+            <h1 id="profile-page-heading" class="h2">Profile &amp; Settings Shell</h1>
+            <p>
+              You are currently viewing the <strong>Profile</strong> section shell. The shared header, ticker, and bottom navigation bar have rendered seamlessly with the <strong>Profile</strong> tab active.
+            </p>
+            <div class="flex items-center gap-sm" style="margin-top: var(--space-xs);">
+              <button type="button" class="btn btn-secondary btn-sm" id="theme-toggle-btn">
+                🌙 Toggle Dark Mode
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Preview of Day 6 Specifications -->
+        <section class="card" aria-labelledby="profile-roadmap-heading">
+          <header class="card-header">
+            <h2 id="profile-roadmap-heading" class="h4">Scheduled Implementation: Day 6</h2>
+          </header>
+          <div class="card-body flex flex-col gap-md">
+            <p class="text-sm">
+              Per <code>docs/SCREENSHOT_ANALYSIS.md</code>, this view will feature:
+            </p>
+            <ul class="flex flex-col gap-xs text-sm" style="padding-left: var(--space-md);">
+              <li>User avatar summary card (Username, account ID)</li>
+              <li>App Rules modal &amp; settlement guidelines</li>
+              <li>Dark Mode toggle setting</li>
+              <li>Push / in-app notification preferences</li>
+              <li>Customer support contacts</li>
+            </ul>
+            <p class="text-sm text-muted">
+              Complete profile menu and preference persistence will be constructed on Day 6.
+            </p>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Bottom Spacer -->
+      <div class="bottom-nav-spacer" aria-hidden="true"></div>
+
+      <!-- Shared Bottom Navigation Mounting Container -->
+      <div id="shared-bottom-nav"></div>
+
+    </main>
+  </div>
+
+  <!-- Application Logic Scripts -->
+  <script src="../js/config.js"></script>
+  <script src="../js/shared-layout.js"></script>
+  <script src="../js/navigation.js"></script>
+  <script src="../js/app.js"></script>
+</body>
+</html>
