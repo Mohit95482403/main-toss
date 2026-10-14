@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>IRONMAN TOSS BOOK | Profile</title>
-  <meta name="description" content="IRONMAN TOSS BOOK - User Profile, Settings, and Dark Mode">
+  <title>IRONMAN TOSS BOOK | My Profile</title>
+  <meta name="description" content="Manage your IRONMAN TOSS BOOK user profile, account settings, notifications, and security preferences.">
 
   <!-- Core Design System CSS -->
   <link rel="stylesheet" href="../css/variables.css">
@@ -19,6 +19,9 @@
   <link rel="stylesheet" href="../css/header.css">
   <link rel="stylesheet" href="../css/announcement-ticker.css">
   <link rel="stylesheet" href="../css/bottom-navigation.css">
+
+  <!-- Profile Page CSS -->
+  <link rel="stylesheet" href="../css/profile.css">
 </head>
 <body data-page="profile" data-in-pages="true">
   <div class="app-wrapper">
@@ -31,53 +34,253 @@
       <div id="shared-ticker"></div>
 
       <!-- Profile Page Content Area -->
-      <div class="main-content">
+      <div class="main-content flex flex-col gap-md">
         
-        <section class="card card-elevated" aria-labelledby="profile-page-heading">
-          <div class="card-body flex flex-col gap-sm">
-            <div class="flex items-center justify-between">
-              <span class="badge badge-info badge-pill">Navigation Verified</span>
-              <span class="text-sm text-muted">Tab: Profile</span>
+        <!-- Page Title & Subtitle -->
+        <header class="profile-title-section" aria-labelledby="profile-heading">
+          <h1 id="profile-heading" class="profile-title">My Profile</h1>
+          <p class="text-sm text-secondary">
+            Manage your account information and preferences.
+          </p>
+        </header>
+
+        <!-- Profile Summary Hero Card -->
+        <section class="profile-hero-card" aria-label="User Profile Summary">
+          <div class="profile-hero-top">
+            <div class="profile-user-left">
+              <div class="profile-avatar-wrapper" aria-hidden="true">
+                <div class="profile-avatar-fallback">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+                <span class="profile-status-dot" title="Active Account"></span>
+              </div>
+              <div class="profile-user-meta">
+                <span class="profile-name" id="hero-profile-name">Rahul Sharma</span>
+                <span class="profile-handle" id="hero-profile-handle">@ironman_99</span>
+                <div class="profile-meta-row">
+                  <span class="profile-id-badge" id="hero-profile-id">UID-2026-8842</span>
+                  <span class="badge badge-success" id="hero-profile-status">Verified Demo</span>
+                </div>
+              </div>
             </div>
-            <h1 id="profile-page-heading" class="h2">Profile &amp; Settings Shell</h1>
-            <p>
-              You are currently viewing the <strong>Profile</strong> section shell. The shared header, ticker, and bottom navigation bar have rendered seamlessly with the <strong>Profile</strong> tab active.
-            </p>
-            <div class="flex items-center gap-sm" style="margin-top: var(--space-xs); flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary btn-sm" id="theme-toggle-btn">
-                🌙 Toggle Dark Mode
-              </button>
-              <a href="login.html" class="btn btn-primary btn-sm">Sign In</a>
-              <a href="register.html" class="btn btn-outline btn-sm">Create Account</a>
+
+            <button type="button" class="profile-edit-btn" id="edit-profile-btn" aria-haspopup="dialog">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              <span>Edit</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Personal Information Section Card -->
+        <section class="profile-section-card" aria-labelledby="personal-info-heading">
+          <header class="profile-card-header">
+            <h2 id="personal-info-heading" class="profile-card-title">Personal Information</h2>
+            <span class="badge badge-neutral text-xs">Demo Profile</span>
+          </header>
+          <div class="profile-info-grid">
+            <div class="profile-info-item">
+              <span class="profile-info-label">Full Name</span>
+              <span class="profile-info-value" id="info-fullname">Rahul Sharma</span>
+            </div>
+            <div class="profile-info-item">
+              <span class="profile-info-label">Username</span>
+              <span class="profile-info-value" id="info-username">@ironman_99</span>
+            </div>
+            <div class="profile-info-item">
+              <span class="profile-info-label">Email Address</span>
+              <span class="profile-info-value" id="info-email">rahul.sharma@example.com</span>
+            </div>
+            <div class="profile-info-item">
+              <span class="profile-info-label">Phone Number</span>
+              <span class="profile-info-value" id="info-phone">+91 98765 43210</span>
+            </div>
+            <div class="profile-info-item">
+              <span class="profile-info-label">Account Created</span>
+              <span class="profile-info-value" id="info-joined">15 Aug 2026</span>
+            </div>
+            <div class="profile-info-item">
+              <span class="profile-info-label">Verification Status</span>
+              <span class="profile-info-value" id="info-kyc">KYC Tier 1 (Demo)</span>
             </div>
           </div>
         </section>
 
-        <!-- Preview of Day 6 Specifications -->
-        <section class="card" aria-labelledby="profile-roadmap-heading">
-          <header class="card-header">
-            <h2 id="profile-roadmap-heading" class="h4">Scheduled Implementation: Day 6</h2>
-          </header>
-          <div class="card-body flex flex-col gap-md">
-            <p class="text-sm">
-              Per <code>docs/SCREENSHOT_ANALYSIS.md</code>, this view will feature:
-            </p>
-            <ul class="flex flex-col gap-xs text-sm" style="padding-left: var(--space-md);">
-              <li>User avatar summary card (Username, account ID)</li>
-              <li>App Rules modal &amp; settlement guidelines</li>
-              <li>Dark Mode toggle setting</li>
-              <li>Push / in-app notification preferences</li>
-              <li>Customer support contacts</li>
-            </ul>
-            <p class="text-sm text-muted">
-              Complete profile menu and preference persistence will be constructed on Day 6.
-            </p>
+        <!-- Account Settings Menu List -->
+        <section aria-labelledby="account-settings-heading">
+          <div class="flex items-center justify-between" style="margin-bottom: var(--space-xs);">
+            <h2 id="account-settings-heading" class="h4">Account Settings</h2>
+          </div>
+
+          <div class="settings-list" role="list">
+            
+            <!-- 1. Edit Personal Information -->
+            <button type="button" class="settings-item" id="menu-edit-profile-btn" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-primary" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">Edit Personal Information</span>
+                  <span class="settings-desc">Update your name, handle, and contact number</span>
+                </div>
+              </div>
+              <div class="settings-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </button>
+
+            <!-- 2. Change Password -->
+            <button type="button" class="settings-item" id="menu-change-password-btn" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">Change Password</span>
+                  <span class="settings-desc">Update your account login password</span>
+                </div>
+              </div>
+              <div class="settings-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </button>
+
+            <!-- 3. Dark Mode Theme Switcher -->
+            <div class="settings-item" id="dark-mode-item" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-purple" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">Dark Mode</span>
+                  <span class="settings-desc">Switch between light and dark visual themes</span>
+                </div>
+              </div>
+              <label class="switch-control" for="dark-mode-switch-input">
+                <input type="checkbox" id="dark-mode-switch-input" aria-label="Toggle dark mode theme">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <!-- 4. Notification Preferences -->
+            <button type="button" class="settings-item" id="menu-notifications-btn" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">Notification Preferences</span>
+                  <span class="settings-desc">Manage match reminders, toss results, and alert settings</span>
+                </div>
+              </div>
+              <div class="settings-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </button>
+
+            <!-- 5. App Rules & Guidelines -->
+            <button type="button" class="settings-item" id="menu-rules-btn" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">App Rules &amp; Guidelines</span>
+                  <span class="settings-desc">Official toss rules, declaration criteria, and settlement policies</span>
+                </div>
+              </div>
+              <div class="settings-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </button>
+
+            <!-- 6. Privacy & Data Protection -->
+            <button type="button" class="settings-item" id="menu-privacy-btn" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-gray" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">Privacy &amp; Data Protection</span>
+                  <span class="settings-desc">View data protection principles and privacy policy summary</span>
+                </div>
+              </div>
+              <div class="settings-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </button>
+
+            <!-- 7. Help & Support -->
+            <button type="button" class="settings-item" id="menu-support-btn" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-primary" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">Help &amp; Customer Support</span>
+                  <span class="settings-desc">Frequently asked questions and support desk</span>
+                </div>
+              </div>
+              <div class="settings-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </button>
+
+            <!-- 8. Logout -->
+            <button type="button" class="settings-item settings-item-logout" id="menu-logout-btn" role="listitem">
+              <div class="settings-item-left">
+                <div class="settings-icon-box icon-box-danger" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                </div>
+                <div class="settings-text-group">
+                  <span class="settings-title">Log Out</span>
+                  <span class="settings-desc">Sign out of your active demo account session</span>
+                </div>
+              </div>
+              <div class="settings-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </button>
+
           </div>
         </section>
 
       </div>
 
-      <!-- Bottom Spacer -->
+      <!-- Bottom Spacer for Fixed Navigation -->
       <div class="bottom-nav-spacer" aria-hidden="true"></div>
 
       <!-- Shared Bottom Navigation Mounting Container -->
@@ -86,10 +289,327 @@
     </main>
   </div>
 
+  <!-- =========================================================================
+       MODALS
+       ========================================================================= -->
+
+  <!-- 1. Edit Profile Modal -->
+  <div id="edit-profile-modal" class="profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" aria-hidden="true">
+    <div class="profile-modal-card">
+      <header class="profile-modal-header">
+        <h3 id="edit-profile-title" class="profile-modal-title">Edit Personal Information</h3>
+        <button type="button" class="profile-modal-close-btn" data-modal-close aria-label="Close edit profile dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <form id="edit-profile-form" novalidate>
+        <div class="profile-modal-body">
+          <div class="profile-modal-notice">
+            Changes saved here update the local demonstration account in this browser. Database persistence will be linked with the Day 11 User API.
+          </div>
+
+          <div class="form-group">
+            <label for="edit-name-input" class="form-label">Full Name *</label>
+            <input type="text" id="edit-name-input" class="form-control" placeholder="Enter your full name" required>
+            <span class="field-error-msg" id="edit-name-error"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-username-input" class="form-label">Username *</label>
+            <input type="text" id="edit-username-input" class="form-control" placeholder="Enter username (e.g., ironman_99)" required>
+            <span class="field-error-msg" id="edit-username-error"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-phone-input" class="form-label">Phone Number *</label>
+            <input type="tel" id="edit-phone-input" class="form-control" placeholder="+91 98765 43210" required>
+            <span class="field-error-msg" id="edit-phone-error"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-email-input" class="form-label">Email Address (Read-only)</label>
+            <input type="email" id="edit-email-input" class="form-control" readonly disabled>
+            <span class="text-xs text-muted" style="margin-top: 2px;">
+              Email modification requires an OTP verification workflow scheduled for Day 11.
+            </span>
+          </div>
+        </div>
+        <footer class="profile-modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="save-profile-btn">Save Changes</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Change Password Modal -->
+  <div id="change-password-modal" class="profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="change-password-title" aria-hidden="true">
+    <div class="profile-modal-card">
+      <header class="profile-modal-header">
+        <h3 id="change-password-title" class="profile-modal-title">Change Password</h3>
+        <button type="button" class="profile-modal-close-btn" data-modal-close aria-label="Close change password dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <form id="change-password-form" novalidate>
+        <div class="profile-modal-body">
+          <div class="profile-modal-notice">
+            Security Notice: Password authentication and bcrypt hashing will be connected on Day 11. No plaintext passwords or credentials are stored.
+          </div>
+
+          <div class="form-group">
+            <label for="curr-password-input" class="form-label">Current Password *</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="curr-password-input" class="form-control" placeholder="Enter current password" required>
+              <button type="button" class="password-toggle-eye" data-target="curr-password-input" aria-label="Show password">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+            <span class="field-error-msg" id="curr-password-error"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="new-password-input" class="form-label">New Password * (Min 8 chars)</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="new-password-input" class="form-control" placeholder="Enter new password" required>
+              <button type="button" class="password-toggle-eye" data-target="new-password-input" aria-label="Show password">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+            <span class="field-error-msg" id="new-password-error"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="conf-password-input" class="form-label">Confirm New Password *</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="conf-password-input" class="form-control" placeholder="Re-enter new password" required>
+              <button type="button" class="password-toggle-eye" data-target="conf-password-input" aria-label="Show password">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+            <span class="field-error-msg" id="conf-password-error"></span>
+          </div>
+        </div>
+        <footer class="profile-modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Update Password</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Notification Preferences Modal -->
+  <div id="notifications-modal" class="profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="notifications-title" aria-hidden="true">
+    <div class="profile-modal-card">
+      <header class="profile-modal-header">
+        <h3 id="notifications-title" class="profile-modal-title">Notification Preferences</h3>
+        <button type="button" class="profile-modal-close-btn" data-modal-close aria-label="Close notification preferences dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="profile-modal-body">
+        <div class="profile-modal-notice">
+          Preferences configured below are saved to local browser state. Real-time push notification service will be linked on Day 18.
+        </div>
+
+        <div class="flex items-center justify-between" style="padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle);">
+          <div style="padding-right: 12px;">
+            <div style="font-weight: 600; color: var(--color-text);">Toss Result Alerts</div>
+            <div class="text-xs text-muted">Instant alert when a toss is officially declared</div>
+          </div>
+          <label class="switch-control" for="pref-toss-alerts">
+            <input type="checkbox" id="pref-toss-alerts" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between" style="padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle);">
+          <div style="padding-right: 12px;">
+            <div style="font-weight: 600; color: var(--color-text);">Match Countdown Reminders</div>
+            <div class="text-xs text-muted">Receive a notice 15 minutes before toss lock</div>
+          </div>
+          <label class="switch-control" for="pref-match-reminders">
+            <input type="checkbox" id="pref-match-reminders" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between" style="padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle);">
+          <div style="padding-right: 12px;">
+            <div style="font-weight: 600; color: var(--color-text);">Account &amp; Wallet Activity</div>
+            <div class="text-xs text-muted">Alerts on deposit confirmations and wager settlements</div>
+          </div>
+          <label class="switch-control" for="pref-wallet-notices">
+            <input type="checkbox" id="pref-wallet-notices" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between" style="padding: 8px 0;">
+          <div style="padding-right: 12px;">
+            <div style="font-weight: 600; color: var(--color-text);">Promotional Offers &amp; Tournaments</div>
+            <div class="text-xs text-muted">Periodic updates on special IPL/World Cup bonus events</div>
+          </div>
+          <label class="switch-control" for="pref-promo-updates">
+            <input type="checkbox" id="pref-promo-updates">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </div>
+      <footer class="profile-modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-modal-close>Done</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 4. App Rules Modal -->
+  <div id="app-rules-modal" class="profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="app-rules-title" aria-hidden="true">
+    <div class="profile-modal-card">
+      <header class="profile-modal-header">
+        <h3 id="app-rules-title" class="profile-modal-title">App Rules &amp; Toss Guidelines</h3>
+        <button type="button" class="profile-modal-close-btn" data-modal-close aria-label="Close app rules dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="profile-modal-body">
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">1. Toss Market Definition</h4>
+          <p class="text-xs text-secondary">
+            All wagers placed in the Toss Market apply solely to the official coin toss performed by match referees and team captains prior to the scheduled match start time.
+          </p>
+        </div>
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">2. Market Locking Time</h4>
+          <p class="text-xs text-secondary">
+            Wagering locks exactly 5 minutes before the scheduled coin toss or as soon as captain toss footage is broadcast. Any wager submitted after toss commencement is deemed void.
+          </p>
+        </div>
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">3. Match Abandonment &amp; Weather</h4>
+          <p class="text-xs text-secondary">
+            If the match is abandoned prior to the toss taking place, all stakes are refunded in full (Status: <em>No Result</em>). If the toss is completed and declared, subsequent rain or match cancellation does not affect toss settlement.
+          </p>
+        </div>
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">4. Settlement Speed</h4>
+          <p class="text-xs text-secondary">
+            Official toss settlements are credited directly to your Available Balance within 120 seconds of official broadcast confirmation.
+          </p>
+        </div>
+      </div>
+      <footer class="profile-modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-modal-close>Understood</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 5. Privacy & Data Protection Modal -->
+  <div id="privacy-modal" class="profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="privacy-title" aria-hidden="true">
+    <div class="profile-modal-card">
+      <header class="profile-modal-header">
+        <h3 id="privacy-title" class="profile-modal-title">Privacy &amp; Data Protection</h3>
+        <button type="button" class="profile-modal-close-btn" data-modal-close aria-label="Close privacy dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="profile-modal-body">
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">Data Confidentiality</h4>
+          <p class="text-xs text-secondary">
+            IRONMAN TOSS BOOK respects your privacy. In our production release (scheduled for Day 20), all personal details, contact identifiers, and transactional records are encrypted at rest and in transit via TLS 1.3.
+          </p>
+        </div>
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">No Third-Party Data Sharing</h4>
+          <p class="text-xs text-secondary">
+            Your phone number, email address, and financial account numbers are never sold or rented to external marketing agencies or ad trackers.
+          </p>
+        </div>
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">Sandbox Development Notice</h4>
+          <p class="text-xs text-secondary">
+            You are currently interacting with a frontend interface demonstration. No real government IDs or financial documents should be uploaded during this development phase.
+          </p>
+        </div>
+      </div>
+      <footer class="profile-modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-modal-close>Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 6. Help & Support Modal -->
+  <div id="support-modal" class="profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="support-title" aria-hidden="true">
+    <div class="profile-modal-card">
+      <header class="profile-modal-header">
+        <h3 id="support-title" class="profile-modal-title">Help &amp; Customer Support</h3>
+        <button type="button" class="profile-modal-close-btn" data-modal-close aria-label="Close customer support dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="profile-modal-body">
+        <div class="profile-modal-notice">
+          Our dedicated customer support desk operates 24/7 to assist with wagering questions, rules verification, and settlement clarifications.
+        </div>
+
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">Official Channels</h4>
+          <ul class="flex flex-col gap-xs text-xs" style="padding-left: var(--space-md); color: var(--color-text-secondary);">
+            <li><strong>Support Desk Email:</strong> support@ironmantossbook.com</li>
+            <li><strong>Telegram Channel:</strong> @IronmanTossOfficial</li>
+            <li><strong>WhatsApp Helpline:</strong> +91 98765 00000</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">Frequently Asked Questions</h4>
+          <p class="text-xs text-secondary">
+            <strong>How soon are won bets credited?</strong><br>
+            Winnings are automatically credited immediately following official umpire coin declaration.
+          </p>
+          <p class="text-xs text-secondary" style="margin-top: 6px;">
+            <strong>Can I cancel a wager after placement?</strong><br>
+            Due to real-time market rate fluctuations, all confirmed bets are final once locked.
+          </p>
+        </div>
+      </div>
+      <footer class="profile-modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-modal-close>Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 7. Logout Confirmation Modal -->
+  <div id="logout-modal" class="profile-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="logout-title" aria-hidden="true">
+    <div class="profile-modal-card">
+      <header class="profile-modal-header">
+        <h3 id="logout-title" class="profile-modal-title">Sign Out of Account</h3>
+        <button type="button" class="profile-modal-close-btn" data-modal-close aria-label="Close sign out dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="profile-modal-body">
+        <p>
+          Are you sure you want to log out of your <strong>IRONMAN TOSS BOOK</strong> demo account session?
+        </p>
+        <p class="text-xs text-muted">
+          Your demonstration balance and wagering history will remain preserved in your local session.
+        </p>
+      </div>
+      <footer class="profile-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="confirm-logout-btn" style="background-color: var(--color-danger); border-color: var(--color-danger);">
+          Confirm Sign Out
+        </button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Application Logic Scripts -->
   <script src="../js/config.js"></script>
   <script src="../js/shared-layout.js"></script>
   <script src="../js/navigation.js"></script>
+  <script src="../js/profile.js"></script>
   <script src="../js/app.js"></script>
 </body>
 </html>

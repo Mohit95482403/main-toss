@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>IRONMAN TOSS BOOK | Home &amp; Shared Navigation</title>
-  <meta name="description" content="IRONMAN TOSS BOOK - Responsive Sports Toss Wagering &amp; Ledger Platform. Featuring shared header, live ticker, and bottom navigation.">
+  <meta name="description"
+    content="IRONMAN TOSS BOOK - Responsive Sports Toss Wagering &amp; Ledger Platform. Featuring shared header, live ticker, and bottom navigation.">
 
   <!-- Core Design System CSS -->
   <link rel="stylesheet" href="css/variables.css">
@@ -20,10 +22,11 @@
   <link rel="stylesheet" href="css/announcement-ticker.css">
   <link rel="stylesheet" href="css/bottom-navigation.css">
 </head>
+
 <body data-page="home">
   <div class="app-wrapper">
     <main class="app-container" id="app-root">
-      
+
       <!-- Shared Header Mounting Container -->
       <div id="shared-header"></div>
 
@@ -32,7 +35,7 @@
 
       <!-- Main Home & Verification Body -->
       <div class="main-content">
-        
+
         <!-- Welcome Hero -->
         <section class="card card-elevated" aria-labelledby="welcome-heading">
           <div class="card-body flex flex-col gap-sm">
@@ -42,7 +45,8 @@
             </div>
             <h1 id="welcome-heading" style="font-size: var(--font-size-xl);">Authentication Suite Active</h1>
             <p>
-              The shared interface and new authentication frontend (<strong>Login</strong>, <strong>Register</strong>, <strong>Forgot Password</strong>, and <strong>Reset Password</strong>) are now operational.
+              The shared interface and new authentication frontend (<strong>Login</strong>, <strong>Register</strong>,
+              <strong>Forgot Password</strong>, and <strong>Reset Password</strong>) are now operational.
             </p>
             <div class="flex items-center gap-sm" style="margin-top: var(--space-xs); flex-wrap: wrap;">
               <button type="button" class="btn btn-secondary btn-sm" id="theme-toggle-btn">
@@ -63,7 +67,8 @@
           </header>
           <div class="card-body flex flex-col gap-sm">
             <p class="text-sm">
-              Explore the client-validated authentication flows with real-time password strength and visibility controls:
+              Explore the client-validated authentication flows with real-time password strength and visibility
+              controls:
             </p>
             <div class="flex items-center gap-sm" style="flex-wrap: wrap; margin-top: var(--space-xs);">
               <a href="pages/login.html" class="btn btn-primary btn-sm">Sign In Page</a>
@@ -84,8 +89,10 @@
               The header displays two real-time indicators matching the reference screenshots:
             </p>
             <ul class="flex flex-col gap-xs text-sm" style="padding-left: var(--space-md);">
-              <li><strong style="color: var(--color-primary);">&#9632; Available Balance (Bal):</strong> Formatted in Rupee currency. Dynamically reactive to account events.</li>
-              <li><strong style="color: var(--color-danger);">&#9632; Active Exposure (Exp):</strong> Reflects committed funds in open toss markets.</li>
+              <li><strong style="color: var(--color-primary);">&#9632; Available Balance (Bal):</strong> Formatted in
+                Rupee currency. Dynamically reactive to account events.</li>
+              <li><strong style="color: var(--color-danger);">&#9632; Active Exposure (Exp):</strong> Reflects committed
+                funds in open toss markets.</li>
             </ul>
             <small class="text-muted">
               Note: Current values are development mock presentations. Real financial accounts are integrated on Day 14.
@@ -181,4 +188,5 @@
     });
   </script>
 </body>
+
 </html>
