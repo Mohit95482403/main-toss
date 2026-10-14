@@ -1,17 +1,19 @@
 /**
- * IRONMAN TOSS BOOK - Bets History & Filter Controller (Day 4)
- * Handles client-side demonstration betting data, date grouping, status filtering, and empty states.
+ * IRONMAN TOSS BOOK - Bets History & Filter Controller (Day 9 Enhanced)
+ * Handles client-side demonstration betting data, date grouping, status filtering,
+ * real-time search, dynamic summary metrics, and accessible bet details modal.
  */
 
 (function () {
   'use strict';
 
-  // SVGs for Status Badges & Empty State
+  // SVGs for Status Badges, Icons & Empty State
   const ICONS = {
     check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
     cross: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
     coin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 6v12M9 9h6M9 15h6"></path></svg>`,
-    empty: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M7 10h10M7 14h6"></path></svg>`
+    empty: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M7 10h10M7 14h6"></path></svg>`,
+    arrowRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`
   };
 
   /**
@@ -137,6 +139,7 @@
   }
 
   function escapeHtml(str) {
+    if (!str) return '';
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
@@ -158,6 +161,65 @@
       default:
         return `<span class="bet-status-pill">${escapeHtml(status)}</span>`;
     }
+  }
+
+  /**
+   * Calculate summary metrics from a given list of bet records
+   */
+  function calculateMetrics(bets) {
+    if (!Array.isArray(bets)) {
+      return {
+        totalCount: 0,
+        totalStake: 0,
+        liveCount: 0,
+        liveStake: 0,
+        wonCount: 0,
+        wonReturn: 0,
+        lostCount: 0,
+        lostStake: 0
+      };
+    }
+
+    let totalStake = 0;
+    let liveCount = 0;
+    let liveStake = 0;
+    let wonCount = 0;
+    let wonReturn = 0;
+    let lostCount = 0;
+    let lostStake = 0;
+
+    bets.forEach(bet => {
+      const stake = typeof bet.stake === 'number' && !isNaN(bet.stake) ? bet.stake : 0;
+      totalStake += stake;
+
+      if (bet.status === 'live') {
+        liveCount++;
+        liveStake += stake;
+      } else if (bet.status === 'won') {
+        wonCount++;
+        const payout = typeof bet.payout === 'number' && !isNaN(bet.payout) 
+          ? bet.payout 
+          : stake * (bet.rate || 1);
+        wonReturn += payout;
+      } else if (bet.status === 'lost') {
+        lostCount++;
+        lostStake += stake;
+      } else if (bet.status === 'no_result') {
+        lostCount++; // counted under lost/other/settled
+        lostStake += stake;
+      }
+    });
+
+    return {
+      totalCount: bets.length,
+      totalStake,
+      liveCount,
+      liveStake,
+      wonCount,
+      wonReturn,
+      lostCount,
+      lostStake
+    };
   }
 
   /**
@@ -187,18 +249,21 @@
     }
 
     return `
-      <article class="bet-card" aria-label="Bet on ${escapeHtml(bet.matchTitle)}, Status: ${bet.status}">
-        <!-- Header: Tournament & Status -->
+      <article class="bet-card" aria-label="Bet ticket ${escapeHtml(bet.id)} on ${escapeHtml(bet.matchTitle)}, Status: ${bet.status}">
+        <!-- Header: Tournament, Bet ID & Status -->
         <header class="bet-card-header">
-          <span class="tournament-badge" title="${escapeHtml(bet.competition)}">
-            ${escapeHtml(bet.competition)}
-          </span>
+          <div class="bet-header-left">
+            <span class="tournament-badge" title="${escapeHtml(bet.competition)}">
+              ${escapeHtml(bet.competition)}
+            </span>
+            <span class="bet-id-badge">${escapeHtml(bet.id)}</span>
+          </div>
           ${renderStatusPill(bet.status)}
         </header>
 
         <!-- Body: Teams, Chosen Side & Metrics -->
         <div class="bet-card-body">
-          <h2 class="match-title">${escapeHtml(bet.matchTitle)}</h2>
+          <h3 class="match-title">${escapeHtml(bet.matchTitle)}</h3>
           
           <div class="selection-row">
             <span>Market: <strong>${escapeHtml(bet.marketName)}</strong></span>
@@ -222,14 +287,24 @@
           </div>
         </div>
 
-        <!-- Footer: Result Note & Time -->
+        <!-- Footer: Result Note, Time & View Details CTA -->
         <footer class="bet-card-footer">
           <span class="result-text" title="${escapeHtml(bet.resultText)}">
             ${escapeHtml(bet.resultText)}
           </span>
-          <time class="placed-time text-muted" datetime="${escapeHtml(bet.placedAt)}">
-            ${escapeHtml(bet.placedAt)}
-          </time>
+          <div class="bet-footer-right">
+            <time class="placed-time text-muted" datetime="${escapeHtml(bet.placedAt)}">
+              ${escapeHtml(bet.placedAt)}
+            </time>
+            <button 
+              type="button" 
+              class="btn-bet-details" 
+              data-bet-id="${escapeHtml(bet.id)}"
+              aria-label="View details for bet ${escapeHtml(bet.id)}"
+            >
+              Details ${ICONS.arrowRight}
+            </button>
+          </div>
         </footer>
       </article>
     `;
@@ -253,21 +328,24 @@
   /**
    * Render Empty State
    */
-  function renderEmptyState(activeFilter) {
+  function renderEmptyState(activeFilter, searchQuery) {
     let filterName = activeFilter.toUpperCase();
     if (filterName === 'NO_RESULT') filterName = 'NO RESULT';
+
+    let desc = `There are currently no demo toss wagers matching the "${escapeHtml(filterName)}" category.`;
+    if (searchQuery) {
+      desc = `No toss wagers found matching "${escapeHtml(searchQuery)}" in category "${escapeHtml(filterName)}".`;
+    }
 
     return `
       <section class="bets-empty-state" aria-live="polite">
         <div class="empty-state-icon" aria-hidden="true">
           ${ICONS.empty}
         </div>
-        <h3 class="empty-state-title">No ${escapeHtml(filterName)} Bets Found</h3>
-        <p class="empty-state-desc">
-          There are currently no demo toss wagers matching the "${escapeHtml(filterName)}" category.
-        </p>
+        <h3 class="empty-state-title">No Matching Bets Found</h3>
+        <p class="empty-state-desc">${desc}</p>
         <button type="button" class="btn btn-outline btn-sm" id="reset-filter-btn">
-          View All Bets
+          Reset Filter & Search
         </button>
       </section>
     `;
@@ -280,12 +358,69 @@
     const container = document.getElementById('bets-feed-container');
     const totalCountBadge = document.getElementById('total-bets-count');
     const filterButtons = document.querySelectorAll('.filter-btn');
+    const searchInput = document.getElementById('bets-search-input');
+    const searchClearBtn = document.getElementById('search-clear-btn');
+
+    // Summary Metric Elements
+    const summaryTotalCount = document.getElementById('summary-total-count');
+    const summaryTotalStake = document.getElementById('summary-total-stake');
+    const summaryLiveCount = document.getElementById('summary-live-count');
+    const summaryLiveStake = document.getElementById('summary-live-stake');
+    const summaryWonCount = document.getElementById('summary-won-count');
+    const summaryWonReturn = document.getElementById('summary-won-return');
+    const summaryLostCount = document.getElementById('summary-lost-count');
+    const summaryLostStake = document.getElementById('summary-lost-stake');
+
+    // Modal Elements
+    const modalBackdrop = document.getElementById('bet-detail-modal');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalFooterCloseBtn = document.getElementById('modal-footer-close-btn');
+    const modalTitle = document.getElementById('modal-bet-title');
+    const modalStatusPill = document.getElementById('modal-status-pill');
+    const modalCompetition = document.getElementById('modal-competition');
+    const modalMatchTitle = document.getElementById('modal-match-title');
+    const modalTicketId = document.getElementById('modal-ticket-id');
+    const modalMarketName = document.getElementById('modal-market-name');
+    const modalSelectedTeam = document.getElementById('modal-selected-team');
+    const modalPlacedAt = document.getElementById('modal-placed-at');
+    const modalRate = document.getElementById('modal-rate');
+    const modalStake = document.getElementById('modal-stake');
+    const modalPayoutLabel = document.getElementById('modal-payout-label');
+    const modalPayout = document.getElementById('modal-payout');
+    const modalResultText = document.getElementById('modal-result-text');
 
     if (!container) return;
 
     let currentFilter = 'all';
+    let searchQuery = '';
+    let lastActiveElement = null;
 
-    // Update filter counts dynamically
+    /**
+     * Update Dynamic Summary Cards
+     */
+    function updateSummaryMetrics() {
+      const metrics = calculateMetrics(DEMO_BETS);
+
+      if (summaryTotalCount) summaryTotalCount.textContent = metrics.totalCount;
+      if (summaryTotalStake) summaryTotalStake.textContent = `${formatCurrency(metrics.totalStake)} Staked`;
+
+      if (summaryLiveCount) summaryLiveCount.textContent = metrics.liveCount;
+      if (summaryLiveStake) summaryLiveStake.textContent = `${formatCurrency(metrics.liveStake)} In Play`;
+
+      if (summaryWonCount) summaryWonCount.textContent = metrics.wonCount;
+      if (summaryWonReturn) summaryWonReturn.textContent = `${formatCurrency(metrics.wonReturn)} Return`;
+
+      if (summaryLostCount) summaryLostCount.textContent = metrics.lostCount;
+      if (summaryLostStake) summaryLostStake.textContent = `${formatCurrency(metrics.lostStake)} Settled`;
+
+      if (totalCountBadge) {
+        totalCountBadge.textContent = `${metrics.totalCount} Bets`;
+      }
+    }
+
+    /**
+     * Update filter count badges
+     */
     function updateFilterCounts() {
       const counts = {
         all: DEMO_BETS.length,
@@ -302,24 +437,55 @@
           countSpan.textContent = counts[filterKey];
         }
       });
-
-      if (totalCountBadge) {
-        totalCountBadge.textContent = `${DEMO_BETS.length} Total Bets`;
-      }
     }
 
-    // Render feed based on current filter
-    function renderFeed() {
-      let filteredBets = DEMO_BETS;
+    /**
+     * Filter bets by status and search query
+     */
+    function getFilteredBets() {
+      let result = DEMO_BETS;
+
+      // 1. Status Filter
       if (currentFilter !== 'all') {
-        filteredBets = DEMO_BETS.filter(b => b.status === currentFilter);
+        result = result.filter(b => b.status === currentFilter);
       }
 
+      // 2. Search Query Filter
+      if (searchQuery.trim().length > 0) {
+        const q = searchQuery.toLowerCase().trim();
+        result = result.filter(b => {
+          return (
+            (b.matchTitle && b.matchTitle.toLowerCase().includes(q)) ||
+            (b.competition && b.competition.toLowerCase().includes(q)) ||
+            (b.selectedTeam && b.selectedTeam.toLowerCase().includes(q)) ||
+            (b.id && b.id.toLowerCase().includes(q)) ||
+            (b.marketName && b.marketName.toLowerCase().includes(q)) ||
+            (b.dateGroup && b.dateGroup.toLowerCase().includes(q))
+          );
+        });
+      }
+
+      return result;
+    }
+
+    /**
+     * Render the bets feed
+     */
+    function renderFeed() {
+      const filteredBets = getFilteredBets();
+
       if (filteredBets.length === 0) {
-        container.innerHTML = renderEmptyState(currentFilter);
+        container.innerHTML = renderEmptyState(currentFilter, searchQuery);
         const resetBtn = document.getElementById('reset-filter-btn');
         if (resetBtn) {
-          resetBtn.addEventListener('click', () => setFilter('all'));
+          resetBtn.addEventListener('click', () => {
+            if (searchInput) {
+              searchInput.value = '';
+              searchQuery = '';
+              if (searchClearBtn) searchClearBtn.style.display = 'none';
+            }
+            setFilter('all');
+          });
         }
         return;
       }
@@ -330,8 +496,8 @@
       Object.keys(grouped).forEach(dateKey => {
         const cardsHtml = grouped[dateKey].map(renderBetCard).join('');
         html += `
-          <section class="date-group" aria-labelledby="heading-${dateKey.replace(/\s+/g, '-')}">
-            <h2 id="heading-${dateKey.replace(/\s+/g, '-')}" class="date-group-heading">
+          <section class="date-group" aria-labelledby="heading-${dateKey.replace(/[^a-zA-Z0-9]/g, '-')}">
+            <h2 id="heading-${dateKey.replace(/[^a-zA-Z0-9]/g, '-')}" class="date-group-heading">
               ${escapeHtml(dateKey)}
             </h2>
             <div class="flex flex-col gap-sm">
@@ -342,9 +508,22 @@
       });
 
       container.innerHTML = html;
+
+      // Bind Details buttons
+      const detailBtns = container.querySelectorAll('.btn-bet-details');
+      detailBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const betId = btn.dataset.betId;
+          lastActiveElement = btn;
+          openBetModal(betId);
+        });
+      });
     }
 
-    // Set and apply filter
+    /**
+     * Set and apply status filter
+     */
     function setFilter(filterKey) {
       currentFilter = filterKey;
 
@@ -357,7 +536,85 @@
       renderFeed();
     }
 
-    // Bind filter clicks
+    /**
+     * Open Bet Details Modal
+     */
+    function openBetModal(betId) {
+      const bet = DEMO_BETS.find(b => b.id === betId);
+      if (!bet || !modalBackdrop) return;
+
+      if (modalTitle) modalTitle.textContent = `Ticket ${bet.id}`;
+      if (modalStatusPill) modalStatusPill.innerHTML = renderStatusPill(bet.status);
+      if (modalCompetition) modalCompetition.textContent = bet.competition;
+      if (modalMatchTitle) modalMatchTitle.textContent = bet.matchTitle;
+      if (modalTicketId) modalTicketId.textContent = bet.id;
+      if (modalMarketName) modalMarketName.textContent = bet.marketName;
+      if (modalSelectedTeam) modalSelectedTeam.textContent = bet.selectedTeam;
+      if (modalPlacedAt) modalPlacedAt.textContent = bet.placedAt;
+      if (modalRate) modalRate.textContent = formatRate(bet.rate);
+      if (modalStake) modalStake.textContent = formatCurrency(bet.stake);
+
+      // Financial return calculation
+      let returnLabel = 'Potential Payout';
+      let returnAmount = bet.stake * bet.rate;
+      if (bet.status === 'won') {
+        returnLabel = 'Returned Payout';
+        returnAmount = bet.payout !== undefined ? bet.payout : bet.stake * bet.rate;
+      } else if (bet.status === 'lost') {
+        returnLabel = 'Settled Payout';
+        returnAmount = 0.00;
+      } else if (bet.status === 'no_result') {
+        returnLabel = 'Refund Amount';
+        returnAmount = bet.stake;
+      }
+
+      if (modalPayoutLabel) modalPayoutLabel.textContent = returnLabel;
+      if (modalPayout) modalPayout.textContent = formatCurrency(returnAmount);
+      if (modalResultText) modalResultText.textContent = bet.resultText;
+
+      modalBackdrop.removeAttribute('hidden');
+      document.body.style.overflow = 'hidden';
+
+      // Focus close button for accessibility
+      if (modalCloseBtn) {
+        setTimeout(() => modalCloseBtn.focus(), 50);
+      }
+    }
+
+    /**
+     * Close Bet Details Modal
+     */
+    function closeBetModal() {
+      if (!modalBackdrop) return;
+      modalBackdrop.setAttribute('hidden', '');
+      document.body.style.overflow = '';
+
+      if (lastActiveElement && typeof lastActiveElement.focus === 'function') {
+        lastActiveElement.focus();
+      }
+    }
+
+    // Modal close event listeners
+    if (modalCloseBtn) {
+      modalCloseBtn.addEventListener('click', closeBetModal);
+    }
+    if (modalFooterCloseBtn) {
+      modalFooterCloseBtn.addEventListener('click', closeBetModal);
+    }
+    if (modalBackdrop) {
+      modalBackdrop.addEventListener('click', (e) => {
+        if (e.target === modalBackdrop) {
+          closeBetModal();
+        }
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modalBackdrop && !modalBackdrop.hasAttribute('hidden')) {
+        closeBetModal();
+      }
+    });
+
+    // Bind filter button clicks
     filterButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const filterKey = btn.dataset.filter;
@@ -365,21 +622,51 @@
       });
     });
 
+    // Bind search input
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        if (searchClearBtn) {
+          searchClearBtn.style.display = searchQuery.length > 0 ? 'flex' : 'none';
+        }
+        renderFeed();
+      });
+    }
+
+    if (searchClearBtn) {
+      searchClearBtn.addEventListener('click', () => {
+        if (searchInput) {
+          searchInput.value = '';
+          searchQuery = '';
+          searchClearBtn.style.display = 'none';
+          searchInput.focus();
+        }
+        renderFeed();
+      });
+    }
+
     // Initial render
+    updateSummaryMetrics();
     updateFilterCounts();
     setFilter('all');
+
+    // Export controller methods
+    window.BetsController = {
+      init: initBetsPage,
+      getDemoBets: () => DEMO_BETS,
+      getFilteredBets: getFilteredBets,
+      setFilter: setFilter,
+      calculateMetrics: calculateMetrics,
+      openBetModal: openBetModal,
+      closeBetModal: closeBetModal
+    };
   }
 
-  // Bind to DOM
+  // Bind on DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initBetsPage);
   } else {
     initBetsPage();
   }
-
-  // Export controller for programmatic testing
-  window.BetsController = {
-    init: initBetsPage,
-    getDemoBets: () => DEMO_BETS
-  };
 })();
+

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>My Bets | IRONMAN TOSS BOOK</title>
+  <title>IRONMAN TOSS BOOK | My Bets</title>
   <meta name="description" content="View your live, won, lost, and settled toss betting history on IRONMAN TOSS BOOK.">
 
   <!-- Core Design System CSS -->
@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="../css/announcement-ticker.css">
   <link rel="stylesheet" href="../css/bottom-navigation.css">
 
-  <!-- Bets Page CSS (Day 4) -->
+  <!-- Bets Page CSS (Day 9 Enhanced) -->
   <link rel="stylesheet" href="../css/bets.css">
 </head>
 <body data-page="bets" data-in-pages="true">
@@ -34,41 +34,224 @@
       <div id="shared-ticker"></div>
 
       <!-- Bets Page Content Area -->
-      <div class="main-content">
+      <div class="main-content flex flex-col gap-md">
         
-        <!-- Page Title & Metric Row -->
-        <header class="bets-header-section">
+        <!-- Page Title & Overview Row -->
+        <header class="bets-header-section" aria-labelledby="bets-page-heading">
           <div class="bets-page-title-row">
-            <h1 class="bets-page-title">My Bets</h1>
-            <span class="bets-total-count" id="total-bets-count">6 Total Bets</span>
+            <div>
+              <h1 id="bets-page-heading" class="bets-page-title">My Bets</h1>
+              <p class="text-sm text-secondary">
+                Track your live toss wagers, win/loss rates, and settlement records.
+              </p>
+            </div>
+            <div class="flex items-center gap-xs">
+              <span class="badge badge-neutral text-xs" id="demo-mode-badge">Demo Records</span>
+              <span class="bets-total-count" id="total-bets-count">6 Bets</span>
+            </div>
           </div>
-          <p class="text-sm text-muted">Track your live toss wagers, win/loss rates, and settlement records.</p>
         </header>
 
-        <!-- Status Filter Segmented Navigation Strip -->
-        <nav class="bets-filter-strip" aria-label="Filter Bets by Status" role="region">
-          <button type="button" class="filter-btn active" data-filter="all" aria-pressed="true">
-            All <span class="filter-count">6</span>
-          </button>
-          <button type="button" class="filter-btn" data-filter="live" aria-pressed="false">
-            Live <span class="filter-count">1</span>
-          </button>
-          <button type="button" class="filter-btn" data-filter="won" aria-pressed="false">
-            Won <span class="filter-count">2</span>
-          </button>
-          <button type="button" class="filter-btn" data-filter="lost" aria-pressed="false">
-            Lost <span class="filter-count">2</span>
-          </button>
-          <button type="button" class="filter-btn" data-filter="no_result" aria-pressed="false">
-            No Result <span class="filter-count">1</span>
-          </button>
-        </nav>
+        <!-- Dynamic Bet Summary Metrics Section -->
+        <section class="bets-summary-section" aria-label="Wager Summary Metrics">
+          <div class="bets-summary-grid" id="bets-summary-grid">
+            <!-- Metric 1: Total Wagers -->
+            <article class="bet-summary-card" aria-label="Total Wagers Summary">
+              <div class="summary-card-header">
+                <span class="summary-card-icon icon-total" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                </span>
+                <span class="summary-card-label">Total Wagers</span>
+              </div>
+              <div class="summary-val-row">
+                <span class="summary-val" id="summary-total-count">0</span>
+                <span class="summary-subval" id="summary-total-stake">₹0.00 Staked</span>
+              </div>
+            </article>
+
+            <!-- Metric 2: Live / In-Play Wagers -->
+            <article class="bet-summary-card" aria-label="Live Active Wagers Summary">
+              <div class="summary-card-header">
+                <span class="summary-card-icon icon-live" aria-hidden="true">
+                  <span class="summary-live-dot"></span>
+                </span>
+                <span class="summary-card-label">Live / In-Play</span>
+              </div>
+              <div class="summary-val-row">
+                <span class="summary-val val-live" id="summary-live-count">0</span>
+                <span class="summary-subval" id="summary-live-stake">₹0.00 In Play</span>
+              </div>
+            </article>
+
+            <!-- Metric 3: Won Wagers -->
+            <article class="bet-summary-card" aria-label="Won Wagers Summary">
+              <div class="summary-card-header">
+                <span class="summary-card-icon icon-won" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+                <span class="summary-card-label">Won Wagers</span>
+              </div>
+              <div class="summary-val-row">
+                <span class="summary-val val-won" id="summary-won-count">0</span>
+                <span class="summary-subval" id="summary-won-return">₹0.00 Return</span>
+              </div>
+            </article>
+
+            <!-- Metric 4: Lost / Other Wagers -->
+            <article class="bet-summary-card" aria-label="Lost and Refunded Wagers Summary">
+              <div class="summary-card-header">
+                <span class="summary-card-icon icon-lost" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </span>
+                <span class="summary-card-label">Lost / Other</span>
+              </div>
+              <div class="summary-val-row">
+                <span class="summary-val val-lost" id="summary-lost-count">0</span>
+                <span class="summary-subval" id="summary-lost-stake">₹0.00 Settled</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Controls: Search & Category Filter Section -->
+        <section class="bets-controls-section" aria-label="Search and filter wagers">
+          
+          <!-- Search Field -->
+          <div class="search-wrapper">
+            <span class="search-icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input 
+              type="search" 
+              id="bets-search-input" 
+              class="search-input" 
+              placeholder="Search by match, tournament, selection, or bet ID..."
+              aria-label="Search bets by match or ticket ID"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button type="button" id="search-clear-btn" class="search-clear-btn" aria-label="Clear search query" title="Clear search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+
+          <!-- Status Filter Horizontal Strip -->
+          <nav class="bets-filter-strip" aria-label="Filter Bets by Status" role="region">
+            <button type="button" class="filter-btn active" data-filter="all" aria-pressed="true">
+              All <span class="filter-count">0</span>
+            </button>
+            <button type="button" class="filter-btn" data-filter="live" aria-pressed="false">
+              Live <span class="filter-count">0</span>
+            </button>
+            <button type="button" class="filter-btn" data-filter="won" aria-pressed="false">
+              Won <span class="filter-count">0</span>
+            </button>
+            <button type="button" class="filter-btn" data-filter="lost" aria-pressed="false">
+              Lost <span class="filter-count">0</span>
+            </button>
+            <button type="button" class="filter-btn" data-filter="no_result" aria-pressed="false">
+              No Result <span class="filter-count">0</span>
+            </button>
+          </nav>
+        </section>
 
         <!-- Dynamic Date-Grouped Bet Cards Feed -->
-        <div id="bets-feed-container" class="bets-feed-container" aria-live="polite">
-          <!-- Populated dynamically via bets.js -->
-        </div>
+        <section class="bets-feed-section" aria-label="Bet Records List">
+          <div id="bets-feed-container" class="bets-feed-container" aria-live="polite">
+            <!-- Populated dynamically via bets.js -->
+          </div>
+        </section>
 
+      </div>
+
+      <!-- Bet Details Modal Dialog -->
+      <div 
+        id="bet-detail-modal" 
+        class="modal-backdrop" 
+        role="dialog" 
+        aria-modal="true" 
+        aria-labelledby="modal-bet-title" 
+        hidden
+      >
+        <div class="modal-card" role="document">
+          <header class="modal-header">
+            <div class="flex items-center gap-xs">
+              <h2 id="modal-bet-title" class="modal-title">Bet Details</h2>
+              <div id="modal-status-pill"></div>
+            </div>
+            <button type="button" class="modal-close-btn" id="modal-close-btn" aria-label="Close bet details">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </header>
+
+          <div class="modal-body">
+            <!-- Notice Banner -->
+            <div class="modal-notice-banner" role="note">
+              <strong>DEMO RECORD:</strong> Fictional toss wagering ticket for interface testing. Real-time wagering connects in Day 13.
+            </div>
+
+            <!-- Match and Tournament Details -->
+            <div class="modal-detail-group">
+              <span class="detail-label">Competition</span>
+              <span class="detail-value text-primary font-semibold" id="modal-competition">—</span>
+            </div>
+
+            <div class="modal-detail-group">
+              <span class="detail-label">Match</span>
+              <span class="detail-value font-bold text-base" id="modal-match-title">—</span>
+            </div>
+
+            <div class="modal-detail-row">
+              <div class="modal-detail-group">
+                <span class="detail-label">Ticket ID</span>
+                <span class="detail-value font-mono text-xs" id="modal-ticket-id">—</span>
+              </div>
+              <div class="modal-detail-group text-right">
+                <span class="detail-label">Market</span>
+                <span class="detail-value font-semibold" id="modal-market-name">Toss Winner</span>
+              </div>
+            </div>
+
+            <div class="modal-detail-row">
+              <div class="modal-detail-group">
+                <span class="detail-label">Selected Team</span>
+                <span class="detail-value font-bold text-primary" id="modal-selected-team">—</span>
+              </div>
+              <div class="modal-detail-group text-right">
+                <span class="detail-label">Placed Time</span>
+                <span class="detail-value text-xs text-muted" id="modal-placed-at">—</span>
+              </div>
+            </div>
+
+            <!-- Financial Details Card -->
+            <div class="modal-financial-grid" role="group" aria-label="Wager financial breakdown">
+              <div class="fin-cell">
+                <span class="fin-label">Rate / Odds</span>
+                <span class="fin-val" id="modal-rate">0.00</span>
+              </div>
+              <div class="fin-cell">
+                <span class="fin-label">Stake Amount</span>
+                <span class="fin-val" id="modal-stake">₹0.00</span>
+              </div>
+              <div class="fin-cell fin-cell-return">
+                <span class="fin-label" id="modal-payout-label">Payout / Return</span>
+                <span class="fin-val" id="modal-payout">₹0.00</span>
+              </div>
+            </div>
+
+            <!-- Settlement Result Explanation -->
+            <div class="modal-detail-group">
+              <span class="detail-label">Official Settlement Note</span>
+              <p class="modal-result-box" id="modal-result-text">—</p>
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" id="modal-footer-close-btn">
+              Close
+            </button>
+          </footer>
+        </div>
       </div>
 
       <!-- Bottom Spacer to prevent navigation overlap -->

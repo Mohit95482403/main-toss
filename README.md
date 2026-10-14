@@ -214,7 +214,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 8 of 20)
+## 9. Current Implementation Status (Day 9 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -228,12 +228,13 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Announcement Ticker | Completed (Day 2) | Continuous marquee with dual track loop, English & Hindi, pause on hover |
 | Bottom Navigation | Completed (Day 2) | 4 tabs (Home, Bets, Passbook, Profile) with SVGs, active states, safe-area support |
 | Authentication Suite | Completed (Day 3) | Login, Register, Forgot Password, Reset Password, validation, strength meter |
-| Bets Page UI | Completed (Day 4) | Status filters (All, Live, Won, Lost, No Result), date grouping, bet cards, empty state |
+| Bets Page UI (Baseline) | Completed (Day 4) | Status filters (All, Live, Won, Lost, No Result), date grouping, bet cards, empty state |
 | Passbook Page UI | Completed (Day 5) | Hero balance card (₹10,000), search, type/status filters, ledger cards, Deposit/Withdraw modals |
 | Profile & Settings UI | Completed (Day 6) | Hero profile card, personal info grid, interactive settings, Dark Mode switch, edit & security modals |
 | Home Dashboard & Matches | Completed (Day 7) | Featured live toss card, category filter pills, match fixture cards, rate previews |
 | Match Details Page UI | Completed (Day 8) | Dynamic URL routing (`?id=`), match summary hero, toss rates preview, venue metadata, rules, and not-found state |
-| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 9 |
+| Bets Page Enhancement | Completed (Day 9) | Dynamic summary metrics cards, search input with clear button, status filter strip with counter badges, enhanced cards with bet ID & financial breakdown, accessible Bet Details modal, and empty state reset |
+| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 10 |
 | Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 11 |
 | Profile & Preferences APIs | Planned | Real user profiles and persistent settings scheduled for Day 12 |
 | Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 13 |
@@ -242,8 +243,8 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
 > [!WARNING]
-> **Match Details and Toss Rates are Strictly Demonstration Content for Day 8**:
-> Day 8 delivers the dedicated Match Details view (`pages/match-details.html?id=...`) connected seamlessly to Home page match cards. The page presents match summary headers, captains, pitch conditions, venue details, and toss rate previews. Real transactional wagering, odds locking, and automated settlement resolution are scheduled for **Day 13**. No real-money betting, live scores, or third-party sports APIs are active.
+> **Bets Records and Summary Metrics are Strictly Demonstration Content for Day 9**:
+> Day 9 delivers the enhanced Bets view (`pages/bets.html`) with dynamic summary metric calculation (total, live, won, lost), unified search, category filtering, and an accessible Bet Details modal. Real transactional wagering, odds locking, and automated settlement resolution connect in **Day 13**. No real-money betting, live balance deductions, or third-party sports APIs are active.
 
 ---
 

@@ -1,6 +1,7 @@
 /**
- * IRONMAN TOSS BOOK - Bets Page Styles (Day 4)
- * Filter strip, date grouping, bet history cards, status badges, and empty states.
+ * IRONMAN TOSS BOOK - Bets Page Styles (Day 9 Enhanced)
+ * Summary metrics grid, search input, status filters, date-grouped wager cards, 
+ * interactive bet details modal, empty states, and responsive design.
  */
 
 /* ==========================================================================
@@ -15,8 +16,10 @@
 
 .bets-page-title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--space-sm, 8px);
+  flex-wrap: wrap;
 }
 
 .bets-page-title {
@@ -33,6 +36,7 @@
   background-color: var(--color-primary-subtle, #E8F2FC);
   padding: 3px 8px;
   border-radius: var(--radius-full, 9999px);
+  white-space: nowrap;
 }
 
 [data-theme="dark"] .bets-total-count {
@@ -41,29 +45,277 @@
 }
 
 /* ==========================================================================
-   Status Filters Horizontal Strip
+   Summary Metrics Cards Grid
    ========================================================================== */
 
+.bets-summary-section {
+  width: 100%;
+}
+
+.bets-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm, 8px);
+}
+
+@media (min-width: 640px) {
+  .bets-summary-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.bet-summary-card {
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 12px;
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.bet-summary-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.08));
+  border-color: var(--color-border-hover, #CBD5E1);
+}
+
+[data-theme="dark"] .bet-summary-card {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+.summary-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary-card-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm, 4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.summary-card-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-total {
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  color: var(--color-primary, #0860BE);
+}
+
+.icon-live {
+  background-color: #E0F2FE;
+  color: #0284C7;
+}
+
+.summary-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #0284C7;
+  animation: pulse-dot 1.5s infinite;
+}
+
+.icon-won {
+  background-color: var(--color-success-bg, #DCFCE7);
+  color: var(--color-success-text, #14532D);
+}
+
+.icon-lost {
+  background-color: var(--color-danger-bg, #FEE2E2);
+  color: var(--color-danger-text, #7F1D1D);
+}
+
+[data-theme="dark"] .icon-total {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #93C5FD;
+}
+
+[data-theme="dark"] .icon-live {
+  background-color: rgba(2, 132, 199, 0.2);
+  color: #38BDF8;
+}
+
+[data-theme="dark"] .icon-won {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #86EFAC;
+}
+
+[data-theme="dark"] .icon-lost {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #FCA5A5;
+}
+
+.summary-card-label {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary, #4B5563);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme="dark"] .summary-card-label {
+  color: var(--color-text-secondary, #94A3B8);
+}
+
+.summary-val-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.summary-val {
+  font-size: 1.125rem; /* 18px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+  font-family: var(--font-family-mono, monospace);
+  line-height: 1;
+}
+
+.summary-val.val-live {
+  color: #0284C7;
+}
+
+.summary-val.val-won {
+  color: var(--color-success, #16A34A);
+}
+
+.summary-val.val-lost {
+  color: var(--color-text-secondary, #64748B);
+}
+
+[data-theme="dark"] .summary-val.val-live {
+  color: #38BDF8;
+}
+
+[data-theme="dark"] .summary-val.val-won {
+  color: #4ADE80;
+}
+
+.summary-subval {
+  font-size: 0.6875rem; /* 11px */
+  color: var(--color-text-muted, #737B87);
+  font-family: var(--font-family-mono, monospace);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Controls Section: Search Field & Status Filters
+   ========================================================================== */
+
+.bets-controls-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+}
+
+/* Search Field */
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-icon-badge {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted, #737B87);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon-badge svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.search-input {
+  width: 100%;
+  padding: 9px 36px 9px 36px;
+  font-size: 0.8125rem; /* 13px */
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  color: var(--color-text, #15171A);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.search-input:focus {
+  border-color: var(--color-primary, #0860BE);
+  box-shadow: 0 0 0 3px var(--color-primary-focus, rgba(8, 96, 190, 0.25));
+  outline: none;
+}
+
+[data-theme="dark"] .search-input {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+  color: var(--color-text, #F8FAFC);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #737B87);
+  cursor: pointer;
+  padding: 2px;
+  display: none;
+  border-radius: 50%;
+}
+
+.search-clear-btn:hover {
+  color: var(--color-text, #15171A);
+}
+
+.search-clear-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Status Filters Strip */
 .bets-filter-strip {
   display: flex;
   align-items: center;
   gap: var(--space-xs, 6px);
   overflow-x: auto;
-  padding: 2px 0 6px 0;
-  scrollbar-width: none; /* Firefox */
+  padding: 2px 0 4px 0;
+  scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   user-select: none;
 }
 
 .bets-filter-strip::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Edge */
+  display: none;
 }
 
 .filter-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   font-size: 0.75rem; /* 12px */
   font-weight: 600;
   color: var(--color-text-secondary, #4B5563);
@@ -87,7 +339,6 @@
   outline-offset: 2px;
 }
 
-/* Active Filter Pill */
 .filter-btn.active {
   background-color: var(--color-primary, #0860BE);
   color: #FFFFFF;
@@ -121,7 +372,7 @@
 }
 
 /* ==========================================================================
-   Date Grouping Sections
+   Date Grouping Sections & Bet Cards Feed
    ========================================================================== */
 
 .bets-feed-container {
@@ -171,11 +422,12 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
 .bet-card:hover {
-  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.08));
+  box-shadow: var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.08));
+  border-color: var(--color-border-hover, #CBD5E1);
 }
 
 [data-theme="dark"] .bet-card {
@@ -191,11 +443,19 @@
   padding: 10px 14px;
   background-color: var(--color-surface-subtle, #F8FAFC);
   border-bottom: 1px solid var(--color-border-subtle, #EEF0F2);
+  gap: 8px;
 }
 
 [data-theme="dark"] .bet-card-header {
   background-color: #121824;
   border-bottom-color: #243042;
+}
+
+.bet-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .tournament-badge {
@@ -207,11 +467,27 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 220px;
+  max-width: 200px;
 }
 
 [data-theme="dark"] .tournament-badge {
   color: #60A5FA;
+}
+
+.bet-id-badge {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.625rem; /* 10px */
+  font-weight: 600;
+  color: var(--color-text-muted, #737B87);
+  background-color: rgba(0, 0, 0, 0.04);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm, 4px);
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .bet-id-badge {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-muted, #94A3B8);
 }
 
 /* Status Badges */
@@ -225,6 +501,7 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   border-radius: var(--radius-full, 9999px);
+  flex-shrink: 0;
 }
 
 .bet-status-pill svg {
@@ -295,6 +572,8 @@
   justify-content: space-between;
   font-size: 0.8125rem; /* 13px */
   color: var(--color-text-secondary, #4B5563);
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .selection-choice {
@@ -354,7 +633,7 @@
   color: var(--color-danger, #D62828);
 }
 
-/* Card Footer: Settlement result explanation */
+/* Card Footer: Settlement result explanation & View Details CTA */
 .bet-card-footer {
   padding: 8px 14px;
   background-color: var(--color-surface, #FFFFFF);
@@ -362,6 +641,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   font-size: 0.6875rem; /* 11px */
   color: var(--color-text-muted, #737B87);
 }
@@ -376,12 +656,273 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
+  flex: 1;
+  min-width: 0;
+}
+
+.bet-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .placed-time {
   white-space: nowrap;
   font-size: 0.625rem; /* 10px */
+}
+
+.btn-bet-details {
+  background: transparent;
+  border: 1px solid var(--color-border, #E5E7EB);
+  color: var(--color-primary, #0860BE);
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all var(--transition-fast);
+}
+
+.btn-bet-details:hover {
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  border-color: var(--color-primary, #0860BE);
+}
+
+.btn-bet-details:focus-visible {
+  outline: 2px solid var(--color-primary, #0860BE);
+  outline-offset: 1px;
+}
+
+[data-theme="dark"] .btn-bet-details {
+  border-color: #243042;
+  color: #93C5FD;
+}
+
+[data-theme="dark"] .btn-bet-details:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: #3B82F6;
+}
+
+/* ==========================================================================
+   Bet Details Modal Styles
+   ========================================================================== */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-md, 12px);
+  opacity: 1;
+  transition: opacity var(--transition-fast);
+}
+
+.modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.modal-card {
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-xl, 16px);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  animation: modal-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+[data-theme="dark"] .modal-card {
+  background-color: #151D2A;
+  border-color: #243042;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  padding: var(--space-md, 12px) var(--space-lg, 16px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border-subtle, #EEF0F2);
+  gap: 8px;
+}
+
+[data-theme="dark"] .modal-header {
+  border-bottom-color: #243042;
+}
+
+.modal-title {
+  font-size: 1rem; /* 16px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #737B87);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm, 6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast);
+}
+
+.modal-close-btn:hover {
+  color: var(--color-text, #15171A);
+}
+
+.modal-close-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #0860BE);
+}
+
+.modal-close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-body {
+  padding: var(--space-lg, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 10px);
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+  line-height: 1.5;
+}
+
+.modal-notice-banner {
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  border: 1px solid rgba(8, 96, 190, 0.2);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 10px;
+  color: var(--color-primary, #0860BE);
+  font-size: 0.75rem; /* 12px */
+  line-height: 1.4;
+}
+
+[data-theme="dark"] .modal-notice-banner {
+  background-color: #1E293B;
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93C5FD;
+}
+
+.modal-detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal-detail-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm, 8px);
+}
+
+.detail-label {
+  font-size: 0.6875rem; /* 11px */
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted, #737B87);
+  font-weight: 600;
+}
+
+.detail-value {
+  color: var(--color-text, #15171A);
+}
+
+.modal-financial-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-xs, 6px);
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  border: 1px solid var(--color-border-subtle, #EEF0F2);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px;
+  margin: 4px 0;
+}
+
+[data-theme="dark"] .modal-financial-grid {
+  background-color: #121824;
+  border-color: #243042;
+}
+
+.fin-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.fin-cell-return {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.fin-label {
+  font-size: 0.625rem; /* 10px */
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #737B87);
+}
+
+.fin-val {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.875rem; /* 14px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+}
+
+.modal-result-box {
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  border-left: 3px solid var(--color-primary, #0860BE);
+  padding: 8px 10px;
+  border-radius: 0 var(--radius-sm, 4px) var(--radius-sm, 4px) 0;
+  font-size: 0.75rem; /* 12px */
+  color: var(--color-text, #15171A);
+  line-height: 1.4;
+  margin: 0;
+}
+
+[data-theme="dark"] .modal-result-box {
+  background-color: #121824;
+  color: #F8FAFC;
+}
+
+.modal-footer {
+  padding: var(--space-sm, 10px) var(--space-lg, 16px);
+  display: flex;
+  justify-content: flex-end;
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  border-top: 1px solid var(--color-border-subtle, #EEF0F2);
+}
+
+[data-theme="dark"] .modal-footer {
+  background-color: #121824;
+  border-top-color: #243042;
 }
 
 /* ==========================================================================
@@ -433,11 +974,25 @@
 .empty-state-desc {
   font-size: 0.8125rem; /* 13px */
   color: var(--color-text-secondary, #4B5563);
-  max-width: 280px;
+  max-width: 320px;
   margin-bottom: var(--space-xs, 4px);
 }
 
-/* Small mobile responsiveness */
+/* ==========================================================================
+   Responsive Breakpoints
+   ========================================================================== */
+
+@media (max-width: 480px) {
+  .bets-page-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tournament-badge {
+    max-width: 140px;
+  }
+}
+
 @media (max-width: 360px) {
   .bet-card-header,
   .bet-card-body,
@@ -457,4 +1012,13 @@
   .metric-val {
     font-size: 0.75rem; /* 12px */
   }
+
+  .summary-val {
+    font-size: 1rem; /* 16px */
+  }
+
+  .bets-summary-grid {
+    gap: 6px;
+  }
 }
+
