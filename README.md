@@ -46,7 +46,8 @@ toss/
 │   │   ├── announcement-ticker.css # Ticker continuous marquee & dual tracks
 │   │   ├── bottom-navigation.css # 4-tab fixed bottom navigation bar
 │   │   ├── auth.css              # [Day 3] Authentication forms, strength meter & cards
-│   │   └── bets.css              # [Day 4] Bets filters, cards, and date groups
+│   │   ├── bets.css              # [Day 4] Bets filters, cards, and date groups
+│   │   └── passbook.css          # [Day 5] Hero balance card, search, filters, modals
 │   ├── js/
 │   │   ├── auth/                 # [Day 3] Client-side authentication logic
 │   │   │   ├── validation.js     # Field validation, password toggles & strength checker
@@ -55,6 +56,7 @@ toss/
 │   │   │   ├── forgot-password.js# Email syntax validation & reset simulation
 │   │   │   └── reset-password.js # Token status notice & password update simulation
 │   │   ├── bets.js               # [Day 4] Bets dataset, date grouping & status filters
+│   │   ├── passbook.js           # [Day 5] Ledger dataset, search, filters & modals
 │   │   ├── config.js             # API base URL, mock balances, announcements config
 │   │   ├── shared-layout.js      # Shared Header, Ticker & Nav rendering engine
 │   │   ├── navigation.js         # Tab active states & accessibility controller
@@ -204,7 +206,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 4 of 20)
+## 9. Current Implementation Status (Day 5 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -219,16 +221,18 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Bottom Navigation | Completed (Day 2) | 4 tabs (Home, Bets, Passbook, Profile) with SVGs, active states, safe-area support |
 | Authentication Suite | Completed (Day 3) | Login, Register, Forgot Password, Reset Password, validation, strength meter |
 | Bets Page UI | Completed (Day 4) | Status filters (All, Live, Won, Lost, No Result), date grouping, bet cards, empty state |
+| Passbook Page UI | Completed (Day 5) | Hero balance card (₹10,000), search, type/status filters, ledger cards, Deposit/Withdraw modals |
 | MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 9 |
 | Auth Backend & Passwords | Planned | Hashing, sessions, and database user creation scheduled for Day 11 |
 | Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 13 |
-| Wallet / Passbook | Out of Scope | Shell created for navigation; full UI scheduled for Day 5 |
+| Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 14 |
+| Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5; real payment flow scheduled for Days 15 & 16 |
 | Profile & Settings | Out of Scope | Shell created for navigation; full UI scheduled for Day 6 |
 | Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
 
 > [!WARNING]
-> **Real Betting Transactions & Live Sports Feeds are Strictly Out of Scope for Day 4**:
-> Day 4 delivers the complete client-side Bets history interface with clearly identified fictional demo records. No real money betting, wallet balance deductions, live scores, or automated database settlements are active. Backend betting endpoints and balance locking will be implemented on **Day 13**.
+> **Deposit & Withdraw Buttons are Strictly Informational UI Placeholders for Day 5**:
+> Day 5 delivers the frontend Passbook transaction-history interface featuring mathematically consistent demo transactions (Credits: ₹15,000, Debits: ₹5,000, Available: ₹10,000). Clicking Deposit or Withdraw triggers informational dialogs clarifying that payment processing will be implemented on **Day 15 & 16**. Under no circumstances are actual bank transfers, UPI transactions, or balance alterations executed.
 
 ---
 

@@ -1,0 +1,696 @@
+/**
+ * IRONMAN TOSS BOOK - Passbook Page Styles (Day 5)
+ * Hero balance card, deposit/withdraw action buttons, transaction search, filters, ledger cards, and modals.
+ */
+
+/* ==========================================================================
+   Page Title Section
+   ========================================================================== */
+
+.passbook-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs, 4px);
+}
+
+.passbook-title {
+  font-size: 1.25rem; /* 20px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   Hero Balance Summary Card
+   ========================================================================== */
+
+.hero-balance-card {
+  background: linear-gradient(135deg, #0A4B94 0%, #0860BE 60%, #1D70CD 100%);
+  color: #FFFFFF;
+  border-radius: var(--radius-xl, 16px);
+  padding: var(--space-lg, 16px) var(--space-xl, 20px);
+  box-shadow: 0 4px 14px rgba(8, 96, 190, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md, 12px);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .hero-balance-card {
+  background: linear-gradient(135deg, #0F1D38 0%, #1A3668 60%, #204685 100%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* Subtle background geometric accent */
+.hero-balance-card::after {
+  content: "";
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.hero-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hero-balance-label {
+  font-size: 0.75rem; /* 12px */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+
+.hero-account-badge {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 2px 8px;
+  border-radius: var(--radius-full, 9999px);
+  letter-spacing: 0.03em;
+}
+
+.hero-balance-amount {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 1.875rem; /* 30px */
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* Two-column summary metrics: Total Credits & Total Debits */
+.hero-summary-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm, 8px);
+  padding-top: var(--space-xs, 6px);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.hero-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-metric-label {
+  font-size: 0.6875rem; /* 11px */
+  opacity: 0.8;
+  font-weight: 500;
+}
+
+.hero-metric-val {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.875rem; /* 14px */
+  font-weight: 700;
+}
+
+.val-credit {
+  color: #86EFAC; /* Soft green */
+}
+
+.val-debit {
+  color: #FCA5A5; /* Soft red */
+}
+
+/* Action CTA Buttons (Deposit & Withdraw) */
+.hero-action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm, 8px);
+  margin-top: 2px;
+}
+
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 700;
+  border-radius: var(--radius-md, 8px);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.hero-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+
+.hero-btn-deposit {
+  background-color: #FFFFFF;
+  color: #0860BE;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.hero-btn-deposit:hover {
+  background-color: #F1F5F9;
+  transform: translateY(-1px);
+}
+
+.hero-btn-withdraw {
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hero-btn-withdraw:hover {
+  background: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+.hero-btn:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Transaction Search & Filters Section
+   ========================================================================== */
+
+.txn-controls-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+}
+
+/* Search Field */
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-icon-badge {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted, #737B87);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon-badge svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.search-input {
+  width: 100%;
+  padding: 9px 36px 9px 36px;
+  font-size: 0.8125rem; /* 13px */
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  color: var(--color-text, #15171A);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.search-input:focus {
+  border-color: var(--color-primary, #0860BE);
+  box-shadow: 0 0 0 3px var(--color-primary-focus, rgba(8, 96, 190, 0.25));
+  outline: none;
+}
+
+[data-theme="dark"] .search-input {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #737B87);
+  cursor: pointer;
+  padding: 2px;
+  display: none;
+  border-radius: 50%;
+}
+
+.search-clear-btn.visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-clear-btn:hover {
+  color: var(--color-text, #15171A);
+}
+
+.search-clear-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Filter Strip */
+.txn-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  overflow-x: auto;
+  padding: 2px 0 4px 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  user-select: none;
+}
+
+.txn-filter-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.txn-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 0.75rem; /* 12px */
+  font-weight: 600;
+  color: var(--color-text-secondary, #4B5563);
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-full, 9999px);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.txn-filter-btn:hover:not(.active) {
+  background-color: var(--color-surface-hover, #F8FAFC);
+  color: var(--color-text, #15171A);
+}
+
+.txn-filter-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #0860BE);
+  outline-offset: 2px;
+}
+
+.txn-filter-btn.active {
+  background-color: var(--color-primary, #0860BE);
+  color: #FFFFFF;
+  border-color: var(--color-primary, #0860BE);
+  box-shadow: 0 2px 4px rgba(8, 96, 190, 0.25);
+}
+
+.txn-filter-count {
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--radius-full, 9999px);
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.txn-filter-btn.active .txn-filter-count {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .txn-filter-btn {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+  color: var(--color-text-secondary, #94A3B8);
+}
+
+[data-theme="dark"] .txn-filter-btn.active {
+  background-color: var(--color-primary, #3B82F6);
+  border-color: var(--color-primary, #3B82F6);
+  color: #FFFFFF;
+}
+
+/* ==========================================================================
+   Transaction Feed & Ledger Cards
+   ========================================================================== */
+
+.txn-feed-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+}
+
+.txn-card {
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md, 12px);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.txn-card:hover {
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+[data-theme="dark"] .txn-card {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+/* Left side details */
+.txn-left {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm, 10px);
+  min-width: 0;
+  flex: 1;
+}
+
+/* Circular Type Icon (Credit vs Debit) */
+.txn-icon-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.txn-icon-circle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.txn-icon-credit {
+  background-color: var(--color-success-bg, #DCFCE7);
+  color: var(--color-success, #16A34A);
+}
+
+.txn-icon-debit {
+  background-color: var(--color-danger-bg, #FEE2E2);
+  color: var(--color-danger, #D62828);
+}
+
+.txn-meta-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.txn-title {
+  font-size: 0.875rem; /* 14px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.txn-id-date {
+  font-size: 0.6875rem; /* 11px */
+  color: var(--color-text-muted, #737B87);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.txn-id {
+  font-family: var(--font-family-mono, monospace);
+  font-weight: 600;
+}
+
+/* Right side metrics */
+.txn-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.txn-amount {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.txn-amount.credit {
+  color: var(--color-success, #16A34A);
+}
+
+.txn-amount.debit {
+  color: var(--color-danger, #D62828);
+}
+
+.txn-closing-bal {
+  font-size: 0.6875rem; /* 11px */
+  color: var(--color-text-muted, #737B87);
+}
+
+/* Status Badges */
+.txn-status-badge {
+  font-size: 0.625rem; /* 10px */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs, 4px);
+}
+
+.status-completed {
+  background-color: var(--color-success-bg, #DCFCE7);
+  color: var(--color-success-text, #14532D);
+}
+
+.status-pending {
+  background-color: var(--color-warning-bg, #FEF3C7);
+  color: var(--color-warning-text, #78350F);
+}
+
+.status-failed {
+  background-color: var(--color-danger-bg, #FEE2E2);
+  color: var(--color-danger-text, #7F1D1D);
+}
+
+/* ==========================================================================
+   Modals (Deposit & Withdraw Informational Placeholders)
+   ========================================================================== */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-overlay, rgba(15, 23, 42, 0.6));
+  z-index: var(--z-modal, 200);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md, 12px);
+  backdrop-filter: blur(2px);
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal-card {
+  background-color: var(--color-surface, #FFFFFF);
+  border-radius: var(--radius-xl, 16px);
+  border: 1px solid var(--color-border, #E5E7EB);
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+  width: 100%;
+  max-width: 400px;
+  overflow: hidden;
+  animation: modal-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .modal-card {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  padding: var(--space-md, 12px) var(--space-lg, 16px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border-subtle, #EEF0F2);
+}
+
+[data-theme="dark"] .modal-header {
+  border-bottom-color: #243042;
+}
+
+.modal-title {
+  font-size: 1rem; /* 16px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #737B87);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm, 6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast);
+}
+
+.modal-close-btn:hover {
+  color: var(--color-text, #15171A);
+}
+
+.modal-close-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #0860BE);
+}
+
+.modal-close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-body {
+  padding: var(--space-lg, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+  line-height: 1.5;
+}
+
+.modal-notice-banner {
+  background-color: var(--color-primary-subtle, #E8F2FC);
+  border: 1px solid rgba(8, 96, 190, 0.2);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 12px;
+  color: var(--color-primary, #0860BE);
+  font-weight: 500;
+}
+
+[data-theme="dark"] .modal-notice-banner {
+  background-color: #1E293B;
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #93C5FD;
+}
+
+.modal-footer {
+  padding: var(--space-md, 12px) var(--space-lg, 16px);
+  display: flex;
+  justify-content: flex-end;
+  background-color: var(--color-surface-subtle, #F8FAFC);
+  border-top: 1px solid var(--color-border-subtle, #EEF0F2);
+}
+
+[data-theme="dark"] .modal-footer {
+  background-color: #121824;
+  border-top-color: #243042;
+}
+
+/* ==========================================================================
+   Passbook Empty State
+   ========================================================================== */
+
+.passbook-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-2xl, 32px) var(--space-lg, 16px);
+  background-color: var(--color-surface, #FFFFFF);
+  border: 1px dashed var(--color-border, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  gap: var(--space-sm, 8px);
+}
+
+[data-theme="dark"] .passbook-empty-state {
+  background-color: var(--color-surface, #151D2A);
+  border-color: var(--color-border, #243042);
+}
+
+.empty-state-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--color-surface-subtle, #F1F4F8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted, #737B87);
+}
+
+.empty-state-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.empty-state-title {
+  font-size: 1rem; /* 16px */
+  font-weight: 700;
+  color: var(--color-text, #15171A);
+}
+
+.empty-state-desc {
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-secondary, #4B5563);
+  max-width: 280px;
+}
+
+/* Small mobile responsiveness */
+@media (max-width: 360px) {
+  .hero-balance-card {
+    padding: 12px 14px;
+  }
+
+  .hero-balance-amount {
+    font-size: 1.5rem; /* 24px */
+  }
+
+  .hero-btn {
+    padding: 7px 10px;
+    font-size: 0.75rem; /* 12px */
+  }
+
+  .txn-card {
+    padding: 10px;
+  }
+
+  .txn-title {
+    font-size: 0.8125rem; /* 13px */
+  }
+
+  .txn-amount {
+    font-size: 0.875rem; /* 14px */
+  }
+}
