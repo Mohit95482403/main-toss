@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>IRONMAN TOSS BOOK | Project Initialization &amp; Foundation</title>
+  <meta name="description" content="IRONMAN TOSS BOOK - A clean, modern sports toss wagering and ledger platform. Currently on Day 1: Project Initialization and Foundation.">
+
+  <!-- Core Design System CSS -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <div class="app-wrapper">
+    <main class="app-container" id="app-root">
+      
+      <!-- Top Development Notice Bar -->
+      <header class="card-header flex items-center justify-between" style="border-bottom: 1px solid var(--color-border);">
+        <div class="flex items-center gap-sm">
+          <span class="status-dot status-dot-active" aria-hidden="true"></span>
+          <span style="font-weight: var(--font-weight-bold); color: var(--color-primary); font-size: var(--font-size-md);">
+            IRONMAN TOSS BOOK
+          </span>
+        </div>
+        <span class="badge badge-primary badge-pill">Day 1 of 20</span>
+      </header>
+
+      <!-- Main Welcome & Verification Body -->
+      <div class="main-content">
+        
+        <!-- Welcome Hero -->
+        <section class="card card-elevated" aria-labelledby="welcome-heading">
+          <div class="card-body flex flex-col gap-sm">
+            <span class="badge badge-warning" style="width: fit-content;">Development In Progress</span>
+            <h1 id="welcome-heading" style="font-size: var(--font-size-xl);">Project Foundation Active</h1>
+            <p>
+              Welcome to the foundation build for <strong>IRONMAN TOSS BOOK</strong>. The project architecture, CSS design system, and backend diagnostics have been initialized.
+            </p>
+            <div class="flex items-center gap-sm" style="margin-top: var(--space-xs);">
+              <button type="button" class="btn btn-secondary btn-sm" id="theme-toggle-btn">
+                🌙 Switch to Dark Mode
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Backend Diagnostic Verification Card -->
+        <section class="card" aria-labelledby="diagnostic-heading">
+          <header class="card-header flex items-center justify-between">
+            <h2 id="diagnostic-heading" class="h4">Backend Health Diagnostic</h2>
+            <span id="api-status-badge" class="badge badge-warning badge-pill">Pending</span>
+          </header>
+          <div class="card-body flex flex-col gap-md">
+            <p id="api-status-text" class="text-secondary">
+              Probing Express health endpoint (<code>GET /api/health</code>)...
+            </p>
+            <div class="flex items-center justify-between">
+              <span class="text-sm">Target: <code>http://localhost:5000/api/health</code></span>
+              <button type="button" class="btn btn-outline btn-sm" id="api-check-btn">
+                Test Health Probe
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Foundation Design Tokens Verification -->
+        <section class="card" aria-labelledby="tokens-heading">
+          <header class="card-header">
+            <h2 id="tokens-heading" class="h4">Design System Verification</h2>
+          </header>
+          <div class="card-body flex flex-col gap-md">
+            <div>
+              <p class="text-sm" style="margin-bottom: var(--space-xs);">Semantic Status Badges:</p>
+              <div class="flex items-center gap-xs" style="flex-wrap: wrap;">
+                <span class="badge badge-success badge-pill">Won (Green)</span>
+                <span class="badge badge-danger badge-pill">Lost (Red)</span>
+                <span class="badge badge-warning badge-pill">Pending (Amber)</span>
+                <span class="badge badge-info badge-pill">Live Match</span>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-sm" style="margin-bottom: var(--space-xs);">Button Hierarchy:</p>
+              <div class="flex items-center gap-sm" style="flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary btn-sm">Primary Action</button>
+                <button type="button" class="btn btn-secondary btn-sm">Secondary</button>
+                <button type="button" class="btn btn-outline btn-sm">Outline</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 20-Day Roadmap Summary -->
+        <section class="card" aria-labelledby="roadmap-heading">
+          <header class="card-header">
+            <h2 id="roadmap-heading" class="h4">20-Day Roadmap Status</h2>
+          </header>
+          <div class="card-body flex flex-col gap-sm">
+            <div class="flex items-center justify-between text-sm">
+              <span><strong>Day 1:</strong> Initialization &amp; Foundation</span>
+              <span class="badge badge-success badge-pill">Active / Ready</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span><strong>Day 2:</strong> Shared Header, Ticker &amp; Navigation</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled Next</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span><strong>Day 3:</strong> Auth &amp; Registration UI</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span><strong>Day 4:</strong> Bets Page UI</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span><strong>Day 5:</strong> Passbook Page UI</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span><strong>Day 6:</strong> Profile Page &amp; Settings</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span><strong>Days 7–20:</strong> Features, APIs, Security &amp; Deploy</span>
+              <span class="badge badge-secondary badge-pill" style="opacity: 0.7;">Scheduled</span>
+            </div>
+          </div>
+          <footer class="card-footer text-center">
+            <small class="text-muted">
+              Refer to <code>docs/DEVELOPMENT_ROADMAP.md</code> for full 20-day specifications.
+            </small>
+          </footer>
+        </section>
+
+      </div>
+
+      <!-- Footer Info -->
+      <footer style="padding: var(--space-md); text-align: center; border-top: 1px solid var(--color-border-subtle);">
+        <small class="text-muted">
+          IRONMAN TOSS BOOK &copy; 2026 &bull; Production Foundation v1.0.0
+        </small>
+      </footer>
+
+    </main>
+  </div>
+
+  <!-- Application Logic Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

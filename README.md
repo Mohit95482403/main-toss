@@ -1,0 +1,235 @@
+# IRONMAN TOSS BOOK
+
+A responsive sports toss wagering, ledger, and account management web platform. Designed with a mobile-first philosophy inspired by clean sports entertainment interfaces, the system delivers real-time match toss betting, instant passbook tracking, and administrative governance.
+
+---
+
+## 1. Project Overview
+
+**IRONMAN TOSS BOOK** is being developed incrementally following a structured **20-Day Implementation Roadmap**. The platform provides sports bettors with a friction-free experience for wagering on cricket and sports toss outcomes, monitoring account balances and exposure, reviewing immutable passbook ledgers, and managing personal preferences.
+
+---
+
+## 2. Technology Stack
+
+The platform intentionally leverages standard, lightweight, and performant web technologies:
+
+- **Frontend**: HTML5, CSS3 (Vanilla design tokens & custom properties), Vanilla JavaScript (ES6+). Zero external frameworks (no React, Next.js, Vue, or Angular).
+- **Backend**: Node.js (v24.x LTS) with Express.js (v4.x), using standard CommonJS modules.
+- **Database**: MySQL (v8.x+) for strict ACID compliance, relational foreign-key integrity, and decimal precision.
+- **Tooling**: npm, Git, CORS, Dotenv, native `node --watch`.
+
+---
+
+## 3. Directory Structure
+
+```text
+toss/
+├── frontend/                     # Client-side web application
+│   ├── index.html                # Entry point & foundation test page
+│   ├── css/
+│   │   ├── variables.css         # Design tokens, color palette, spacing, typography
+│   │   ├── reset.css             # Cross-browser CSS normalization
+│   │   ├── global.css            # Base typography, link states, focus-visible
+│   │   ├── layout.css            # Mobile-first app container & flex utilities
+│   │   ├── components.css        # Buttons, cards, form inputs, status badges
+│   │   └── responsive.css        # Breakpoints & accessibility (prefers-reduced-motion)
+│   ├── js/
+│   │   ├── config.js             # API base URL & runtime configuration
+│   │   └── app.js                # Theme switcher & backend health check probe
+│   └── assets/                   # Static media, icons, and fonts
+│
+├── backend/                      # Express.js REST API service
+│   ├── src/
+│   │   ├── config/
+│   │   │   └── db.js             # Non-blocking MySQL pool & diagnostics
+│   │   ├── routes/
+│   │   │   └── health.js         # GET /api/health and /api/health/db
+│   │   └── middleware/
+│   │       ├── logger.js         # Safe request logger (no sensitive leak)
+│   │       └── errorHandler.js   # 404 handler & centralized error handler
+│   ├── database/
+│   │   └── README.md             # Schema notes (scheduled for Day 9)
+│   ├── app.js                    # Express application entry point
+│   └── package.json              # Backend dependencies & dev scripts
+│
+├── docs/                         # Architecture & planning documentation
+│   ├── PROJECT_OVERVIEW.md       # High-level architecture & system scope
+│   ├── SCREENSHOT_ANALYSIS.md    # Detailed UI breakdown of reference screenshots
+│   ├── DESIGN_SYSTEM.md          # Tokens, color palettes, spacing, & accessibility
+│   ├── DATABASE_PLAN.md          # Relational entities, ledger rules, & table specs
+│   └── DEVELOPMENT_ROADMAP.md   # Day-by-day 20-day implementation plan
+│
+├── scripts/
+│   └── serve-frontend.js         # Zero-dependency local static server (port 5500)
+├── .editorconfig                 # Consistent indentation & formatting rules
+├── .env.example                  # Environment variable configuration template
+├── .gitignore                    # Version control exclusion rules
+├── package.json                  # Root orchestration scripts
+└── README.md                     # Project documentation
+```
+
+---
+
+## 4. Prerequisites
+
+Before running the application locally, ensure you have:
+
+- **Node.js**: `v18.0.0` or higher (tested on `v24.18.0`)
+- **npm**: `v9.0.0` or higher (tested on `v11.16.0`)
+- **MySQL Server** *(Optional on Day 1)*: MySQL v8.0+ running on port 3306. Note that Day 1 runs completely without requiring a live MySQL server.
+- **Web Browser**: Any modern browser (Chrome, Edge, Firefox, Safari).
+
+---
+
+## 5. Installation Instructions
+
+1. Clone or navigate to the project directory:
+   ```bash
+   cd toss
+   ```
+
+2. Copy the environment variables template:
+   - On Windows (PowerShell):
+     ```powershell
+     Copy-Item .env.example .env
+     ```
+   - On macOS/Linux:
+     ```bash
+     cp .env.example .env
+     ```
+
+3. Install backend dependencies:
+   ```bash
+   cd backend
+   npm install
+   cd ..
+   ```
+
+---
+
+## 6. How to Run the Project
+
+### A. Starting the Backend API Server
+
+From the project root:
+```bash
+npm run start:backend
+```
+Or for auto-reloading during development:
+```bash
+npm run dev:backend
+```
+The Express server will start listening at: `http://localhost:5000`
+
+### B. Starting the Frontend Web App
+
+In a separate terminal window from the project root:
+```bash
+npm run serve-frontend
+```
+Open your browser and navigate to:
+```text
+http://localhost:5500/
+```
+
+You can also directly open `frontend/index.html` in your browser.
+
+---
+
+## 7. How to Test the Health Endpoint
+
+### In the Browser
+- Open `http://localhost:5000/api/health` directly, or click the **"Test Health Probe"** button on the frontend entry page (`http://localhost:5500/`).
+
+### Via Terminal / PowerShell
+```powershell
+npm run test:health
+```
+Or with curl:
+```bash
+curl http://localhost:5000/api/health
+```
+
+Expected JSON response:
+```json
+{
+  "success": true,
+  "message": "IRONMAN TOSS BOOK API is running",
+  "service": "ironman-toss-book-api",
+  "version": "1.0.0",
+  "environment": "development",
+  "timestamp": "2026-10-14T...",
+  "uptime": 12.34
+}
+```
+
+### Database Diagnostic Endpoint
+You can also test the database connection status:
+```bash
+curl http://localhost:5000/api/health/db
+```
+If MySQL is not yet configured or the `ironman_toss_book` database does not exist, it safely returns HTTP 503 with the diagnostic status without crashing the server.
+
+---
+
+## 8. MySQL Preparation & Current Status
+
+- **Status**: Architecture and relational schema plan documented in `docs/DATABASE_PLAN.md`.
+- **Diagnostics**: Non-blocking connectivity probe implemented in `backend/src/config/db.js`.
+- **Scheduled Schema Creation**: **Day 9** will introduce the physical SQL DDL schema script (`backend/database/schema.sql`) and development seed data (`seed.sql`).
+- **Honest Connection Reporting**: The backend accurately reports whether a connection could be established rather than falsifying database connectivity.
+
+---
+
+## 9. Current Implementation Status (Day 1 of 20)
+
+| Feature / Area | Status | Notes |
+| :--- | :--- | :--- |
+| Project Structure & Config | Completed | Verified directory topology and environment template |
+| Screenshot Analysis | Completed | Documented in `docs/SCREENSHOT_ANALYSIS.md` |
+| Design System Tokens | Completed | CSS custom properties, typography, buttons, badges |
+| Frontend Entry Point | Completed | Verified responsive layout, zero overflow, Dark Mode toggle |
+| Backend Server | Completed | Express server, request logger, 404 handler, central error handler |
+| API Health Endpoint | Completed | `GET /api/health` verified with 200 OK |
+| MySQL Integration | Planned | Architecture planned (Day 1); DDL execution scheduled for Day 9 |
+| Bets / Wagers | Out of Scope | Scheduled for Day 4 (UI) and Day 13 (APIs) |
+| Wallet / Passbook | Out of Scope | Scheduled for Day 5 (UI) and Day 14 (APIs) |
+| Auth & Admin Area | Out of Scope | Scheduled for Days 3, 11, 16, 17 |
+
+> [!WARNING]
+> **Financial & Betting Transactions are Strictly Out of Scope for Day 1**:
+> No real or fake wallet transactions, balance modifications, deposits, withdrawals, or wager settlements are active on Day 1. All financial elements displayed on the welcome page are purely demonstrative design system tokens.
+
+---
+
+## 10. Planned 20-Day Sequence
+
+- **Day 1**: Project initialization, screenshot analysis, CSS foundation, Express health probe.
+- **Day 2**: Shared header, announcement ticker, and mobile bottom navigation.
+- **Day 3**: Login, registration, and password recovery UI.
+- **Day 4**: Bets page UI (status filters, bet history cards).
+- **Day 5**: Passbook page UI (hero balance, search, credit/debit records).
+- **Day 6**: Profile page, Dark Mode toggle, and settings.
+- **Day 7**: Home dashboard UI (matches, live odds).
+- **Day 8**: Responsive design and visual polish audit.
+- **Day 9**: MySQL schema DDL script and seed data.
+- **Day 10**: Express backend database connection pool and query helpers.
+- **Day 11**: User authentication backend (registration, login, JWT/sessions).
+- **Day 12**: Profile and preferences APIs.
+- **Day 13**: Bets APIs (odds listing, bet placement with balance locking).
+- **Day 14**: Wallet, Passbook, and double-entry ledger APIs.
+- **Day 15**: Simulated deposit and withdrawal lifecycle.
+- **Day 16**: Admin dashboard UI.
+- **Day 17**: Admin management APIs and toss settlement engine.
+- **Day 18**: Frontend-backend integration and security audit.
+- **Day 19**: End-to-end testing, edge cases, and bug remediation.
+- **Day 20**: Production deployment preparation and final verification.
+
+---
+
+## 11. Known Limitations (Day 1)
+
+1. The frontend entry view is an initialization and diagnostic screen; full Bets, Passbook, and Profile UIs will be developed in subsequent days.
+2. MySQL database tables have not yet been instantiated (scheduled for Day 9).
+3. Authentication and user session tokens are not yet implemented (scheduled for Day 11).

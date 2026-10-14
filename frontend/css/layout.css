@@ -1,0 +1,66 @@
+/**
+ * IRONMAN TOSS BOOK - Layout & Structure Foundations
+ */
+
+/* ==========================================================================
+   Root Layout Container
+   Centers the mobile-first application container on wider viewports
+   ========================================================================== */
+
+.app-wrapper {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-color: var(--color-background);
+  padding: 0;
+}
+
+.app-container {
+  width: 100%;
+  max-width: var(--container-max-width);
+  min-height: 100vh;
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   Main Content Area
+   ========================================================================== */
+
+.main-content {
+  flex: 1;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Spacers for fixed top header and bottom nav */
+.header-spacer {
+  height: calc(var(--header-height) + var(--ticker-height));
+  flex-shrink: 0;
+}
+
+.bottom-nav-spacer {
+  height: var(--bottom-nav-height);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Flex & Grid Utility Foundations
+   ========================================================================== */
+
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-xs { gap: var(--space-xs); }
+.gap-sm { gap: var(--space-sm); }
+.gap-md { gap: var(--space-md); }
+.gap-lg { gap: var(--space-lg); }

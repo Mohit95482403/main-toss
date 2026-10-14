@@ -1,0 +1,19 @@
+{
+  "name": "ironman-toss-book",
+  "version": "1.0.0",
+  "description": "IRONMAN TOSS BOOK - Responsive Sports Toss Wagering & Ledger Platform",
+  "private": true,
+  "scripts": {
+    "start:backend": "cd backend && npm start",
+    "dev:backend": "cd backend && npm run dev",
+    "serve:frontend": "node ./scripts/serve-frontend.js",
+    "test:health": "node -e \"fetch('http://localhost:5000/api/health').then(r=>r.json()).then(d=>console.log('Health Check:',d)).catch(e=>console.error('API Offline:',e.message));\""
+  },
+  "keywords": [
+    "ironman",
+    "toss-book",
+    "sports-betting"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "ISC"
+}

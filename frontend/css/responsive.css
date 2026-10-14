@@ -1,0 +1,62 @@
+/**
+ * IRONMAN TOSS BOOK - Responsive Foundations & Media Queries
+ */
+
+/* ==========================================================================
+   Small Mobile Viewports (<= 360px)
+   ========================================================================== */
+
+@media (max-width: 360px) {
+  :root {
+    --space-lg: 0.75rem; /* 12px padding for tight screens */
+    --font-size-base: 0.8125rem; /* 13px */
+  }
+
+  .btn {
+    padding: 0.5rem 0.875rem;
+  }
+}
+
+/* ==========================================================================
+   Tablet & Above Viewports (>= 768px)
+   ========================================================================== */
+
+@media (min-width: 768px) {
+  .app-wrapper {
+    padding: var(--space-xl) var(--space-lg);
+    background-color: var(--color-background);
+  }
+
+  .app-container {
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+    min-height: calc(100vh - 3rem);
+    max-height: 900px;
+  }
+}
+
+/* ==========================================================================
+   Desktop Viewports (>= 1024px)
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+  .app-wrapper {
+    padding: var(--space-2xl) 0;
+  }
+}
+
+/* ==========================================================================
+   Reduced Motion Accessibility Preference
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
