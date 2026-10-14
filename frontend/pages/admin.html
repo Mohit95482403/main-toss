@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>IRONMAN TOSS BOOK | Admin Governance Portal</title>
+  <meta name="description" content="Administrative control center, user management, and operational monitoring for IRONMAN TOSS BOOK.">
+
+  <!-- Core Design System CSS -->
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+
+  <!-- Admin Page Specific CSS -->
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body data-page="admin" data-in-pages="true">
+  <div class="admin-view-wrapper">
+    
+    <!-- Admin Header -->
+    <header class="admin-header" role="banner">
+      <div class="admin-header-inner">
+        <div class="admin-header-left">
+          <a href="../index.html" class="admin-logo-badge" title="IRONMAN TOSS BOOK Home">
+            <div class="admin-logo-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"></path>
+              </svg>
+            </div>
+            <span class="admin-brand-title">IRONMAN TOSS BOOK</span>
+            <span class="admin-portal-tag">Admin</span>
+          </a>
+        </div>
+
+        <div class="admin-header-right">
+          <!-- Current Authenticated Admin Chip -->
+          <div class="admin-user-chip" id="admin-user-chip">
+            <div class="admin-avatar" id="admin-avatar">A</div>
+            <span class="admin-username" id="admin-username">Admin</span>
+            <span class="admin-role-badge super_admin" id="admin-role-badge">Super Admin</span>
+          </div>
+
+          <a href="../index.html" class="btn btn-secondary btn-sm" id="btn-return-app" title="Switch to user view">
+            Player View
+          </a>
+
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-admin-logout" title="Sign out of administrative session">
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Administrative Navigation Tabs -->
+    <nav class="admin-nav-bar" aria-label="Administrative Tabs">
+      <div class="admin-nav-inner">
+        <button type="button" class="admin-tab-btn active" data-tab="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          Overview
+        </button>
+
+        <button type="button" class="admin-tab-btn" data-tab="users">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          User Management
+        </button>
+
+        <button type="button" class="admin-tab-btn" data-tab="audits">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          Audit History
+        </button>
+
+        <button type="button" class="admin-tab-btn" data-tab="system">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          System Health
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="admin-main" id="admin-main-container">
+
+      <!-- =================================================================== -->
+      <!-- TAB 1: OVERVIEW -->
+      <!-- =================================================================== -->
+      <section class="admin-section active" id="section-overview" aria-labelledby="overview-heading">
+        <h1 id="overview-heading" class="sr-only">Administrative Dashboard Overview</h1>
+
+        <!-- Quick System Health Banner -->
+        <div class="admin-health-banner">
+          <div class="health-banner-left">
+            <span class="status-beacon-live" aria-hidden="true"></span>
+            <div>
+              <div class="text-sm font-bold">System Status: Operational</div>
+              <div class="text-xs text-muted">Node.js Express + MySQL Database Cluster</div>
+            </div>
+          </div>
+          <div class="health-banner-metrics">
+            <div class="health-metric-item">
+              <span class="health-metric-label">DB Status</span>
+              <span class="health-metric-val text-success" id="banner-db-status">Online</span>
+            </div>
+            <div class="health-metric-item">
+              <span class="health-metric-label">DB Latency</span>
+              <span class="health-metric-val" id="banner-db-latency">-- ms</span>
+            </div>
+            <div class="health-metric-item">
+              <span class="health-metric-label">Uptime</span>
+              <span class="health-metric-val" id="banner-uptime">--</span>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-stats">
+              Refresh Stats
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric KPI Cards Grid -->
+        <div class="admin-kpi-grid">
+          <!-- Total Users -->
+          <div class="admin-kpi-card kpi-info">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">Total Registered Users</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-total-users">--</div>
+            <div class="kpi-card-subtitle">
+              <span>Platform user records in MySQL</span>
+            </div>
+          </div>
+
+          <!-- Active Users -->
+          <div class="admin-kpi-card kpi-success">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">Active Players</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-active-users">--</div>
+            <div class="kpi-card-subtitle">
+              <span>Accounts in good standing</span>
+            </div>
+          </div>
+
+          <!-- Suspended / Banned -->
+          <div class="admin-kpi-card kpi-warning">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">Suspended & Banned</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-restricted-users">--</div>
+            <div class="kpi-card-subtitle">
+              <span>Moderated user accounts</span>
+            </div>
+          </div>
+
+          <!-- New in 24h -->
+          <div class="admin-kpi-card kpi-info">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">New Users (24h)</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-new-24h">--</div>
+            <div class="kpi-card-subtitle">
+              <span id="kpi-new-7d-sub">New registrations</span>
+            </div>
+          </div>
+
+          <!-- Total User Balance -->
+          <div class="admin-kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">Total Wallet Balances</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-total-balance">₹0.00</div>
+            <div class="kpi-card-subtitle">
+              <span>Combined available balances</span>
+            </div>
+          </div>
+
+          <!-- Total Match Exposure -->
+          <div class="admin-kpi-card kpi-danger">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">Total Exposure</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-total-exposure">₹0.00</div>
+            <div class="kpi-card-subtitle">
+              <span>Active match wager exposure</span>
+            </div>
+          </div>
+
+          <!-- Active Sessions -->
+          <div class="admin-kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">Active Sessions</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-active-sessions">--</div>
+            <div class="kpi-card-subtitle">
+              <span>Valid unexpired auth tokens</span>
+            </div>
+          </div>
+
+          <!-- Audit Activity in 24h -->
+          <div class="admin-kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-card-title">Admin Actions (24h)</span>
+              <div class="kpi-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              </div>
+            </div>
+            <div class="kpi-card-value" id="kpi-admin-actions">--</div>
+            <div class="kpi-card-subtitle">
+              <span>Governance interventions logged</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity Quick Table -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <span class="admin-card-title">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              Recent Administrative Actions
+            </span>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-view-all-audits">
+              View All Logs
+            </button>
+          </div>
+          <div class="admin-table-container">
+            <table class="admin-table" id="table-recent-audits">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Admin</th>
+                  <th>Action</th>
+                  <th>Target</th>
+                  <th>Reason / Details</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-recent-audits">
+                <tr>
+                  <td colspan="5" class="text-center text-muted" style="padding: 24px;">
+                    Loading recent audit records...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 2: USER MANAGEMENT -->
+      <!-- =================================================================== -->
+      <section class="admin-section" id="section-users" aria-labelledby="users-heading">
+        <h1 id="users-heading" class="sr-only">User Management & Moderation</h1>
+
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <span class="admin-card-title">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+              Registered Users Directory
+            </span>
+            <div class="text-xs text-muted" id="user-count-summary">
+              Showing users from database
+            </div>
+          </div>
+
+          <!-- Filters & Search Toolbar -->
+          <div class="admin-toolbar">
+            <div class="toolbar-group-left">
+              <div class="admin-search-box">
+                <svg class="admin-search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" class="admin-search-input" id="user-search-input" placeholder="Search by name, username, email, phone..." />
+              </div>
+
+              <select class="admin-select" id="filter-user-role" aria-label="Filter by Role">
+                <option value="all">All Roles</option>
+                <option value="user">User / Player</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+
+              <select class="admin-select" id="filter-user-status" aria-label="Filter by Status">
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="banned">Banned</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-users">
+              Refresh
+            </button>
+          </div>
+
+          <!-- User Table Container -->
+          <div class="admin-table-container">
+            <table class="admin-table" id="table-users">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>User Profile</th>
+                  <th>Contact Info</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Balance</th>
+                  <th>Registered</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-users">
+                <tr>
+                  <td colspan="8" class="text-center text-muted" style="padding: 30px;">
+                    Loading user records...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="admin-pagination-bar">
+            <div class="pagination-info" id="users-pagination-info">
+              Showing page 1 of 1 (0 total users)
+            </div>
+            <div class="pagination-controls">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-users-prev" disabled>
+                Previous
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-users-next" disabled>
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 3: AUDIT HISTORY -->
+      <!-- =================================================================== -->
+      <section class="admin-section" id="section-audits" aria-labelledby="audits-heading">
+        <h1 id="audits-heading" class="sr-only">Administrative Audit Trail</h1>
+
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <span class="admin-card-title">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              Immutable Administrative Audit Log
+            </span>
+          </div>
+
+          <!-- Audit Toolbar -->
+          <div class="admin-toolbar">
+            <div class="toolbar-group-left">
+              <div class="admin-search-box">
+                <svg class="admin-search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" class="admin-search-input" id="audit-search-input" placeholder="Search audit history..." />
+              </div>
+
+              <select class="admin-select" id="filter-audit-action" aria-label="Filter by Action Type">
+                <option value="all">All Actions</option>
+                <option value="admin_provisioned">Admin Provisioned</option>
+                <option value="user_status_suspended">User Suspended</option>
+                <option value="user_status_active">User Restored</option>
+                <option value="user_status_banned">User Banned</option>
+                <option value="user_role_change">Role Changed</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-audits">
+              Refresh
+            </button>
+          </div>
+
+          <!-- Table Container -->
+          <div class="admin-table-container">
+            <table class="admin-table" id="table-audits">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Admin</th>
+                  <th>Action Type</th>
+                  <th>Target Entity</th>
+                  <th>Details & Reason</th>
+                  <th>IP Address</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-audits">
+                <tr>
+                  <td colspan="6" class="text-center text-muted" style="padding: 30px;">
+                    Loading audit records...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="admin-pagination-bar">
+            <div class="pagination-info" id="audits-pagination-info">
+              Showing page 1 of 1
+            </div>
+            <div class="pagination-controls">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-audits-prev" disabled>
+                Previous
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-audits-next" disabled>
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 4: SYSTEM HEALTH -->
+      <!-- =================================================================== -->
+      <section class="admin-section" id="section-system" aria-labelledby="system-heading">
+        <h1 id="system-heading" class="sr-only">Operational Status & Diagnostics</h1>
+
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <span class="admin-card-title">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              Application & Database Health Diagnostics
+            </span>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-run-diag">
+              Run Diagnostics Probe
+            </button>
+          </div>
+
+          <div style="padding: 20px;">
+            <div class="system-metrics-grid">
+              
+              <!-- Service Info Box -->
+              <div class="system-metric-box">
+                <div class="text-sm font-bold text-secondary">APPLICATION SERVICE</div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Service Name:</span>
+                  <span class="font-bold" id="sys-app-name">IRONMAN TOSS BOOK</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Environment:</span>
+                  <span class="badge badge-neutral" id="sys-env">development</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Server Uptime:</span>
+                  <span class="font-bold" id="sys-uptime">--</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Server Clock:</span>
+                  <span class="text-xs" id="sys-clock">--</span>
+                </div>
+              </div>
+
+              <!-- Database Info Box -->
+              <div class="system-metric-box">
+                <div class="text-sm font-bold text-secondary">MYSQL DATABASE CLUSTER</div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Connection Status:</span>
+                  <span class="badge badge-success" id="sys-db-status">Online</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Driver / Pool:</span>
+                  <span class="font-bold" id="sys-db-driver">mysql2/promise (pool)</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Test Probe Latency:</span>
+                  <span class="font-bold" id="sys-db-latency">-- ms</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Active Sessions:</span>
+                  <span class="font-bold" id="sys-sessions-count">--</span>
+                </div>
+              </div>
+
+              <!-- Process & Memory Box -->
+              <div class="system-metric-box">
+                <div class="text-sm font-bold text-secondary">NODE.JS PROCESS RUNTIME</div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Node Version:</span>
+                  <span class="font-bold" id="sys-node-version">--</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">OS Platform:</span>
+                  <span class="font-bold" id="sys-platform">--</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Memory (RSS):</span>
+                  <span class="font-bold" id="sys-mem-rss">--</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">Memory (Heap Used):</span>
+                  <span class="font-bold" id="sys-mem-heap">--</span>
+                </div>
+              </div>
+
+              <!-- MySQL Table Record Counts -->
+              <div class="system-metric-box">
+                <div class="text-sm font-bold text-secondary">RELATIONAL TABLE RECORDS</div>
+                <div class="system-metric-row">
+                  <span class="text-muted">users table:</span>
+                  <span class="font-bold" id="tbl-users-count">--</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">wallets table:</span>
+                  <span class="font-bold" id="tbl-wallets-count">--</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">sessions table:</span>
+                  <span class="font-bold" id="tbl-sessions-count">--</span>
+                </div>
+                <div class="system-metric-row">
+                  <span class="text-muted">admin_audit_logs:</span>
+                  <span class="font-bold" id="tbl-audits-count">--</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODALS -->
+  <!-- ===================================================================== -->
+
+  <!-- 1. User Inspect Modal -->
+  <div class="admin-modal-overlay" id="modal-inspect-user" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="admin-modal-card">
+      <header class="admin-modal-header">
+        <h2 class="text-base font-bold">User Account Inspector</h2>
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close aria-label="Close dialog">✕</button>
+      </header>
+      <div class="admin-modal-body" id="inspect-modal-body">
+        <div class="text-center text-muted" style="padding: 20px;">Loading details...</div>
+      </div>
+      <footer class="admin-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 2. User Status Action Modal (Suspend / Restore / Ban) -->
+  <div class="admin-modal-overlay" id="modal-status-user" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="admin-modal-card">
+      <header class="admin-modal-header">
+        <h2 class="text-base font-bold" id="status-modal-title">Update Account Status</h2>
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close aria-label="Close dialog">✕</button>
+      </header>
+      <div class="admin-modal-body">
+        <p class="text-sm" id="status-modal-desc">
+          Are you sure you want to change the status of this user account?
+        </p>
+
+        <div class="field-group">
+          <label for="status-target-select" class="field-label">Action / New Status:</label>
+          <select id="status-target-select" class="admin-select" style="width: 100%;">
+            <option value="active">Active (Restore Account)</option>
+            <option value="suspended">Suspended (Temporary Lockout)</option>
+            <option value="banned">Banned (Permanent Restriction)</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="status-reason-input" class="field-label">Reason for Administrative Action:</label>
+          <textarea id="status-reason-input" class="admin-search-input" rows="3" placeholder="Enter reason for audit record (e.g. Terms of Service compliance, requested verification)..."></textarea>
+        </div>
+
+        <div class="alert alert-warning" id="status-warning-box" style="display: none;">
+          <span class="alert-icon">⚠️</span>
+          <span class="alert-text">Suspending or banning this user will immediately invalidate all active login sessions.</span>
+        </div>
+      </div>
+      <footer class="admin-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-status-change">
+          Confirm Update
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 3. User Role Action Modal (Super Admin only) -->
+  <div class="admin-modal-overlay" id="modal-role-user" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="admin-modal-card">
+      <header class="admin-modal-header">
+        <h2 class="text-base font-bold">Assign User Role</h2>
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close aria-label="Close dialog">✕</button>
+      </header>
+      <div class="admin-modal-body">
+        <p class="text-sm" id="role-modal-desc">
+          Adjust the platform permission level for this account.
+        </p>
+
+        <div class="field-group">
+          <label for="role-target-select" class="field-label">New Role:</label>
+          <select id="role-target-select" class="admin-select" style="width: 100%;">
+            <option value="user">User / Standard Player</option>
+            <option value="admin">Admin (Operational Access)</option>
+            <option value="super_admin">Super Admin (Full Governance)</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="role-reason-input" class="field-label">Reason for Role Assignment:</label>
+          <textarea id="role-reason-input" class="admin-search-input" rows="3" placeholder="Provide justification for security audit logging..."></textarea>
+        </div>
+      </div>
+      <footer class="admin-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-role-change">
+          Update Role
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Shared Toast Mount Container -->
+  <div class="app-toast-container" id="app-toast-container" aria-live="polite"></div>
+
+  <!-- Application Logic Scripts -->
+  <script src="../js/config.js"></script>
+  <script src="../js/shared-layout.js"></script>
+  <script src="../js/admin.js"></script>
+</body>
+</html>

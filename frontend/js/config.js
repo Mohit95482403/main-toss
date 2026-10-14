@@ -15,7 +15,11 @@ const APP_CONFIG = Object.freeze({
     authMe: '/auth/me',
     authProfile: '/auth/profile',
     authChangePassword: '/auth/change-password',
-    authLogout: '/auth/logout'
+    authLogout: '/auth/logout',
+    adminDashboardStats: '/admin/dashboard/stats',
+    adminUsers: '/admin/users',
+    adminAuditLogs: '/admin/audit-logs',
+    adminSystemStatus: '/admin/system/status'
   },
   defaultTheme: 'light',
   

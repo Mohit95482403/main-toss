@@ -15,7 +15,9 @@ const securityHeaders = require('./src/middleware/securityHeaders');
 const { notFoundHandler, centralErrorHandler } = require('./src/middleware/errorHandler');
 const healthRoutes = require('./src/routes/health');
 const authRoutes = require('./src/routes/auth');
+const adminRoutes = require('./src/routes/admin');
 const { initializeDatabase } = require('./src/config/initDb');
+const { seedAdmin } = require('./src/config/seedAdmin');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
@@ -56,13 +58,14 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // 5. API Routes Mounting
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Root informational endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
     service: 'IRONMAN TOSS BOOK API',
     status: 'active',
-    version: '1.0.0',
+    version: '1.0.0-day14',
     documentation: '/docs',
     endpoints: {
       health: '/api/health',
@@ -72,7 +75,14 @@ app.get('/', (req, res) => {
       authMe: 'GET /api/auth/me',
       authProfile: 'PUT /api/auth/profile',
       authPassword: 'POST /api/auth/change-password',
-      authLogout: 'POST /api/auth/logout'
+      authLogout: 'POST /api/auth/logout',
+      adminStats: 'GET /api/admin/dashboard/stats',
+      adminUsers: 'GET /api/admin/users',
+      adminUserDetail: 'GET /api/admin/users/:id',
+      adminUserStatus: 'PUT /api/admin/users/:id/status',
+      adminUserRole: 'PUT /api/admin/users/:id/role',
+      adminAuditLogs: 'GET /api/admin/audit-logs',
+      adminSystemStatus: 'GET /api/admin/system/status'
     }
   });
 });
@@ -85,10 +95,12 @@ app.use(centralErrorHandler);
 
 // 7. Start Server Listener (only if not required by a test suite)
 if (require.main === module) {
-  // Ensure tables exist
-  initializeDatabase().catch((err) => {
-    console.warn('[STARTUP] Database auto-initialization note:', err.message);
-  });
+  // Ensure tables and root administrator exist
+  initializeDatabase()
+    .then(() => seedAdmin())
+    .catch((err) => {
+      console.warn('[STARTUP] Database auto-initialization note:', err.message);
+    });
 
   const server = app.listen(PORT, () => {
     console.log(`====================================================`);

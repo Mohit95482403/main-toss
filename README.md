@@ -238,14 +238,14 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Profile & Account Settings Enhancement | Completed (Day 11) | Dynamic avatar initials badge (`#hero-avatar-initials`), real-time error clearing, button loading states ("Saving...", "Updating..."), password policy validation, notification switches with toast feedback, and session clearance on logout |
 | UI Consistency & Shared Components | Completed (Day 12) | Standardized status badges (.badge-live, .badge-won, .badge-lost, etc.), skeleton loaders (.skeleton, .skeleton-text), inline alerts (.alert), standardized empty states across all feeds (.empty-state), reusable toast notification engine (SharedLayout.showToast), INR currency & date formatters, button loading states (.btn-loading, .btn-spinner), safe-area bottom navigation, and global modal Escape listener |
 | Auth Security & Backend API Protection | Completed (Day 13) | MySQL users & wallets relational schema DDL, scrypt password hashing with unique salts, HS256 signed JWT tokens, timing-safe equality verification, in-memory rate-limiter, security headers (nosniff, SAMEORIGIN), authentication middleware (Bearer token & role guard), sanitized user responses, IDOR protection, mass-assignment defense, and full endpoint suite (register, login, me, profile, change-password, logout) |
-| Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 14 |
-| Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 15 |
-| Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5 & 10; real payment flow scheduled for Days 15 & 16 |
-| Admin Area | Out of Scope | Scheduled for Days 16 & 17 |
+| Admin Dashboard & Application Governance | Completed (Day 14) | Comprehensive SaaS administrative portal (`frontend/pages/admin.html`), KPI cards, server-side paginated user management with search and filters, user moderation (suspend/restore/ban) with immediate session revocation, role assignments, immutable audit trail (`admin_audit_logs`), operational monitoring (`/api/admin/system/status`), idempotent admin seeding (`backend/src/config/seedAdmin.js`), and role-based API protection (`admin`, `super_admin`) |
+| Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 15 |
+| Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 16 |
+| Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5 & 10; real payment flow scheduled for Days 16 & 17 |
 
 > [!NOTE]
-> **Authentication Security & Backend API Protection (Day 13)**:
-> Day 13 activates production-grade authentication security on the Express backend and MySQL database. Core tables (`users`, `wallets`, `sessions`, `user_preferences`) are instantiated via `backend/database/schema.sql` and initialized automatically on startup. User passwords are cryptographically hashed using Node's native `scrypt` with unique 16-byte salts and verified with `crypto.timingSafeEqual`. Authenticated sessions issue signed HS256 tokens. The API suite is fully protected with in-memory rate limiting, security headers, role-based access control, IDOR defense, and mass-assignment shielding. Bet placement and wager settlement APIs continue on **Day 14**.
+> **Admin Dashboard, User Management & Operational Monitoring (Day 14)**:
+> Day 14 delivers an enterprise-grade administrative governance suite. The system introduces `admin_audit_logs` in MySQL, root administrator provisioning via `seedAdmin.js`, and role-guarded APIs (`/api/admin/dashboard/stats`, `/api/admin/users`, `/api/admin/users/:id/status`, `/api/admin/users/:id/role`, `/api/admin/audit-logs`, `/api/admin/system/status`). An administrative dashboard (`frontend/pages/admin.html`) provides real-time KPI overview cards, search/filtering over MySQL users, confirmation modals for user suspension and role assignment, an immutable audit trail, and operational monitoring probes. All features are verified with a 68-test automated suite.
 
 ---
 

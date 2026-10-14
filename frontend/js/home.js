@@ -19,7 +19,7 @@
    * Demonstration Cricket Match Fixtures
    * Uses centralized TossBookMatches if available, else local fallback.
    */
-  const FALLBACK_MATCHES = [
+  const DEMO_MATCHES = [
     {
       id: 'MATCH-2026-001',
       featured: true,
@@ -125,11 +125,12 @@
     }
   ];
 
-  function getMatches() {
-    if (window.TossBookMatches && typeof window.TossBookMatches.getAll === 'function') {
-      return window.TossBookMatches.getAll();
-    }
-    return FALLBACK_MATCHES;
+    return DEMO_MATCHES;
+  }
+
+  // Backward compatibility modal setup stub
+  function setupMatchModal() {
+    // Handled via match-details page routing in Day 8
   }
 
   let currentCategory = 'all';
