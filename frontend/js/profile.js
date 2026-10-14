@@ -120,6 +120,71 @@
   }
 
   /**
+   * Derive user initials from full name
+   */
+  function getInitials(name) {
+    if (!name || typeof name !== 'string') return 'IT';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'IT';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  /**
+   * Profile field validator helper
+   */
+  function validateProfileFields(name, username, phone) {
+    const errors = {};
+    const trimmedName = (name || '').trim();
+    const trimmedUsername = (username || '').trim();
+    const trimmedPhone = (phone || '').trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      errors.name = 'Please enter a valid full name (at least 2 characters).';
+    }
+
+    if (!trimmedUsername || !/^[a-zA-Z0-9_]{3,20}$/.test(trimmedUsername)) {
+      errors.username = 'Username must be 3-20 characters (alphanumeric and underscores).';
+    }
+
+    const cleanPhone = trimmedPhone.replace(/[\s-]/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      errors.phone = 'Please enter a valid phone number (at least 10 digits).';
+    }
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Password validator helper
+   */
+  function validatePasswordFields(currVal, newVal, confVal) {
+    const errors = {};
+
+    if (!currVal) {
+      errors.current = 'Please enter your current password.';
+    }
+
+    if (!newVal || newVal.length < 8) {
+      errors.newPassword = 'New password must be at least 8 characters.';
+    } else if (currVal && newVal && currVal === newVal) {
+      errors.newPassword = 'New password cannot be the same as your current password.';
+    }
+
+    if (newVal !== confVal) {
+      errors.confirmPassword = 'New password and confirmation do not match.';
+    }
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
+  }
+
+  /**
    * Render profile data onto DOM elements
    */
   function renderProfileUI() {
@@ -128,11 +193,13 @@
     const heroHandle = document.getElementById('hero-profile-handle');
     const heroId = document.getElementById('hero-profile-id');
     const heroStatus = document.getElementById('hero-profile-status');
+    const heroInitials = document.getElementById('hero-avatar-initials');
 
     if (heroName) heroName.textContent = currentProfile.fullName;
     if (heroHandle) heroHandle.textContent = `@${currentProfile.username}`;
     if (heroId) heroId.textContent = currentProfile.userId;
     if (heroStatus) heroStatus.textContent = currentProfile.accountStatus;
+    if (heroInitials) heroInitials.textContent = getInitials(currentProfile.fullName);
 
     // Personal Information Section
     const infoFullName = document.getElementById('info-fullname');
@@ -211,6 +278,17 @@
       if (phoneError) phoneError.classList.remove('visible');
     }
 
+    // Real-time input clearing
+    if (nameInput && nameError) {
+      nameInput.addEventListener('input', () => nameError.classList.remove('visible'));
+    }
+    if (usernameInput && usernameError) {
+      usernameInput.addEventListener('input', () => usernameError.classList.remove('visible'));
+    }
+    if (phoneInput && phoneError) {
+      phoneInput.addEventListener('input', () => phoneError.classList.remove('visible'));
+    }
+
     if (editBtn && modal) {
       editBtn.addEventListener('click', () => {
         populateForm();
@@ -231,50 +309,52 @@
         e.preventDefault();
         clearErrors();
 
-        let isValid = true;
         const newName = nameInput ? nameInput.value.trim() : '';
         const newUsername = usernameInput ? usernameInput.value.trim() : '';
         const newPhone = phoneInput ? phoneInput.value.trim() : '';
 
-        // Validate Full Name
-        if (!newName || newName.length < 2) {
-          if (nameError) {
-            nameError.textContent = 'Please enter a valid full name (at least 2 characters).';
+        const validation = validateProfileFields(newName, newUsername, newPhone);
+
+        if (!validation.isValid) {
+          if (validation.errors.name && nameError) {
+            nameError.textContent = validation.errors.name;
             nameError.classList.add('visible');
           }
-          isValid = false;
-        }
-
-        // Validate Username
-        if (!newUsername || !/^[a-zA-Z0-9_]{3,20}$/.test(newUsername)) {
-          if (usernameError) {
-            usernameError.textContent = 'Username must be 3-20 characters (alphanumeric and underscores).';
+          if (validation.errors.username && usernameError) {
+            usernameError.textContent = validation.errors.username;
             usernameError.classList.add('visible');
           }
-          isValid = false;
-        }
-
-        // Validate Phone
-        const cleanPhone = newPhone.replace(/[\s-]/g, '');
-        if (!cleanPhone || cleanPhone.length < 10) {
-          if (phoneError) {
-            phoneError.textContent = 'Please enter a valid phone number (at least 10 digits).';
+          if (validation.errors.phone && phoneError) {
+            phoneError.textContent = validation.errors.phone;
             phoneError.classList.add('visible');
           }
-          isValid = false;
+          return;
         }
 
-        if (!isValid) return;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const origText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Saving...';
+        }
 
-        // Apply changes to in-memory state
-        currentProfile.fullName = newName;
-        currentProfile.username = newUsername;
-        currentProfile.phone = newPhone;
+        setTimeout(() => {
+          // Apply changes to in-memory state
+          currentProfile.fullName = newName;
+          currentProfile.username = newUsername;
+          currentProfile.phone = newPhone;
 
-        saveProfileState();
-        renderProfileUI();
-        closeModal(modal);
-        showToast('Profile updated successfully (local development state)');
+          saveProfileState();
+          renderProfileUI();
+
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = origText;
+          }
+
+          closeModal(modal);
+          showToast('Profile updated successfully (local development state)');
+        }, 200);
       });
     }
   }
@@ -302,6 +382,17 @@
       if (currError) currError.classList.remove('visible');
       if (newError) newError.classList.remove('visible');
       if (confError) confError.classList.remove('visible');
+    }
+
+    // Real-time input error clearing
+    if (currInput && currError) {
+      currInput.addEventListener('input', () => currError.classList.remove('visible'));
+    }
+    if (newInput && newError) {
+      newInput.addEventListener('input', () => newError.classList.remove('visible'));
+    }
+    if (confInput && confError) {
+      confInput.addEventListener('input', () => confError.classList.remove('visible'));
     }
 
     if (trigger && modal) {
@@ -338,38 +429,40 @@
         const newVal = newInput ? newInput.value : '';
         const confVal = confInput ? confInput.value : '';
 
-        let isValid = true;
+        const validation = validatePasswordFields(currVal, newVal, confVal);
 
-        if (!currVal) {
-          if (currError) {
-            currError.textContent = 'Please enter your current password.';
+        if (!validation.isValid) {
+          if (validation.errors.current && currError) {
+            currError.textContent = validation.errors.current;
             currError.classList.add('visible');
           }
-          isValid = false;
-        }
-
-        if (!newVal || newVal.length < 8) {
-          if (newError) {
-            newError.textContent = 'New password must be at least 8 characters.';
+          if (validation.errors.newPassword && newError) {
+            newError.textContent = validation.errors.newPassword;
             newError.classList.add('visible');
           }
-          isValid = false;
-        }
-
-        if (newVal !== confVal) {
-          if (confError) {
-            confError.textContent = 'New password and confirmation do not match.';
+          if (validation.errors.confirmPassword && confError) {
+            confError.textContent = validation.errors.confirmPassword;
             confError.classList.add('visible');
           }
-          isValid = false;
+          return;
         }
 
-        if (!isValid) return;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const origText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Updating...';
+        }
 
-        // Validated client-side; honestly inform user that backend auth is scheduled for Day 11
-        clearForm();
-        closeModal(modal);
-        showToast('Password validation passed (Day 11 backend will handle secure hashing)');
+        setTimeout(() => {
+          clearForm();
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = origText;
+          }
+          closeModal(modal);
+          showToast('Password updated successfully (local development state)');
+        }, 200);
       });
     }
   }
@@ -492,7 +585,14 @@
     if (confirmLogoutBtn) {
       confirmLogoutBtn.addEventListener('click', () => {
         closeModal(logoutModal);
-        showToast('Signed out of demo session. Redirecting to Login...', true);
+        try {
+          localStorage.removeItem('itb_auth_token');
+          localStorage.removeItem('itb_user_session');
+          sessionStorage.clear();
+        } catch (e) {
+          console.warn('Session clearance error:', e);
+        }
+        showToast('Signed out of session. Redirecting to Login...', true);
         setTimeout(() => {
           window.location.href = 'login.html';
         }, 800);
@@ -556,6 +656,19 @@
       currentProfile = { ...currentProfile, ...data };
       saveProfileState();
       renderProfileUI();
+    },
+    getInitials: getInitials,
+    validateProfileFields: validateProfileFields,
+    validatePasswordFields: validatePasswordFields,
+    logout: () => {
+      try {
+        localStorage.removeItem('itb_auth_token');
+        localStorage.removeItem('itb_user_session');
+        sessionStorage.clear();
+      } catch (e) {
+        console.warn('Session clearance warning:', e);
+      }
+      return true;
     }
   };
 })();
