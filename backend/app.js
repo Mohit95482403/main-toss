@@ -65,7 +65,7 @@ app.get('/', (req, res) => {
   res.status(200).json({
     service: 'IRONMAN TOSS BOOK API',
     status: 'active',
-    version: '1.0.0-day14',
+    version: '1.0.0-day15',
     documentation: '/docs',
     endpoints: {
       health: '/api/health',

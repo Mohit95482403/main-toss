@@ -58,6 +58,37 @@
       if (savedPrefs) {
         currentNotifications = Object.assign({}, DEFAULT_NOTIFICATIONS, JSON.parse(savedPrefs));
       }
+
+      // Sync with live authenticated profile if available
+      if (window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated()) {
+        window.ApiClient.get('/auth/me')
+          .then((res) => {
+            const user = res.user || (res.data && res.data.user);
+            if (user) {
+              currentProfile.fullName = user.full_name || user.fullName || currentProfile.fullName;
+              currentProfile.username = user.username || currentProfile.username;
+              currentProfile.email = user.email || currentProfile.email;
+              currentProfile.phone = user.phone || currentProfile.phone;
+              currentProfile.userId = `UID-${user.id}`;
+              currentProfile.accountStatus = user.status === 'active' ? 'Verified Account' : user.status.toUpperCase();
+              currentProfile.kycTier = user.role === 'admin' || user.role === 'super_admin' ? 'Administrative Access' : 'Standard Player';
+              if (user.created_at) {
+                const d = new Date(user.created_at);
+                currentProfile.joinedDate = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+              }
+              renderProfileUI();
+
+              // Toggle admin link visibility based on role
+              const adminLink = document.getElementById('menu-admin-link');
+              if (adminLink) {
+                adminLink.style.display = (user.role === 'admin' || user.role === 'super_admin') ? 'flex' : 'none';
+              }
+            }
+          })
+          .catch((e) => {
+            console.warn('[PROFILE] Live profile sync notice:', e.message);
+          });
+      }
     } catch (e) {
       console.warn('Could not read demo profile state from localStorage:', e);
     }
@@ -338,23 +369,42 @@
           submitBtn.textContent = 'Saving...';
         }
 
-        setTimeout(() => {
-          // Apply changes to in-memory state
-          currentProfile.fullName = newName;
-          currentProfile.username = newUsername;
-          currentProfile.phone = newPhone;
+        const isLive = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
+        const savePromise = isLive
+          ? window.ApiClient.put('/auth/profile', { fullName: newName, username: newUsername, phone: newPhone })
+          : new Promise(resolve => setTimeout(() => resolve({ success: true }), 200));
 
-          saveProfileState();
-          renderProfileUI();
+        savePromise
+          .then((res) => {
+            const updated = res.user || (res.data && res.data.user);
+            currentProfile.fullName = (updated && (updated.full_name || updated.fullName)) || newName;
+            currentProfile.username = (updated && updated.username) || newUsername;
+            currentProfile.phone = (updated && updated.phone) || newPhone;
 
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = origText;
-          }
+            saveProfileState();
+            renderProfileUI();
 
-          closeModal(modal);
-          showToast('Profile updated successfully (local development state)');
-        }, 200);
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = origText;
+            }
+
+            closeModal(modal);
+            showToast('Profile updated successfully' + (isLive ? '' : ' (local development state)'));
+          })
+          .catch((err) => {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = origText;
+            }
+            const msg = (err.error && err.error.message) || err.message || 'Failed to update profile.';
+            if (usernameError && err.code === 'DUPLICATE_USERNAME') {
+              usernameError.textContent = msg;
+              usernameError.classList.add('visible');
+            } else {
+              showToast(msg, false);
+            }
+          });
       });
     }
   }
@@ -454,15 +504,34 @@
           submitBtn.textContent = 'Updating...';
         }
 
-        setTimeout(() => {
-          clearForm();
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = origText;
-          }
-          closeModal(modal);
-          showToast('Password updated successfully (local development state)');
-        }, 200);
+        const isLive = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
+        const pwdPromise = isLive
+          ? window.ApiClient.post('/auth/change-password', { currentPassword: currInput.value, newPassword: newInput.value })
+          : new Promise(resolve => setTimeout(() => resolve({ success: true }), 200));
+
+        pwdPromise
+          .then(() => {
+            clearForm();
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = origText;
+            }
+            closeModal(modal);
+            showToast('Password updated successfully' + (isLive ? '' : ' (local development state)'));
+          })
+          .catch((err) => {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = origText;
+            }
+            const msg = (err.error && err.error.message) || err.message || 'Password update failed.';
+            if (currError && err.code === 'INVALID_CURRENT_PASSWORD') {
+              currError.textContent = msg;
+              currError.classList.add('visible');
+            } else {
+              showToast(msg, false);
+            }
+          });
       });
     }
   }
@@ -585,6 +654,11 @@
     if (confirmLogoutBtn) {
       confirmLogoutBtn.addEventListener('click', () => {
         closeModal(logoutModal);
+        if (window.ApiClient && typeof window.ApiClient.post === 'function') {
+          window.ApiClient.post('/auth/logout').catch(() => {});
+          window.ApiClient.clearToken();
+          window.ApiClient.clearUser();
+        }
         try {
           localStorage.removeItem('itb_auth_token');
           localStorage.removeItem('itb_user_session');

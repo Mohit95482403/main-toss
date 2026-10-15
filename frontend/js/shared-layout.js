@@ -363,7 +363,22 @@
     const tickerContainer = document.getElementById('shared-ticker');
     const bottomNavContainer = document.getElementById('shared-bottom-nav');
 
-    if (headerContainer) renderHeader(headerContainer);
+    if (headerContainer) {
+      renderHeader(headerContainer);
+      if (window.ApiClient && typeof window.ApiClient.getUser === 'function') {
+        const u = window.ApiClient.getUser();
+        if (u && u.wallet) {
+          const avail = u.wallet.available_balance !== undefined ? u.wallet.available_balance : u.wallet.available;
+          const exp = u.wallet.exposure_balance !== undefined ? u.wallet.exposure_balance : u.wallet.exposure;
+          if (avail !== undefined && exp !== undefined) {
+            updateBalances(
+              Number(avail).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+              Number(exp).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            );
+          }
+        }
+      }
+    }
     if (tickerContainer) renderTicker(tickerContainer);
     if (bottomNavContainer) renderBottomNav(bottomNavContainer);
 

@@ -401,8 +401,14 @@
     function updateBalanceCards() {
       const summary = calculateLedgerSummary(DEMO_TRANSACTIONS);
 
+      // Check if real authenticated user with wallet balance exists
+      const authUser = window.ApiClient && typeof window.ApiClient.getUser === 'function' ? window.ApiClient.getUser() : null;
+      const userBalance = authUser && authUser.wallet && (authUser.wallet.available_balance !== undefined ? authUser.wallet.available_balance : authUser.wallet.available);
+
       if (heroAvailableBalance) {
-        heroAvailableBalance.textContent = formatCurrency(summary.availableBalance);
+        heroAvailableBalance.textContent = (userBalance !== undefined && userBalance !== null)
+          ? formatCurrency(userBalance)
+          : formatCurrency(summary.availableBalance);
       }
       if (heroTotalCredits) {
         heroTotalCredits.textContent = `+${formatCurrency(summary.totalCredits)}`;
@@ -413,11 +419,16 @@
 
       // Synchronize Top Header Balances
       if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
-        const balFormatted = summary.availableBalance.toLocaleString('en-IN', {
+        const balValue = (userBalance !== undefined && userBalance !== null) ? userBalance : summary.availableBalance;
+        const balFormatted = balValue.toLocaleString('en-IN', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
         });
-        window.SharedLayout.updateBalances(balFormatted, '0.00');
+        const expFormatted = (authUser && authUser.wallet && authUser.wallet.exposure_balance !== undefined ? authUser.wallet.exposure_balance : 0).toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        window.SharedLayout.updateBalances(balFormatted, expFormatted);
       }
     }
 

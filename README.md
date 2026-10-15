@@ -214,7 +214,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 
 ---
 
-## 9. Current Implementation Status (Day 12 of 20)
+## 9. Current Implementation Status (Day 15 of 20)
 
 | Feature / Area | Status | Notes |
 | :--- | :--- | :--- |
@@ -223,7 +223,7 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | Design System Tokens | Completed | CSS custom properties, typography, buttons, badges |
 | Frontend Entry Point | Completed | Verified responsive layout, zero overflow, Dark Mode toggle |
 | Backend Server | Completed | Express server, request logger, 404 handler, central error handler |
-| API Health Endpoint | Completed | `GET /api/health` verified with 200 OK |
+| API Health Endpoint | Completed | `GET /api/health` and `GET /api/health/db` verified with 200 OK |
 | Shared Header | Completed (Day 2) | Brand logo fallback, Available balance (blue), Exposure (red) |
 | Announcement Ticker | Completed (Day 2) | Continuous marquee with dual track loop, English & Hindi, pause on hover |
 | Bottom Navigation | Completed (Day 2) | 4 tabs (Home, Bets, Passbook, Profile) with SVGs, active states, safe-area support |
@@ -239,13 +239,11 @@ If MySQL is not yet configured or the `ironman_toss_book` database does not exis
 | UI Consistency & Shared Components | Completed (Day 12) | Standardized status badges (.badge-live, .badge-won, .badge-lost, etc.), skeleton loaders (.skeleton, .skeleton-text), inline alerts (.alert), standardized empty states across all feeds (.empty-state), reusable toast notification engine (SharedLayout.showToast), INR currency & date formatters, button loading states (.btn-loading, .btn-spinner), safe-area bottom navigation, and global modal Escape listener |
 | Auth Security & Backend API Protection | Completed (Day 13) | MySQL users & wallets relational schema DDL, scrypt password hashing with unique salts, HS256 signed JWT tokens, timing-safe equality verification, in-memory rate-limiter, security headers (nosniff, SAMEORIGIN), authentication middleware (Bearer token & role guard), sanitized user responses, IDOR protection, mass-assignment defense, and full endpoint suite (register, login, me, profile, change-password, logout) |
 | Admin Dashboard & Application Governance | Completed (Day 14) | Comprehensive SaaS administrative portal (`frontend/pages/admin.html`), KPI cards, server-side paginated user management with search and filters, user moderation (suspend/restore/ban) with immediate session revocation, role assignments, immutable audit trail (`admin_audit_logs`), operational monitoring (`/api/admin/system/status`), idempotent admin seeding (`backend/src/config/seedAdmin.js`), and role-based API protection (`admin`, `super_admin`) |
-| Bets Backend & Wagering | Planned | Real bet placement, rates, and settlements scheduled for Day 15 |
-| Wallet & Ledger APIs | Planned | Real double-entry ledger & balance updates scheduled for Day 16 |
-| Deposit & Withdraw Flow | Planned | Informational placeholders on Day 5 & 10; real payment flow scheduled for Days 16 & 17 |
+| API Integration, Data Integrity & Reliability | Completed (Day 15) | Standardized frontend HTTP client (`frontend/js/api-client.js`), normalized response envelopes (`data: { user, token }` and top-level fields), live auth flows (Login, Register, Profile, Change Password, Logout), session synchronization with header and passbook balance cards, strict user isolation / IDOR defense, atomic MySQL transactions across `users`, `wallets`, and `user_preferences`, and full end-to-end regression testing (82/82 Day 15 tests passed; 450+ total test assertions passed) |
 
 > [!NOTE]
-> **Admin Dashboard, User Management & Operational Monitoring (Day 14)**:
-> Day 14 delivers an enterprise-grade administrative governance suite. The system introduces `admin_audit_logs` in MySQL, root administrator provisioning via `seedAdmin.js`, and role-guarded APIs (`/api/admin/dashboard/stats`, `/api/admin/users`, `/api/admin/users/:id/status`, `/api/admin/users/:id/role`, `/api/admin/audit-logs`, `/api/admin/system/status`). An administrative dashboard (`frontend/pages/admin.html`) provides real-time KPI overview cards, search/filtering over MySQL users, confirmation modals for user suspension and role assignment, an immutable audit trail, and operational monitoring probes. All features are verified with a 68-test automated suite.
+> **Backend API Integration, MySQL Data Integrity, End-to-End Testing & Reliability (Day 15)**:
+> Day 15 audits and strengthens all connections between the frontend, Express backend APIs, authentication system, and MySQL database. A standardized, resilient frontend API client (`frontend/js/api-client.js`) centralizes base URL resolution, token lifecycle management, response error normalization, and real-time wallet balance synchronization. Backend auth and profile response envelopes were normalized with dual-property compatibility (`full_name` and `fullName`, `wallet` object, and structured `data` envelopes). The login and registration pages are fully wired to backend APIs with live error display and redirection. The user profile page is integrated with live `/api/auth/me`, `/api/auth/profile`, and `/api/auth/change-password` endpoints. User isolation is verified to prevent unauthorized cross-user data tampering. Atomic MySQL transactions ensure data consistency across multiple related tables during registration, and comprehensive automated integration testing verifies 82 integration assertions alongside 100% backward test suite compatibility.
 
 ---
 

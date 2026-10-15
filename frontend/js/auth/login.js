@@ -96,21 +96,72 @@
       submitBtn.classList.add('is-submitting');
       submitBtn.disabled = true;
 
-      // Simulate boundary contact with honest development report (No fake session)
-      setTimeout(() => {
-        submitBtn.classList.remove('is-submitting');
-        submitBtn.disabled = false;
+      // Real backend authentication request via ApiClient
+      const rememberCheckbox = document.getElementById('login-remember');
+      const persistSession = rememberCheckbox ? rememberCheckbox.checked : true;
 
-        if (devAlert) {
-          devAlert.innerHTML = `
-            <strong>Client-Side Validation Passed:</strong><br>
-            Backend authentication endpoint (<code>POST /api/auth/login</code>) is scheduled for implementation on <strong>Day 11</strong>.<br>
-            <small class="text-muted">No fake sessions or tokens have been stored in browser storage.</small>
-          `;
-          devAlert.classList.add('visible');
-          devAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }, 600);
+      const apiClient = window.ApiClient;
+      const apiPromise = apiClient
+        ? apiClient.post('/auth/login', { identifier: identifierVal, password: passwordVal })
+        : fetch(`${(window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 'http://localhost:5000/api'}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: identifierVal, password: passwordVal })
+          }).then(r => r.json().then(d => r.ok ? d : Promise.reject(d)));
+
+      apiPromise
+        .then((res) => {
+          submitBtn.classList.remove('is-submitting');
+          submitBtn.disabled = false;
+
+          const token = res.token || (res.data && res.data.token);
+          const user = res.user || (res.data && res.data.user);
+
+          if (token) {
+            if (window.ApiClient) {
+              window.ApiClient.setToken(token, persistSession);
+              window.ApiClient.setUser(user);
+            } else {
+              localStorage.setItem('itb_auth_token', token);
+              if (user) localStorage.setItem('itb_auth_user', JSON.stringify(user));
+            }
+          }
+
+          if (devAlert) {
+            devAlert.innerHTML = `
+              <strong>Signed In Successfully:</strong><br>
+              Welcome back, <strong>${user ? (user.username || user.fullName || 'Player') : 'User'}</strong>!<br>
+              <small class="text-muted">Redirecting to your dashboard...</small>
+            `;
+            devAlert.classList.add('visible');
+          }
+
+          setTimeout(() => {
+            if (user && (user.role === 'admin' || user.role === 'super_admin')) {
+              window.location.href = '../pages/admin.html';
+            } else {
+              window.location.href = '../index.html';
+            }
+          }, 600);
+        })
+        .catch((err) => {
+          submitBtn.classList.remove('is-submitting');
+          submitBtn.disabled = false;
+
+          const errorMsg = (err.error && err.error.message) || err.message || 'Invalid credentials or server unavailable. Please try again.';
+
+          if (errorAlert) {
+            errorAlert.innerHTML = `
+              <strong>Sign In Failed:</strong><br>
+              ${errorMsg}
+            `;
+            errorAlert.classList.add('visible');
+            errorAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else if (devAlert) {
+            devAlert.innerHTML = `<strong>Error:</strong> ${errorMsg}`;
+            devAlert.classList.add('visible');
+          }
+        });
     });
   });
 })();

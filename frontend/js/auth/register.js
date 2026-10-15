@@ -190,21 +190,73 @@
       submitBtn.classList.add('is-submitting');
       submitBtn.disabled = true;
 
-      // Honest simulation boundary
-      setTimeout(() => {
-        submitBtn.classList.remove('is-submitting');
-        submitBtn.disabled = false;
+      const registerPayload = {
+        fullName: nameVal,
+        username: usernameVal,
+        email: emailVal,
+        phone: phoneVal,
+        password: passwordVal
+      };
 
-        if (devAlert) {
-          devAlert.innerHTML = `
-            <strong>Client-Side Registration Verification Passed:</strong><br>
-            All inputs satisfy validation and security policies. The backend account creation endpoint (<code>POST /api/auth/register</code>) with database storage and password hashing is scheduled for <strong>Day 11</strong>.<br>
-            <small class="text-muted">No mock credentials or fake sessions have been committed to browser storage.</small>
-          `;
-          devAlert.classList.add('visible');
-          devAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }, 700);
+      const apiClient = window.ApiClient;
+      const apiPromise = apiClient
+        ? apiClient.post('/auth/register', registerPayload)
+        : fetch(`${(window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 'http://localhost:5000/api'}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(registerPayload)
+          }).then(r => r.json().then(d => r.ok ? d : Promise.reject(d)));
+
+      apiPromise
+        .then((res) => {
+          submitBtn.classList.remove('is-submitting');
+          submitBtn.disabled = false;
+
+          const token = res.token || (res.data && res.data.token);
+          const user = res.user || (res.data && res.data.user);
+
+          if (token) {
+            if (window.ApiClient) {
+              window.ApiClient.setToken(token);
+              window.ApiClient.setUser(user);
+            } else {
+              localStorage.setItem('itb_auth_token', token);
+              if (user) localStorage.setItem('itb_auth_user', JSON.stringify(user));
+            }
+          }
+
+          if (devAlert) {
+            devAlert.innerHTML = `
+              <strong>Account Created Successfully!</strong><br>
+              Welcome to IRONMAN TOSS BOOK, <strong>${user ? (user.username || user.fullName || 'Player') : 'User'}</strong>!<br>
+              <small class="text-muted">Account verified. Redirecting to home dashboard...</small>
+            `;
+            devAlert.classList.add('visible');
+            devAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+
+          setTimeout(() => {
+            window.location.href = '../index.html';
+          }, 800);
+        })
+        .catch((err) => {
+          submitBtn.classList.remove('is-submitting');
+          submitBtn.disabled = false;
+
+          const errorMsg = (err.error && err.error.message) || err.message || 'Registration failed. Please check your information.';
+
+          if (errorAlert) {
+            errorAlert.innerHTML = `
+              <strong>Registration Failed:</strong><br>
+              ${errorMsg}
+            `;
+            errorAlert.classList.add('visible');
+            errorAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else if (devAlert) {
+            devAlert.innerHTML = `<strong>Error:</strong> ${errorMsg}`;
+            devAlert.classList.add('visible');
+          }
+        });
     });
   });
 })();

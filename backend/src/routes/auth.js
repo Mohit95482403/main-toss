@@ -141,19 +141,26 @@ router.post('/register', authRateLimiter, async (req, res, next) => {
         role: 'user'
       });
 
+      const registeredUser = {
+        id: newUserId,
+        uuid: userUuid,
+        full_name: trimmedName,
+        fullName: trimmedName,
+        username: trimmedUsername,
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        role: 'user',
+        status: 'active'
+      };
+
       return res.status(201).json({
         success: true,
         message: 'Account created successfully.',
         token,
-        user: {
-          id: newUserId,
-          uuid: userUuid,
-          fullName: trimmedName,
-          username: trimmedUsername,
-          email: trimmedEmail,
-          phone: trimmedPhone,
-          role: 'user',
-          status: 'active'
+        user: registeredUser,
+        data: {
+          token,
+          user: registeredUser
         }
       });
     } catch (txErr) {
@@ -259,11 +266,16 @@ router.post('/login', authRateLimiter, async (req, res, next) => {
       console.warn('[AUTH] Session tracking record warning:', sessionErr.message);
     }
 
+    const sanitized = sanitizeUser(user);
     return res.status(200).json({
       success: true,
       message: 'Signed in successfully.',
       token,
-      user: sanitizeUser(user)
+      user: sanitized,
+      data: {
+        token,
+        user: sanitized
+      }
     });
   } catch (err) {
     next(err);
@@ -300,9 +312,27 @@ router.get('/me', authenticate, async (req, res, next) => {
       });
     }
 
+    const userRow = rows[0];
+    const sanitized = sanitizeUser(userRow);
+    sanitized.wallet = {
+      available_balance: parseFloat(userRow.available_balance || 0),
+      exposure_balance: parseFloat(userRow.exposure_balance || 0),
+      currency: 'INR'
+    };
+    sanitized.preferences = {
+      darkMode: Boolean(userRow.dark_mode_enabled),
+      tossAlerts: Boolean(userRow.toss_alerts),
+      matchReminders: Boolean(userRow.match_reminders),
+      walletNotices: Boolean(userRow.wallet_notices),
+      promoUpdates: Boolean(userRow.promo_updates)
+    };
+
     return res.status(200).json({
       success: true,
-      user: sanitizeUser(rows[0])
+      user: sanitized,
+      data: {
+        user: sanitized
+      }
     });
   } catch (err) {
     next(err);
@@ -401,10 +431,15 @@ router.put('/profile', authenticate, async (req, res, next) => {
       [req.user.id]
     );
 
+    const sanitized = sanitizeUser(rows[0]);
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully.',
-      user: sanitizeUser(rows[0])
+      user: sanitized,
+      profile: sanitized,
+      data: {
+        user: sanitized
+      }
     });
   } catch (err) {
     next(err);
