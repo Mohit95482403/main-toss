@@ -5,15 +5,15 @@
 (function () {
   'use strict';
 
-  // 1. Initialize Theme from LocalStorage or System Preference
+  // 1. Initialize Theme from LocalStorage or Default to Reference Light Mode
   function initTheme() {
     const savedTheme = localStorage.getItem('itb_theme');
     if (savedTheme === 'dark' || savedTheme === 'light') {
       document.documentElement.setAttribute('data-theme', savedTheme);
       updateThemeToggleButton(savedTheme);
-    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      updateThemeToggleButton('dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      updateThemeToggleButton('light');
     }
   }
 
