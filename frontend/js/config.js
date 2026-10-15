@@ -5,9 +5,11 @@
 const APP_CONFIG = Object.freeze({
   appName: 'IRONMAN TOSS BOOK',
   version: '1.0.0-day2',
-  apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5000/api'
-    : '/api',
+  apiBaseUrl: (typeof window !== 'undefined' && window.ITB_API_URL)
+    ? window.ITB_API_URL
+    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:5000/api'
+        : '/api'),
   endpoints: {
     health: '/health',
     authRegister: '/auth/register',

@@ -19,18 +19,24 @@ const authRoutes = require('./src/routes/auth');
 const adminRoutes = require('./src/routes/admin');
 const { initializeDatabase } = require('./src/config/initDb');
 const { seedAdmin } = require('./src/config/seedAdmin');
+const { validateEnvironment } = require('./src/config/envValidator');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// 1. HTTP Security Headers
+// 1. Production Reverse Proxy Trust (ALB, Nginx, Cloudflare, Heroku/Render)
+if (NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
+// 2. HTTP Security Headers
 app.use(securityHeaders);
 
-// 2. Safe Request Logging
+// 3. Safe Request Logging
 app.use(requestLogger);
 
-// 3. CORS Configuration
+// 4. CORS Configuration
 const allowedOrigins = [
   process.env.FRONTEND_ORIGIN || 'http://localhost:5500',
   'http://127.0.0.1:5500',
@@ -52,12 +58,26 @@ app.use(cors({
   credentials: true
 }));
 
-// 4. Body Parsing & Compression Middleware
+// 5. Body Parsing & Compression Middleware
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(compression);
 
-// 5. API Routes Mounting
+// 6. Optional Static Frontend Serving (Standalone or Monorepo Container Deployment)
+const SERVE_STATIC_FRONTEND = process.env.SERVE_STATIC_FRONTEND === 'true';
+const frontendDir = path.resolve(__dirname, '../frontend');
+if (SERVE_STATIC_FRONTEND) {
+  app.use(express.static(frontendDir, {
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    }
+  }));
+}
+
+// 7. API Routes Mounting
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -67,10 +87,13 @@ app.get('/', (req, res) => {
   res.status(200).json({
     service: 'IRONMAN TOSS BOOK API',
     status: 'active',
-    version: '1.0.0-day17',
+    version: '1.0.0-day19',
+    environment: NODE_ENV,
     documentation: '/docs',
     endpoints: {
       health: '/api/health',
+      healthLive: '/api/health/live',
+      healthReady: '/api/health/ready',
       databaseDiagnostic: '/api/health/db',
       authRegister: 'POST /api/auth/register',
       authLogin: 'POST /api/auth/login',
@@ -89,14 +112,25 @@ app.get('/', (req, res) => {
   });
 });
 
-// 5. Unmatched 404 Handler
+// 8. Unmatched 404 Handler
 app.use(notFoundHandler);
 
-// 6. Centralized Error Handler
+// 9. Centralized Error Handler
 app.use(centralErrorHandler);
 
-// 7. Start Server Listener (only if not required by a test suite)
+// 10. Start Server Listener (only if not required by a test suite)
 if (require.main === module) {
+  // Validate Environment Variables on Startup
+  const envCheck = validateEnvironment();
+  if (envCheck.warnings && envCheck.warnings.length > 0) {
+    envCheck.warnings.forEach(w => console.warn('[STARTUP WARNING]', w));
+  }
+  if (!envCheck.valid && envCheck.isProduction) {
+    console.error('[STARTUP CRITICAL ERROR] Production environment validation failed:');
+    envCheck.errors.forEach(e => console.error('  - ', e));
+    process.exit(1);
+  }
+
   // Ensure tables and root administrator exist
   initializeDatabase()
     .then(() => seedAdmin())
@@ -111,19 +145,32 @@ if (require.main === module) {
     console.log(`  Environment : ${NODE_ENV}`);
     console.log(`  Port        : ${PORT}`);
     console.log(`  Health URL  : http://localhost:${PORT}/api/health`);
+    console.log(`  Liveness    : http://localhost:${PORT}/api/health/live`);
+    console.log(`  Readiness   : http://localhost:${PORT}/api/health/ready`);
     console.log(`====================================================`);
   });
 
   const { closePool } = require('./src/config/db');
 
-  // Graceful shutdown handling
+  // Hardened Graceful shutdown handling with 10s deadline
   async function handleGracefulShutdown(signal) {
     console.log(`\nReceived ${signal}. Gracefully shutting down...`);
-    await closePool();
-    server.close(() => {
-      console.log('HTTP server closed.');
-      process.exit(0);
-    });
+    const shutdownTimer = setTimeout(() => {
+      console.error('[SHUTDOWN] Forceful shutdown triggered after 10s timeout.');
+      process.exit(1);
+    }, 10000);
+    shutdownTimer.unref();
+
+    try {
+      await closePool();
+      server.close(() => {
+        console.log('[SHUTDOWN] HTTP server closed gracefully.');
+        process.exit(0);
+      });
+    } catch (shutdownErr) {
+      console.error('[SHUTDOWN ERROR]', shutdownErr.message);
+      process.exit(1);
+    }
   }
 
   process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));

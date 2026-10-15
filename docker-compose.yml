@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # MySQL Database Service
+  # ----------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: itb-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_change_me}
+      MYSQL_DATABASE: ${DB_NAME:-ironman_toss_book}
+      MYSQL_USER: ${DB_USER:-itb_app_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-itb_secret_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - itb-network
+
+  # ----------------------------------------------------------------------------
+  # IRONMAN TOSS BOOK Application Service (Express API + Static Frontend)
+  # ----------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: itb-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      TRUST_PROXY: "true"
+      SERVE_STATIC_FRONTEND: "true"
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-ironman_toss_book}
+      DB_USER: ${DB_USER:-itb_app_user}
+      DB_PASSWORD: ${DB_PASSWORD:-itb_secret_password}
+      DB_CONNECTION_LIMIT: 10
+      DB_SSL: "false"
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5000}
+      SESSION_SECRET: ${SESSION_SECRET:-production_secure_secret_key_minimum_32_characters}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ironmantossbook.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@Ironman2026}
+    ports:
+      - "5000:5000"
+    networks:
+      - itb-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  itb-network:
+    driver: bridge

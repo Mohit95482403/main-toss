@@ -18,7 +18,15 @@ const dbConfig = {
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
   maxIdle: 10,
-  idleTimeout: 60000
+  idleTimeout: 60000,
+  ...(process.env.DB_SSL === 'true'
+    ? {
+        ssl: {
+          rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+          ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {})
+        }
+      }
+    : {})
 };
 
 let pool = null;
@@ -82,6 +90,7 @@ module.exports = {
     host: dbConfig.host,
     port: dbConfig.port,
     database: dbConfig.database,
-    connectionLimit: dbConfig.connectionLimit
+    connectionLimit: dbConfig.connectionLimit,
+    ssl: Boolean(dbConfig.ssl)
   }
 };

@@ -22,6 +22,12 @@ function securityHeaders(req, res, next) {
   // Strip server banner header
   res.removeHeader('X-Powered-By');
 
+  // Strict-Transport-Security (HSTS) when served over HTTPS or behind TLS proxy
+  const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  if (isHttps) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
   next();
 }
 
