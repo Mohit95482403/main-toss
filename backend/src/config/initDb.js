@@ -20,7 +20,9 @@ const TABLES_DDL = [
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_users_username (username),
     INDEX idx_users_email (email),
-    INDEX idx_users_status (status)
+    INDEX idx_users_status (status),
+    INDEX idx_users_role (role),
+    INDEX idx_users_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 
   `CREATE TABLE IF NOT EXISTS wallets (
@@ -44,9 +46,9 @@ const TABLES_DDL = [
     expires_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_sessions_token (token_hash)
+    INDEX idx_sessions_token (token_hash),
+    INDEX idx_sessions_expires (expires_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
-
   `CREATE TABLE IF NOT EXISTS user_preferences (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
@@ -89,6 +91,27 @@ async function initializeDatabase() {
     for (const ddl of TABLES_DDL) {
       await pool.query(ddl);
     }
+
+    // Ensure performance indexes exist idempotently on existing tables
+    try {
+      const [userIndexes] = await pool.query('SHOW INDEX FROM users');
+      const uIndexNames = userIndexes.map(i => i.Key_name);
+      if (!uIndexNames.includes('idx_users_role')) {
+        await pool.query('ALTER TABLE users ADD INDEX idx_users_role (role)');
+      }
+      if (!uIndexNames.includes('idx_users_created')) {
+        await pool.query('ALTER TABLE users ADD INDEX idx_users_created (created_at)');
+      }
+
+      const [sessionIndexes] = await pool.query('SHOW INDEX FROM sessions');
+      const sIndexNames = sessionIndexes.map(i => i.Key_name);
+      if (!sIndexNames.includes('idx_sessions_expires')) {
+        await pool.query('ALTER TABLE sessions ADD INDEX idx_sessions_expires (expires_at)');
+      }
+    } catch (idxErr) {
+      console.warn('[DB INIT] Performance index verification notice:', idxErr.message);
+    }
+
     console.log('[DB INIT] Core authentication & ledger tables verified successfully.');
     return true;
   } catch (err) {

@@ -74,38 +74,42 @@ router.get('/dashboard/stats', async (req, res, next) => {
   try {
     const pool = getPool();
 
-    // Query genuine statistics from MySQL
-    const [[userCounts]] = await pool.query(`
-      SELECT 
-        COUNT(*) AS totalUsers,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS activeUsers,
-        SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END) AS suspendedUsers,
-        SUM(CASE WHEN status = 'banned' THEN 1 ELSE 0 END) AS bannedUsers,
-        SUM(CASE WHEN role IN ('admin', 'super_admin') THEN 1 ELSE 0 END) AS adminUsers,
-        SUM(CASE WHEN created_at >= NOW() - INTERVAL 1 DAY THEN 1 ELSE 0 END) AS newUsers24h,
-        SUM(CASE WHEN created_at >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) AS newUsers7d
-      FROM users;
-    `);
-
-    const [[walletSums]] = await pool.query(`
-      SELECT 
-        COUNT(*) AS totalWallets,
-        COALESCE(SUM(available_balance), 0) AS totalAvailableBalance,
-        COALESCE(SUM(exposure_balance), 0) AS totalExposureBalance
-      FROM wallets;
-    `);
-
-    const [[sessionCount]] = await pool.query(`
-      SELECT COUNT(*) AS activeSessions
-      FROM sessions
-      WHERE expires_at > NOW();
-    `);
-
-    const [[recentAudits]] = await pool.query(`
-      SELECT COUNT(*) AS recentAudits24h
-      FROM admin_audit_logs
-      WHERE created_at >= NOW() - INTERVAL 24 HOUR;
-    `);
+    // Concurrently execute genuine statistics queries through the connection pool
+    const [
+      [[userCounts]],
+      [[walletSums]],
+      [[sessionCount]],
+      [[recentAudits]]
+    ] = await Promise.all([
+      pool.query(`
+        SELECT 
+          COUNT(*) AS totalUsers,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS activeUsers,
+          SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END) AS suspendedUsers,
+          SUM(CASE WHEN status = 'banned' THEN 1 ELSE 0 END) AS bannedUsers,
+          SUM(CASE WHEN role IN ('admin', 'super_admin') THEN 1 ELSE 0 END) AS adminUsers,
+          SUM(CASE WHEN created_at >= NOW() - INTERVAL 1 DAY THEN 1 ELSE 0 END) AS newUsers24h,
+          SUM(CASE WHEN created_at >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) AS newUsers7d
+        FROM users;
+      `),
+      pool.query(`
+        SELECT 
+          COUNT(*) AS totalWallets,
+          COALESCE(SUM(available_balance), 0) AS totalAvailableBalance,
+          COALESCE(SUM(exposure_balance), 0) AS totalExposureBalance
+        FROM wallets;
+      `),
+      pool.query(`
+        SELECT COUNT(*) AS activeSessions
+        FROM sessions
+        WHERE expires_at > NOW();
+      `),
+      pool.query(`
+        SELECT COUNT(*) AS recentAudits24h
+        FROM admin_audit_logs
+        WHERE created_at >= NOW() - INTERVAL 24 HOUR;
+      `)
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -185,13 +189,8 @@ router.get('/users', async (req, res, next) => {
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    // Total count query
+    // Total count query and paginated data query executed concurrently
     const countQuery = `SELECT COUNT(*) AS total FROM users u ${whereSql}`;
-    const [[countResult]] = await pool.query(countQuery, queryParams);
-    const total = parseInt(countResult.total || 0, 10);
-    const totalPages = Math.ceil(total / limit) || 1;
-
-    // Data query with wallet balances
     const dataQuery = `
       SELECT 
         u.id,
@@ -215,7 +214,12 @@ router.get('/users', async (req, res, next) => {
     `;
 
     const dataParams = [...queryParams, limit, offset];
-    const [rows] = await pool.query(dataQuery, dataParams);
+    const [ [[countResult]], [rows] ] = await Promise.all([
+      pool.query(countQuery, queryParams),
+      pool.query(dataQuery, dataParams)
+    ]);
+    const total = parseInt(countResult.total || 0, 10);
+    const totalPages = Math.ceil(total / limit) || 1;
 
     // Sanitize user list (ensure no password hash)
     const sanitizedUsers = rows.map((row) => ({
@@ -547,13 +551,8 @@ router.get('/audit-logs', async (req, res, next) => {
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    // Count
+    // Count query and paginated audit records executed concurrently
     const countQuery = `SELECT COUNT(*) AS total FROM admin_audit_logs ${whereSql}`;
-    const [[countResult]] = await pool.query(countQuery, queryParams);
-    const total = parseInt(countResult.total || 0, 10);
-    const totalPages = Math.ceil(total / limit) || 1;
-
-    // Data
     const dataQuery = `
       SELECT 
         id,
@@ -572,7 +571,12 @@ router.get('/audit-logs', async (req, res, next) => {
       LIMIT ? OFFSET ?
     `;
 
-    const [rows] = await pool.query(dataQuery, [...queryParams, limit, offset]);
+    const [ [[countResult]], [rows] ] = await Promise.all([
+      pool.query(countQuery, queryParams),
+      pool.query(dataQuery, [...queryParams, limit, offset])
+    ]);
+    const total = parseInt(countResult.total || 0, 10);
+    const totalPages = Math.ceil(total / limit) || 1;
 
     // Parse JSON details if string
     const parsedRows = rows.map((row) => ({

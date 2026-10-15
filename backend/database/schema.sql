@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_users_username (username),
   INDEX idx_users_email (email),
-  INDEX idx_users_status (status)
+  INDEX idx_users_status (status),
+  INDEX idx_users_role (role),
+  INDEX idx_users_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. Wallets Table
@@ -49,7 +51,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TIMESTAMP NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  INDEX idx_sessions_token (token_hash)
+  INDEX idx_sessions_token (token_hash),
+  INDEX idx_sessions_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. User Preferences Table

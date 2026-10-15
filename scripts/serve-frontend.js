@@ -46,20 +46,41 @@ const server = http.createServer((req, res) => {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    res.writeHead(200, {
-      'Content-Type': contentType,
-      'Access-Control-Allow-Origin': '*'
-    });
+    // Performance: Cache-Control headers for static assets
+    const isHtml = ext === '.html';
+    const cacheControl = isHtml ? 'no-cache' : 'public, max-age=86400, stale-while-revalidate=3600';
 
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+    const acceptEncoding = req.headers['accept-encoding'] || '';
+    const compressibleExts = ['.html', '.css', '.js', '.json', '.svg'];
+    const canGzip = acceptEncoding.includes('gzip') && compressibleExts.includes(ext);
+
+    const headers = {
+      'Content-Type': contentType,
+      'Cache-Control': cacheControl,
+      'Access-Control-Allow-Origin': '*',
+      'Vary': 'Accept-Encoding'
+    };
+
+    if (canGzip) {
+      headers['Content-Encoding'] = 'gzip';
+      res.writeHead(200, headers);
+      const zlib = require('zlib');
+      fs.createReadStream(filePath).pipe(zlib.createGzip()).pipe(res);
+    } else {
+      res.writeHead(200, headers);
+      fs.createReadStream(filePath).pipe(res);
+    }
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`  IRONMAN TOSS BOOK - Frontend Local Server`);
-  console.log(`  Serving folder: ${FRONTEND_DIR}`);
-  console.log(`  Local URL     : http://localhost:${PORT}/`);
-  console.log(`====================================================`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`  IRONMAN TOSS BOOK - Frontend Local Server`);
+    console.log(`  Serving folder: ${FRONTEND_DIR}`);
+    console.log(`  Local URL     : http://localhost:${PORT}/`);
+    console.log(`====================================================`);
+  });
+}
+
+module.exports = server;

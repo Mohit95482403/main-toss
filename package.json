@@ -12,7 +12,8 @@
     "test:day13": "node scripts/test-day13-security.js",
     "test:day14": "node scripts/test-day14-admin.js",
     "test:day15": "node scripts/test-day15-integration.js",
-    "test": "node scripts/test-home.js && node scripts/test-match-details.js && node scripts/test-bets.js && node scripts/test-passbook.js && node scripts/test-profile.js && node scripts/test-day12-consistency.js && node scripts/test-day13-security.js && node scripts/test-day14-admin.js && node scripts/test-day15-integration.js"
+    "test:day16": "node scripts/test-day16-performance.js",
+    "test": "node scripts/test-home.js && node scripts/test-match-details.js && node scripts/test-bets.js && node scripts/test-passbook.js && node scripts/test-profile.js && node scripts/test-day12-consistency.js && node scripts/test-day13-security.js && node scripts/test-day14-admin.js && node scripts/test-day15-integration.js && node scripts/test-day16-performance.js"
   },
   "keywords": [
     "ironman",

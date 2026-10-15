@@ -12,6 +12,7 @@ const cors = require('cors');
 
 const requestLogger = require('./src/middleware/logger');
 const securityHeaders = require('./src/middleware/securityHeaders');
+const compression = require('./src/middleware/compression');
 const { notFoundHandler, centralErrorHandler } = require('./src/middleware/errorHandler');
 const healthRoutes = require('./src/routes/health');
 const authRoutes = require('./src/routes/auth');
@@ -51,9 +52,10 @@ app.use(cors({
   credentials: true
 }));
 
-// 4. Body Parsing Middleware
+// 4. Body Parsing & Compression Middleware
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(compression);
 
 // 5. API Routes Mounting
 app.use('/api/health', healthRoutes);
@@ -65,7 +67,7 @@ app.get('/', (req, res) => {
   res.status(200).json({
     service: 'IRONMAN TOSS BOOK API',
     status: 'active',
-    version: '1.0.0-day15',
+    version: '1.0.0-day16',
     documentation: '/docs',
     endpoints: {
       health: '/api/health',

@@ -253,7 +253,12 @@
   // ===========================================================================
   async function loadOverviewStats() {
     try {
-      const statsRes = await apiFetch('/admin/dashboard/stats');
+      // Concurrently fetch stats, banner health, and recent audit preview in parallel
+      const [statsRes] = await Promise.all([
+        apiFetch('/admin/dashboard/stats'),
+        loadQuickBannerStatus(),
+        loadRecentAuditPreview()
+      ]);
       const stats = statsRes.data || {};
 
       // Populate KPI cards
@@ -280,12 +285,6 @@
       if (elTotalExp) elTotalExp.textContent = formatMoney(stats.financials?.totalExposureBalance || 0);
       if (elActiveSessions) elActiveSessions.textContent = (stats.sessions?.activeCount || 0).toLocaleString();
       if (elAdminActions) elAdminActions.textContent = (stats.activity?.recentAuditLogs24h || 0).toLocaleString();
-
-      // Quick banner status probe
-      loadQuickBannerStatus();
-
-      // Recent 5 audit logs for preview
-      loadRecentAuditPreview();
     } catch (err) {
       console.warn('[STATS LOAD ERROR]', err.message);
       notify(`Unable to refresh statistics: ${err.message}`, 'error');
@@ -354,9 +353,17 @@
   // ===========================================================================
   // 3. USER MANAGEMENT & DIRECTORY
   // ===========================================================================
+  let activeUsersAbortController = null;
+
   async function loadUsers() {
     const tbody = document.getElementById('tbody-users');
     if (!tbody) return;
+
+    if (activeUsersAbortController) {
+      try { activeUsersAbortController.abort(); } catch (e) {}
+    }
+    activeUsersAbortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const signal = activeUsersAbortController ? activeUsersAbortController.signal : undefined;
 
     tbody.innerHTML = `
       <tr>
@@ -375,7 +382,7 @@
         status: usersState.status
       });
 
-      const res = await apiFetch(`/admin/users?${queryParams.toString()}`);
+      const res = await apiFetch(`/admin/users?${queryParams.toString()}`, { signal });
       const data = res.data || {};
       const users = data.users || [];
       const pagination = data.pagination || {};
@@ -486,6 +493,7 @@
       // Attach row event listeners
       attachUserTableEvents();
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('[USERS LOAD ERROR]', err);
       tbody.innerHTML = `
         <tr>

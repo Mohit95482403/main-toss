@@ -638,14 +638,18 @@
       });
     });
 
-    // Search input handling
+    // Search input handling with performance debouncing
+    let searchDebounceTimer = null;
     if (searchInput) {
       searchInput.addEventListener('input', () => {
         searchQuery = searchInput.value.trim();
         if (searchClearBtn) {
           searchClearBtn.classList.toggle('visible', searchQuery.length > 0);
         }
-        renderFeed();
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+          renderFeed();
+        }, 150);
       });
     }
 

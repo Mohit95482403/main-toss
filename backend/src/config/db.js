@@ -14,7 +14,11 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
   queueLimit: 0,
-  connectTimeout: 3000 // 3 seconds timeout for diagnostics
+  connectTimeout: 3000, // 3 seconds timeout for diagnostics
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
+  maxIdle: 10,
+  idleTimeout: 60000
 };
 
 let pool = null;
