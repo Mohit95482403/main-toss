@@ -230,6 +230,7 @@
           error.details = errorObj.details || null;
           error.field = errorObj.field || null;
           error.data = data;
+          error.error = errorObj;
 
           // If 401 Unauthorized and was authenticated, session might be expired
           if (res.status === 401 && isAuthenticated()) {

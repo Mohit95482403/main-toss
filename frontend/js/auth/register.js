@@ -28,11 +28,18 @@
     const confirmError = document.getElementById('confirm-error');
     const confirmToggleBtn = document.getElementById('confirm-toggle-btn');
 
+    const phoneInput = document.getElementById('register-phone');
     const termsCheckbox = document.getElementById('register-terms');
     const termsError = document.getElementById('terms-error');
 
     const submitBtn = document.getElementById('register-submit-btn');
     const devAlert = document.getElementById('register-dev-alert');
+    const errorAlert = document.getElementById('register-error-alert');
+
+    function hideAlerts() {
+      if (devAlert) devAlert.classList.remove('visible');
+      if (errorAlert) errorAlert.classList.remove('visible');
+    }
 
     // Strength elements
     const strengthSegments = form.querySelectorAll('.strength-bar-segment');
@@ -87,7 +94,7 @@
     [nameInput, usernameInput, emailInput, passwordInput, confirmInput].forEach(inp => {
       if (inp) {
         inp.addEventListener('input', () => {
-          if (devAlert) devAlert.classList.remove('visible');
+          hideAlerts();
         });
       }
     });
@@ -108,7 +115,7 @@
     // 4. Form Submission Handling
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      if (devAlert) devAlert.classList.remove('visible');
+      hideAlerts();
 
       let isValid = true;
 
@@ -190,11 +197,12 @@
       submitBtn.classList.add('is-submitting');
       submitBtn.disabled = true;
 
+      const phoneVal = phoneInput ? phoneInput.value.trim() : null;
       const registerPayload = {
         fullName: nameVal,
         username: usernameVal,
         email: emailVal,
-        phone: phoneVal,
+        phone: phoneVal || undefined,
         password: passwordVal
       };
 

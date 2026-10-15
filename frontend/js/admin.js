@@ -46,6 +46,9 @@
    * Helper: Authenticated fetch wrapper
    */
   async function apiFetch(endpoint, options = {}) {
+    if (window.ApiClient && typeof window.ApiClient.request === 'function') {
+      return window.ApiClient.request(endpoint, options);
+    }
     const token = getAuthToken();
     const headers = {
       'Content-Type': 'application/json',
@@ -64,6 +67,7 @@
       const err = new Error(errorMsg);
       err.status = res.status;
       err.code = (data.error && data.error.code) || 'API_ERROR';
+      err.error = data.error || {};
       throw err;
     }
 

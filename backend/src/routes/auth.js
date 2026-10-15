@@ -12,10 +12,10 @@ const { hashPassword, verifyPassword, generateToken, sanitizeUser } = require('.
 const { authenticate } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 
-// Rate limiter for authentication attempts: 10 attempts per 15 minutes
+// Rate limiter for authentication attempts: 10 attempts per 15 minutes in production, higher in development/testing
 const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  maxAttempts: 10,
+  maxAttempts: process.env.NODE_ENV === 'production' ? 10 : 250,
   message: 'Too many authentication attempts from this IP address. Please try again in 15 minutes.'
 });
 

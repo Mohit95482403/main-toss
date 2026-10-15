@@ -125,6 +125,10 @@
     }
   ];
 
+  function getMatches() {
+    if (typeof window !== 'undefined' && window.TossBookMatches && typeof window.TossBookMatches.getAll === 'function') {
+      return window.TossBookMatches.getAll();
+    }
     return DEMO_MATCHES;
   }
 
