@@ -150,7 +150,12 @@ router.post('/register', authRateLimiter, async (req, res, next) => {
         email: trimmedEmail,
         phone: trimmedPhone,
         role: 'user',
-        status: 'active'
+        status: 'active',
+        wallet: {
+          available_balance: 0.00,
+          exposure_balance: 0.00,
+          currency: 'INR'
+        }
       };
 
       return res.status(201).json({
@@ -267,6 +272,12 @@ router.post('/login', authRateLimiter, async (req, res, next) => {
     }
 
     const sanitized = sanitizeUser(user);
+    sanitized.wallet = {
+      available_balance: parseFloat(user.available_balance || 0),
+      exposure_balance: parseFloat(user.exposure_balance || 0),
+      currency: 'INR'
+    };
+
     return res.status(200).json({
       success: true,
       message: 'Signed in successfully.',
@@ -425,13 +436,25 @@ router.put('/profile', authenticate, async (req, res, next) => {
       params
     );
 
-    // Fetch and return updated profile
+    // Fetch and return updated profile with wallet
     const [rows] = await pool.query(
-      'SELECT id, uuid, full_name, username, email, phone, role, status, updated_at FROM users WHERE id = ? LIMIT 1',
+      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.updated_at,
+              w.available_balance, w.exposure_balance
+       FROM users u
+       LEFT JOIN wallets w ON u.id = w.user_id
+       WHERE u.id = ?
+       LIMIT 1`,
       [req.user.id]
     );
 
-    const sanitized = sanitizeUser(rows[0]);
+    const userRow = rows[0];
+    const sanitized = sanitizeUser(userRow);
+    sanitized.wallet = {
+      available_balance: parseFloat(userRow.available_balance || 0),
+      exposure_balance: parseFloat(userRow.exposure_balance || 0),
+      currency: 'INR'
+    };
+
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully.',

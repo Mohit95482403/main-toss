@@ -34,9 +34,18 @@
 
     const prefix = getRelativePathPrefix();
     const config = window.APP_CONFIG || {};
-    const balances = config.initialBalances || { available: '0.00', exposure: '0.00', currencySymbol: '₹' };
+    const defaultBalances = config.initialBalances || { available: '0.00', exposure: '0.00', currencySymbol: '₹' };
     const homeUrl = prefix ? `${prefix}index.html` : 'index.html';
     const logoSrc = `${prefix}${config.logo?.src || 'assets/images/logo.png'}`;
+
+    // Read authoritative balance from stored session if authenticated
+    let initialAvail = defaultBalances.available;
+    let initialExp = defaultBalances.exposure;
+    if (window.ApiClient && typeof window.ApiClient.getBalance === 'function' && window.ApiClient.isAuthenticated()) {
+      const b = window.ApiClient.getBalance();
+      initialAvail = b.formattedAvailable;
+      initialExp = b.formattedExposure;
+    }
 
     container.innerHTML = `
       <header class="app-header" role="banner">
@@ -54,12 +63,12 @@
           <img src="${logoSrc}" alt="IRONMAN TOSS BOOK Logo" class="brand-logo-img" style="display: none;" id="brand-logo-img" />
         </a>
 
-        <div class="header-balances" role="region" aria-label="Account Balances (Development Preview)">
+        <div class="header-balances" role="region" aria-label="Account Balances">
           <!-- Available Balance (Blue) -->
           <div class="balance-item balance-available balance-card-pill" title="Available Account Balance">
             <span class="balance-label" id="label-avail-bal">Bal</span>
             <span class="balance-amount" id="header-available-balance" aria-labelledby="label-avail-bal">
-              ${balances.currencySymbol}${balances.available}
+              ${defaultBalances.currencySymbol}${initialAvail}
             </span>
           </div>
 
@@ -67,7 +76,7 @@
           <div class="balance-item balance-exposure balance-card-pill" title="Active Match Exposure">
             <span class="balance-label" id="label-exp-bal">Exp</span>
             <span class="balance-amount" id="header-exposure-balance" aria-labelledby="label-exp-bal">
-              ${balances.currencySymbol}${balances.exposure}
+              ${defaultBalances.currencySymbol}${initialExp}
             </span>
           </div>
         </div>
@@ -341,17 +350,36 @@
   }
 
   /**
-   * Dynamic Balance Update Helper (for future API integration)
+   * Dynamic Balance Update Helper
    */
   function updateBalances(available, exposure) {
     const symbol = (window.APP_CONFIG && window.APP_CONFIG.initialBalances && window.APP_CONFIG.initialBalances.currencySymbol) || '₹';
     const availEl = document.getElementById('header-available-balance');
     const expEl = document.getElementById('header-exposure-balance');
+
+    function formatVal(v) {
+      if (v === undefined || v === null) return null;
+      if (typeof v === 'number') {
+        return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      const clean = String(v).replace(/[^\d.-]/g, '');
+      const num = parseFloat(clean);
+      return !isNaN(num)
+        ? num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : String(v);
+    }
+
     if (availEl && available !== undefined) {
-      availEl.textContent = `${symbol}${available}`;
+      const formatted = formatVal(available);
+      if (formatted !== null) {
+        availEl.textContent = `${symbol}${formatted}`;
+      }
     }
     if (expEl && exposure !== undefined) {
-      expEl.textContent = `${symbol}${exposure}`;
+      const formatted = formatVal(exposure);
+      if (formatted !== null) {
+        expEl.textContent = `${symbol}${formatted}`;
+      }
     }
   }
 
@@ -365,22 +393,20 @@
 
     if (headerContainer) {
       renderHeader(headerContainer);
-      if (window.ApiClient && typeof window.ApiClient.getUser === 'function') {
-        const u = window.ApiClient.getUser();
-        if (u && u.wallet) {
-          const avail = u.wallet.available_balance !== undefined ? u.wallet.available_balance : u.wallet.available;
-          const exp = u.wallet.exposure_balance !== undefined ? u.wallet.exposure_balance : u.wallet.exposure;
-          if (avail !== undefined && exp !== undefined) {
-            updateBalances(
-              Number(avail).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-              Number(exp).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            );
-          }
-        }
+      if (window.ApiClient && typeof window.ApiClient.getBalance === 'function' && window.ApiClient.isAuthenticated()) {
+        const b = window.ApiClient.getBalance();
+        updateBalances(b.formattedAvailable, b.formattedExposure);
       }
     }
     if (tickerContainer) renderTicker(tickerContainer);
     if (bottomNavContainer) renderBottomNav(bottomNavContainer);
+
+    // Global listener for real-time balance sync across all pages
+    window.addEventListener('itb:balance-updated', (e) => {
+      if (e.detail) {
+        updateBalances(e.detail.formattedAvailable, e.detail.formattedExposure);
+      }
+    });
 
     setupGlobalModalAccessibility();
   }

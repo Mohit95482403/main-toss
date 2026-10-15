@@ -64,8 +64,24 @@
   function setUser(user) {
     try {
       if (user) {
+        // Defensive preservation: if updated user lacks wallet, retain previously verified wallet
+        const current = getUser();
+        if (current && !user.wallet && (user.id === current.id || user.uuid === current.uuid) && current.wallet) {
+          user.wallet = current.wallet;
+        }
+
+        // Defensive normalization if flat balance properties exist
+        if (!user.wallet && (user.available_balance !== undefined || user.available !== undefined)) {
+          user.wallet = {
+            available_balance: user.available_balance !== undefined ? user.available_balance : user.available,
+            exposure_balance: user.exposure_balance !== undefined ? user.exposure_balance : (user.exposure || 0),
+            currency: user.currency || 'INR'
+          };
+        }
+
         const str = JSON.stringify(user);
         localStorage.setItem(USER_KEY, str);
+        syncBalancesFromUser(user);
       } else {
         localStorage.removeItem(USER_KEY);
         sessionStorage.removeItem(USER_KEY);
@@ -77,6 +93,14 @@
     try {
       localStorage.removeItem(USER_KEY);
       sessionStorage.removeItem(USER_KEY);
+      if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
+        window.SharedLayout.updateBalances('0.00', '0.00');
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('itb:balance-updated', {
+          detail: { available: 0, exposure: 0, formattedAvailable: '0.00', formattedExposure: '0.00' }
+        }));
+      } catch (evtErr) {}
     } catch (e) {}
   }
 
@@ -85,15 +109,58 @@
   }
 
   /**
+   * Retrieves authoritative balance information from the stored session
+   */
+  function getBalance() {
+    const user = getUser();
+    if (!user || !user.wallet) {
+      return {
+        available: 0,
+        exposure: 0,
+        currency: 'INR',
+        formattedAvailable: '0.00',
+        formattedExposure: '0.00'
+      };
+    }
+    const availNum = Number(user.wallet.available_balance !== undefined ? user.wallet.available_balance : user.wallet.available) || 0;
+    const expNum = Number(user.wallet.exposure_balance !== undefined ? user.wallet.exposure_balance : user.wallet.exposure) || 0;
+    return {
+      available: availNum,
+      exposure: expNum,
+      currency: user.wallet.currency || 'INR',
+      formattedAvailable: availNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      formattedExposure: expNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    };
+  }
+
+  /**
    * Automatically update UI balances if user wallet data is in response
    */
   function syncBalancesFromUser(user) {
-    if (!user || !user.wallet) return;
-    const avail = user.wallet.available_balance !== undefined ? user.wallet.available_balance : user.wallet.available;
-    const exp = user.wallet.exposure_balance !== undefined ? user.wallet.exposure_balance : user.wallet.exposure;
+    if (!user) return;
+    const wallet = user.wallet || (user.available_balance !== undefined ? { available_balance: user.available_balance, exposure_balance: user.exposure_balance || 0 } : null);
+    if (!wallet) return;
+
+    const availNum = Number(wallet.available_balance !== undefined ? wallet.available_balance : wallet.available) || 0;
+    const expNum = Number(wallet.exposure_balance !== undefined ? wallet.exposure_balance : wallet.exposure) || 0;
+
+    const formattedAvail = availNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formattedExp = expNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
     if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
-      window.SharedLayout.updateBalances(avail, exp);
+      window.SharedLayout.updateBalances(formattedAvail, formattedExp);
     }
+
+    try {
+      window.dispatchEvent(new CustomEvent('itb:balance-updated', {
+        detail: {
+          available: availNum,
+          exposure: expNum,
+          formattedAvailable: formattedAvail,
+          formattedExposure: formattedExp
+        }
+      }));
+    } catch (evtErr) {}
   }
 
   // Performance: In-flight request deduplication and client-side TTL response cache
@@ -339,6 +406,8 @@
     setUser,
     clearUser,
     isAuthenticated,
+    getBalance,
+    syncBalancesFromUser,
     initSession,
     getBaseUrl,
     debounce,

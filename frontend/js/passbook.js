@@ -400,37 +400,53 @@
     // Dynamically calculate and render balance totals from transaction data
     function updateBalanceCards() {
       const summary = calculateLedgerSummary(DEMO_TRANSACTIONS);
+      const isAuth = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
 
-      // Check if real authenticated user with wallet balance exists
-      const authUser = window.ApiClient && typeof window.ApiClient.getUser === 'function' ? window.ApiClient.getUser() : null;
-      const userBalance = authUser && authUser.wallet && (authUser.wallet.available_balance !== undefined ? authUser.wallet.available_balance : authUser.wallet.available);
-
-      if (heroAvailableBalance) {
-        heroAvailableBalance.textContent = (userBalance !== undefined && userBalance !== null)
-          ? formatCurrency(userBalance)
-          : formatCurrency(summary.availableBalance);
+      if (isAuth) {
+        // Authoritative balance from authenticated backend user session
+        const balInfo = window.ApiClient.getBalance();
+        if (heroAvailableBalance) {
+          heroAvailableBalance.textContent = formatCurrency(balInfo.available);
+        }
+        const badge = document.querySelector('.hero-account-badge');
+        if (badge) {
+          badge.textContent = 'ACTIVE WALLET';
+        }
+        // Synchronize Top Header Balances
+        if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
+          window.SharedLayout.updateBalances(balInfo.formattedAvailable, balInfo.formattedExposure);
+        }
+      } else {
+        // Unauthenticated demo preview mode
+        if (heroAvailableBalance) {
+          heroAvailableBalance.textContent = formatCurrency(summary.availableBalance);
+        }
+        if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
+          const balFormatted = summary.availableBalance.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+          window.SharedLayout.updateBalances(balFormatted, '0.00');
+        }
       }
+
       if (heroTotalCredits) {
         heroTotalCredits.textContent = `+${formatCurrency(summary.totalCredits)}`;
       }
       if (heroTotalDebits) {
         heroTotalDebits.textContent = `-${formatCurrency(summary.totalDebits)}`;
       }
-
-      // Synchronize Top Header Balances
-      if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
-        const balValue = (userBalance !== undefined && userBalance !== null) ? userBalance : summary.availableBalance;
-        const balFormatted = balValue.toLocaleString('en-IN', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-        const expFormatted = (authUser && authUser.wallet && authUser.wallet.exposure_balance !== undefined ? authUser.wallet.exposure_balance : 0).toLocaleString('en-IN', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-        window.SharedLayout.updateBalances(balFormatted, expFormatted);
-      }
     }
+
+    // Real-time listener for balance updates from backend session sync
+    window.addEventListener('itb:balance-updated', () => {
+      if (window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated()) {
+        const balInfo = window.ApiClient.getBalance();
+        if (heroAvailableBalance) {
+          heroAvailableBalance.textContent = formatCurrency(balInfo.available);
+        }
+      }
+    });
 
     // Sort transactions chronologically (newest first)
     const sortedTransactions = [...DEMO_TRANSACTIONS].sort((a, b) => {

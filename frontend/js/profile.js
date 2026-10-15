@@ -78,6 +78,11 @@
               }
               renderProfileUI();
 
+              // Sync with ApiClient session store
+              if (window.ApiClient && typeof window.ApiClient.setUser === 'function') {
+                window.ApiClient.setUser(user);
+              }
+
               // Toggle admin link visibility based on role
               const adminLink = document.getElementById('menu-admin-link');
               if (adminLink) {
@@ -380,6 +385,10 @@
             currentProfile.fullName = (updated && (updated.full_name || updated.fullName)) || newName;
             currentProfile.username = (updated && updated.username) || newUsername;
             currentProfile.phone = (updated && updated.phone) || newPhone;
+
+            if (updated && window.ApiClient && typeof window.ApiClient.setUser === 'function') {
+              window.ApiClient.setUser(updated);
+            }
 
             saveProfileState();
             renderProfileUI();
