@@ -176,8 +176,29 @@ async function runLiveIntegrationTests() {
     assert(notFoundRes.body.success === false, '404 error envelope includes success: false');
     assert(notFoundRes.body.error && notFoundRes.body.error.code === 'NOT_FOUND', '404 error code is NOT_FOUND');
 
-    // 3. User Registration (Alpha) - Testing Multi-Table Transaction Atomicity
-    const regResA = await makeRequest('POST', '/api/auth/register', testUserA);
+    // Retrieve root administrator account for provisioning
+    const [adminRowsEarly] = await pool.query(
+      "SELECT id, username, email, role FROM users WHERE role IN ('admin', 'super_admin') LIMIT 1"
+    );
+    assert(adminRowsEarly.length > 0, 'Root administrator account exists in MySQL');
+    const rootAdminEarly = adminRowsEarly[0];
+
+    const { generateToken: genTokenEarly } = require('../backend/src/utils/crypto');
+    adminToken = genTokenEarly({
+      userId: rootAdminEarly.id,
+      uuid: 'admin-integration-uuid',
+      username: rootAdminEarly.username,
+      email: rootAdminEarly.email,
+      role: rootAdminEarly.role
+    });
+    assert(Boolean(adminToken), 'Admin privilege token issued for root administrator');
+
+    // 2B. Verify Public Self-Registration is Disabled (401 Unauthorized)
+    const publicRegAttempt = await makeRequest('POST', '/api/auth/register', testUserA);
+    assert(publicRegAttempt.status === 401, 'Unauthenticated public registration rejected with 401');
+
+    // 3. User Registration (Alpha) - Admin-Authorized Multi-Table Transaction Atomicity
+    const regResA = await makeRequest('POST', '/api/auth/register', testUserA, adminToken);
     assert(regResA.status === 201, 'POST /api/auth/register succeeds with 201 Created');
     assert(regResA.body.success === true, 'Registration response contains success: true');
     assert(Boolean(regResA.body.token), 'Registration response contains top-level token');
@@ -199,12 +220,12 @@ async function runLiveIntegrationTests() {
     assert(prefsA.length === 1, 'Transactional insert verified: user_preferences record created for user');
 
     // 4. Duplicate Registration Rejection (Unique Constraints in MySQL)
-    const dupRes = await makeRequest('POST', '/api/auth/register', testUserA);
+    const dupRes = await makeRequest('POST', '/api/auth/register', testUserA, adminToken);
     assert(dupRes.status === 409, 'Duplicate registration returns 409 Conflict');
     assert(dupRes.body.error && dupRes.body.error.code === 'DUPLICATE_ACCOUNT', 'Duplicate registration returns DUPLICATE_ACCOUNT code');
 
     // 5. Register User Beta for Isolation / IDOR Testing
-    const regResB = await makeRequest('POST', '/api/auth/register', testUserB);
+    const regResB = await makeRequest('POST', '/api/auth/register', testUserB, adminToken);
     assert(regResB.status === 201, 'POST /api/auth/register succeeds for second user (Beta)');
     tokenUserB = regResB.body.token;
     userBId = regResB.body.user.id;

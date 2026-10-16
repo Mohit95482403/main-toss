@@ -210,13 +210,25 @@ async function runIntegrationTests() {
     const rootRes = await makeRequest(app, 'GET', '/');
     assert(rootRes.statusCode === 200 && rootRes.body.endpoints.authRegister, 'GET / lists registered authentication endpoints');
 
-    // C. Validation on Register
+    // Admin token for admin-only provisioning
+    const adminAuthHeader = { 'Authorization': `Bearer ${generateToken({ userId: 1, username: 'admin', role: 'admin' })}` };
+
+    // C1. Verify Public Unauthenticated Registration Blocked
+    const unauthRegRes = await makeRequest(app, 'POST', '/api/auth/register', {
+      fullName: 'Public Visitor',
+      username: 'pub_test_user',
+      email: 'pub_test@example.com',
+      password: 'Password@123'
+    });
+    assert(unauthRegRes.statusCode === 401 && unauthRegRes.body.error.code === 'AUTHENTICATION_REQUIRED', 'POST /api/auth/register blocks unauthenticated public registration');
+
+    // C2. Validation on Register (Admin Authorized)
     const invalidRegRes = await makeRequest(app, 'POST', '/api/auth/register', {
       fullName: 'R',
       username: 'bad-username!',
       email: 'notanemail',
       password: '123'
-    });
+    }, adminAuthHeader);
     assert(invalidRegRes.statusCode === 400 && invalidRegRes.body.error.code === 'VALIDATION_ERROR', 'POST /api/auth/register validates fields and rejects malformed inputs');
 
     // D. Validation on Login
@@ -233,7 +245,7 @@ async function runIntegrationTests() {
     const unauthPassRes = await makeRequest(app, 'POST', '/api/auth/change-password', { currentPassword: 'a', newPassword: 'b' });
     assert(unauthPassRes.statusCode === 401, 'POST /api/auth/change-password blocks unauthenticated requests');
 
-    // F. End-to-End Registration & Login flow (using dynamic unique test account)
+    // F. End-to-End Registration & Login flow (Admin Provisioned)
     const testUsername = `user_${Date.now()}`;
     const testEmail = `${testUsername}@example.com`;
     const testPassword = 'SecurePass@2026';
@@ -244,7 +256,7 @@ async function runIntegrationTests() {
       email: testEmail,
       password: testPassword,
       phone: '+91 99999 88888'
-    });
+    }, adminAuthHeader);
 
     if (regRes.statusCode === 201) {
       assert(regRes.statusCode === 201, 'POST /api/auth/register successfully creates user');
@@ -259,7 +271,7 @@ async function runIntegrationTests() {
         username: testUsername,
         email: testEmail,
         password: testPassword
-      });
+      }, adminAuthHeader);
       assert(dupRes.statusCode === 409 && dupRes.body.error.code === 'DUPLICATE_ACCOUNT', 'Duplicate registration rejected with 409 Conflict');
 
       // Valid Login

@@ -45,7 +45,6 @@ assert(htmlContent.includes('class="bottom-nav-spacer"'), 'Bottom navigation spa
 
 assert(htmlContent.includes('id="bets-page-heading"'), 'Page heading element present');
 assert(htmlContent.includes('id="total-bets-count"'), 'Total bets count pill present');
-assert(htmlContent.includes('id="demo-mode-badge"'), 'Demo records badge present');
 
 // Summary Cards Grid
 assert(htmlContent.includes('id="bets-summary-grid"'), 'Summary grid container present');
@@ -102,18 +101,21 @@ assert(cssContent.includes('.modal-card'), 'CSS has .modal-card styling');
 assert(cssContent.includes('[data-theme="dark"]'), 'CSS has [data-theme="dark"] styling tokens');
 assert(cssContent.includes('@media (max-width: 480px)'), 'CSS has responsive mobile breakpoint');
 
-// 4. Data Extraction & Logic Verification in bets.js
+// 4. Data Logic & Calculation Verification
 const jsContent = fs.readFileSync(betsJsPath, 'utf8');
-const demoBetsMatch = jsContent.match(/const DEMO_BETS = (\[[\s\S]*?\]);/);
-assert(demoBetsMatch !== null, 'DEMO_BETS array successfully extracted from bets.js');
+assert(jsContent.includes('loadUserBets') || jsContent.includes('/bets/my-bets'), 'Authentic bets loader defined in bets.js');
 
-let demoBets = [];
-try {
-  demoBets = eval(demoBetsMatch[1]);
-  assert(Array.isArray(demoBets) && demoBets.length === 6, 'DEMO_BETS contains 6 demonstration wagers');
-} catch (e) {
-  assert(false, 'DEMO_BETS evaluated cleanly', e.message);
-}
+const fixtureBets = [
+  { id: 'BET-2026-1049', competition: "ICC MEN'S T20 WORLD CUP", matchTitle: 'India vs Australia', marketName: 'Toss Winner', selectedTeam: 'India', rate: 1.95, stake: 500.00, status: 'live', resultText: 'Match in progress', placedAt: 'Today, 02:45 PM' },
+  { id: 'BET-2026-1048', competition: "IPL 2026 - T20 LEAGUE", matchTitle: 'Mumbai Indians vs Chennai Super Kings', marketName: 'Toss Winner', selectedTeam: 'Mumbai Indians', rate: 1.90, stake: 1000.00, status: 'won', payout: 1900.00, resultText: 'Won toss', placedAt: 'Today, 11:15 AM' },
+  { id: 'BET-2026-1045', competition: "ICC MEN'S T20 WORLD CUP", matchTitle: 'England vs South Africa', marketName: 'Toss Winner', selectedTeam: 'England', rate: 1.85, stake: 750.00, status: 'lost', payout: 0.00, resultText: 'Lost toss', placedAt: '13 Oct 2026' },
+  { id: 'BET-2026-1042', competition: "BIG BASH LEAGUE 2026", matchTitle: 'Sydney Sixers vs Perth Scorchers', marketName: 'Toss Winner', selectedTeam: 'Perth Scorchers', rate: 1.92, stake: 300.00, status: 'won', payout: 576.00, resultText: 'Won toss', placedAt: '13 Oct 2026' },
+  { id: 'BET-2026-1039', competition: "ASIA CUP T20 2026", matchTitle: 'Pakistan vs Sri Lanka', marketName: 'Toss Winner', selectedTeam: 'Pakistan', rate: 1.88, stake: 400.00, status: 'lost', payout: 0.00, resultText: 'Lost toss', placedAt: '11 Oct 2026' },
+  { id: 'BET-2026-1035', competition: "INTERNATIONAL T20 SERIES", matchTitle: 'New Zealand vs West Indies', marketName: 'Toss Winner', selectedTeam: 'New Zealand', rate: 1.90, stake: 500.00, status: 'no_result', payout: 500.00, resultText: 'Toss abandoned', placedAt: '11 Oct 2026' }
+];
+
+let demoBets = fixtureBets;
+assert(Array.isArray(demoBets) && demoBets.length === 6, 'Wager test fixtures contain 6 items for calculation testing');
 
 // Verify fields in each bet
 let allBetsValid = true;

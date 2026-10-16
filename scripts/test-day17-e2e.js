@@ -136,10 +136,34 @@ async function runDay17Tests() {
   let testAuthToken = null;
   let testUserId = null;
 
-  // 2.1 Validation on Registration
+  // Retrieve administrator account for provision testing
+  const [e2eAdminRows] = await pool.query("SELECT id, username, email, role FROM users WHERE role IN ('admin', 'super_admin') LIMIT 1");
+  const { generateToken: genTokenE2E } = require('../backend/src/utils/crypto');
+  const e2eAdminToken = genTokenE2E({
+    userId: e2eAdminRows[0].id,
+    username: e2eAdminRows[0].username,
+    email: e2eAdminRows[0].email,
+    role: e2eAdminRows[0].role
+  });
+  const adminHeaders = { Authorization: `Bearer ${e2eAdminToken}` };
+
+  // 2.0 Unauthenticated Public Registration Rejection
+  try {
+    const unauthRegRes = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(testUser)
+    });
+    assert.strictEqual(unauthRegRes.status, 401);
+    logPass('POST /auth/register rejects unauthenticated public registration with 401');
+  } catch (err) {
+    logFail('Public registration rejection', err);
+  }
+
+  // 2.1 Validation on Registration (Admin Authorized)
   try {
     const emptyRes = await request('/auth/register', {
       method: 'POST',
+      headers: adminHeaders,
       body: JSON.stringify({})
     });
     assert.strictEqual(emptyRes.status, 400);
@@ -152,6 +176,7 @@ async function runDay17Tests() {
   try {
     const invalidEmailRes = await request('/auth/register', {
       method: 'POST',
+      headers: adminHeaders,
       body: JSON.stringify({ ...testUser, email: 'not-an-email' })
     });
     assert.strictEqual(invalidEmailRes.status, 400);
@@ -164,6 +189,7 @@ async function runDay17Tests() {
   try {
     const shortPassRes = await request('/auth/register', {
       method: 'POST',
+      headers: adminHeaders,
       body: JSON.stringify({ ...testUser, password: '123' })
     });
     assert.strictEqual(shortPassRes.status, 400);
@@ -177,6 +203,7 @@ async function runDay17Tests() {
   try {
     const regRes = await request('/auth/register', {
       method: 'POST',
+      headers: adminHeaders,
       body: JSON.stringify(testUser)
     });
 
@@ -211,6 +238,7 @@ async function runDay17Tests() {
   try {
     const dupRes = await request('/auth/register', {
       method: 'POST',
+      headers: adminHeaders,
       body: JSON.stringify(testUser)
     });
     assert.strictEqual(dupRes.status, 409);

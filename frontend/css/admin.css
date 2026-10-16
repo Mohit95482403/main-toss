@@ -677,6 +677,460 @@
   gap: 10px;
 }
 
+.admin-modal-card.admin-modal-lg {
+  max-width: 760px;
+}
+
+.admin-modal-card.admin-modal-xl {
+  max-width: 1080px;
+  width: 95%;
+}
+
+/* Card Header with Step Badge */
+.card-header-styled {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.step-badge {
+  background: var(--color-primary);
+  color: #fff;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  padding: 4px 10px;
+  border-radius: var(--border-radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* Eligible Matches Grid */
+.eligible-matches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+
+.eligible-match-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.eligible-match-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.eligible-match-card.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.match-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.match-card-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin: 4px 0;
+}
+
+.match-card-stats {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--color-surface-subtle);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+.match-card-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.match-card-stat-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-2xs);
+}
+
+.match-card-stat-val {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+/* Match Meta Strip (inside inspector modal) */
+.match-meta-strip {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 12px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.meta-strip-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta-strip-label {
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.meta-strip-value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+/* Outcome Options Grid */
+.outcome-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.outcome-option-card {
+  position: relative;
+  border: 2px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 14px;
+  cursor: pointer;
+  background: var(--color-surface);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.outcome-option-card:hover {
+  border-color: var(--color-primary-light);
+}
+
+.outcome-option-card.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.outcome-option-radio {
+  accent-color: var(--color-primary);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.outcome-option-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.outcome-option-desc {
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-muted);
+}
+
+/* Settlement Preview Grid */
+.settlement-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.preview-kpi-card {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-kpi-title {
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+}
+
+.preview-kpi-val {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+/* Bet Status Badges */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-full);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge-status.pending {
+  background: var(--color-warning-subtle, rgba(234, 179, 8, 0.15));
+  color: var(--color-warning, #ca8a04);
+}
+
+.badge-status.won {
+  background: var(--color-success-subtle, rgba(34, 197, 94, 0.15));
+  color: var(--color-success, #16a34a);
+}
+
+.badge-status.lost {
+  background: var(--color-danger-subtle, rgba(239, 68, 68, 0.15));
+  color: var(--color-danger, #dc2626);
+}
+
+.badge-status.no_result {
+  background: var(--color-info-subtle, rgba(59, 130, 246, 0.15));
+  color: var(--color-info, #2563eb);
+}
+
+.badge-status.settled {
+  background: var(--color-success-subtle, rgba(34, 197, 94, 0.15));
+  color: var(--color-success, #16a34a);
+}
+
+/* ==========================================================================
+   Player Coin Management System Styles
+   ========================================================================== */
+
+/* Coin Search Multiple Matches Grid */
+.coin-matches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.coin-match-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: all var(--transition-fast);
+}
+
+.coin-match-item:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-subtle);
+  transform: translateY(-1px);
+}
+
+.coin-match-item.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.coin-match-user-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.coin-match-user-sub {
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-muted);
+}
+
+.coin-match-user-bal {
+  text-align: right;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+/* Player Info Grid */
+.player-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.player-info-card-item {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.player-info-card-item.highlight-card {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.08) 0%, rgba(202, 138, 4, 0.03) 100%);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.player-info-label {
+  font-size: var(--font-size-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 6px;
+}
+
+.player-info-val {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.player-balance-display {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.coin-symbol {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.player-balance-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #eab308;
+  letter-spacing: -0.02em;
+}
+
+.coin-currency {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Modal Player Summary Box */
+.coin-modal-player-box {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Quick Preset Chips */
+.quick-preset-chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-chip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 4px 10px;
+  border-radius: var(--border-radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.preset-chip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+/* Calculation Preview Card */
+.coin-calc-preview-card {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.calc-row.calc-total-row {
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  margin-top: 2px;
+}
+
+.calc-label {
+  color: var(--color-text-muted);
+}
+
+.calc-val {
+  font-weight: var(--font-weight-semibold);
+}
+
+.btn-success {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  border: 1px solid #15803d !important;
+}
+
+.btn-success:hover {
+  background-color: #15803d !important;
+  color: #ffffff !important;
+}
+
+.btn-danger {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border: 1px solid #b91c1c !important;
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .admin-header-inner {
@@ -695,5 +1149,8 @@
   }
   .admin-search-box {
     max-width: 100%;
+  }
+  .eligible-matches-grid {
+    grid-template-columns: 1fr;
   }
 }

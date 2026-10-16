@@ -8,9 +8,10 @@ const crypto = require('crypto');
 const router = express.Router();
 
 const { getPool } = require('../config/db');
-const { hashPassword, verifyPassword, generateToken, sanitizeUser } = require('../utils/crypto');
+const { hashPassword, verifyPassword, generateToken, verifyToken, sanitizeUser } = require('../utils/crypto');
 const { authenticate } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimiter');
+const { createUserAccount } = require('../services/userService');
 
 // Rate limiter for authentication attempts: 10 attempts per 15 minutes in production, higher in development/testing
 const authRateLimiter = createRateLimiter({
@@ -21,160 +22,124 @@ const authRateLimiter = createRateLimiter({
 
 /**
  * POST /api/auth/register
- * Creates a new user account with secure scrypt password hashing
+ * Admin-only account creation endpoint. Public self-registration is strictly disabled.
+ * Unauthenticated requests receive HTTP 401. Normal users receive HTTP 403.
+ * Authorized administrators can provision player accounts with scrypt hashing and wallets.
  */
 router.post('/register', authRateLimiter, async (req, res, next) => {
   try {
-    const { fullName, username, email, password, phone } = req.body || {};
+    // 1. Enforce Administrator Authentication & Authorization
+    let token = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    } else if (req.headers['x-access-token']) {
+      token = req.headers['x-access-token'];
+    }
 
-    // 1. Server-side Input Validation
-    const trimmedName = (fullName || '').trim();
-    const trimmedUsername = (username || '').trim();
-    const trimmedEmail = (email || '').trim().toLowerCase();
-    const rawPassword = password || '';
-    const trimmedPhone = phone ? String(phone).trim() : null;
-
-    if (!trimmedName || trimmedName.length < 2 || trimmedName.length > 100) {
-      return res.status(400).json({
+    if (!token) {
+      return res.status(401).json({
         success: false,
         error: {
-          code: 'VALIDATION_ERROR',
-          field: 'fullName',
-          message: 'Full name is required and must be between 2 and 100 characters.'
+          code: 'AUTHENTICATION_REQUIRED',
+          message: 'Account registration is restricted to administrators. Public self-registration is disabled.'
         }
       });
     }
 
-    if (!trimmedUsername || !/^[a-zA-Z0-9_]{3,30}$/.test(trimmedUsername)) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          field: 'username',
-          message: 'Username must be 3-30 characters long and contain only letters, numbers, or underscores.'
-        }
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!trimmedEmail || !emailRegex.test(trimmedEmail) || trimmedEmail.length > 150) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          field: 'email',
-          message: 'A valid email address is required.'
-        }
-      });
-    }
-
-    if (!rawPassword || rawPassword.length < 8) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          field: 'password',
-          message: 'Password must be at least 8 characters long.'
-        }
-      });
-    }
-
-    const pool = getPool();
-
-    // 2. Check for duplicate account using parameterized query
-    const [existing] = await pool.query(
-      'SELECT id, username, email FROM users WHERE username = ? OR email = ? LIMIT 1',
-      [trimmedUsername, trimmedEmail]
-    );
-
-    if (existing.length > 0) {
-      const match = existing[0];
-      const conflictField = match.email === trimmedEmail ? 'email' : 'username';
-      return res.status(409).json({
-        success: false,
-        error: {
-          code: 'DUPLICATE_ACCOUNT',
-          field: conflictField,
-          message: `An account with that ${conflictField} is already registered.`
-        }
-      });
-    }
-
-    // 3. Cryptographically hash password with scrypt + salt
-    const passwordHash = hashPassword(rawPassword);
-    const userUuid = crypto.randomUUID();
-
-    // 4. Atomic transaction for user creation and wallet setup
-    const connection = await pool.getConnection();
+    let decoded;
     try {
-      await connection.beginTransaction();
-
-      const [userResult] = await connection.query(
-        `INSERT INTO users (uuid, full_name, username, email, phone, password_hash, role, status)
-         VALUES (?, ?, ?, ?, ?, ?, 'user', 'active')`,
-        [userUuid, trimmedName, trimmedUsername, trimmedEmail, trimmedPhone, passwordHash]
-      );
-
-      const newUserId = userResult.insertId;
-
-      // Initialize default wallet
-      await connection.query(
-        `INSERT INTO wallets (user_id, available_balance, exposure_balance, currency)
-         VALUES (?, 0.00, 0.00, 'INR')`,
-        [newUserId]
-      );
-
-      // Initialize default preferences
-      await connection.query(
-        `INSERT INTO user_preferences (user_id) VALUES (?)`,
-        [newUserId]
-      );
-
-      await connection.commit();
-
-      // 5. Generate secure signed auth token
-      const token = generateToken({
-        userId: newUserId,
-        uuid: userUuid,
-        username: trimmedUsername,
-        email: trimmedEmail,
-        role: 'user'
-      });
-
-      const registeredUser = {
-        id: newUserId,
-        uuid: userUuid,
-        full_name: trimmedName,
-        fullName: trimmedName,
-        username: trimmedUsername,
-        email: trimmedEmail,
-        phone: trimmedPhone,
-        role: 'user',
-        status: 'active',
-        wallet: {
-          available_balance: 0.00,
-          exposure_balance: 0.00,
-          currency: 'INR'
-        }
-      };
-
-      return res.status(201).json({
-        success: true,
-        message: 'Account created successfully.',
-        token,
-        user: registeredUser,
-        data: {
-          token,
-          user: registeredUser
+      decoded = verifyToken(token);
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'INVALID_TOKEN',
+          message: 'Authentication token is invalid or expired.'
         }
       });
-    } catch (txErr) {
-      await connection.rollback();
-      throw txErr;
-    } finally {
-      connection.release();
     }
+
+    if (!decoded || !['admin', 'super_admin'].includes(decoded.role)) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access denied. Only authorized administrators can create user accounts.'
+        }
+      });
+    }
+
+    const admin = {
+      id: decoded.userId !== undefined ? decoded.userId : decoded.id,
+      uuid: decoded.uuid,
+      username: decoded.username || 'admin',
+      role: decoded.role
+    };
+
+    const {
+      displayName,
+      fullName,
+      username,
+      email,
+      password,
+      confirmPassword,
+      phone,
+      initialCoinBalance,
+      initialBalance,
+      accountStatus,
+      status,
+      role
+    } = req.body || {};
+
+    // 2. Delegate to authoritative user creation service
+    const registeredUser = await createUserAccount({
+      admin,
+      displayName: displayName !== undefined ? displayName : fullName,
+      fullName: displayName !== undefined ? displayName : fullName,
+      username,
+      email: email || null,
+      password,
+      confirmPassword,
+      phone: phone || null,
+      initialCoinBalance: initialCoinBalance !== undefined ? initialCoinBalance : (initialBalance !== undefined ? initialBalance : 0),
+      initialBalance: initialCoinBalance !== undefined ? initialCoinBalance : (initialBalance !== undefined ? initialBalance : 0),
+      accountStatus: accountStatus !== undefined ? accountStatus : (status !== undefined ? status : 'active'),
+      status: accountStatus !== undefined ? accountStatus : (status !== undefined ? status : 'active'),
+      role,
+      ip: req.ip
+    });
+
+    // 3. Generate signed token for newly created player
+    const authToken = generateToken({
+      userId: registeredUser.id,
+      uuid: registeredUser.uuid,
+      username: registeredUser.username,
+      email: registeredUser.email,
+      role: registeredUser.role
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Account created successfully by administrator.',
+      token: authToken,
+      user: registeredUser,
+      data: {
+        token: authToken,
+        user: registeredUser
+      }
+    });
   } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({
+        success: false,
+        error: {
+          code: err.code || 'VALIDATION_ERROR',
+          field: err.field,
+          message: err.message
+        }
+      });
+    }
     next(err);
   }
 });
@@ -185,9 +150,9 @@ router.post('/register', authRateLimiter, async (req, res, next) => {
  */
 router.post('/login', authRateLimiter, async (req, res, next) => {
   try {
-    const { identifier, password } = req.body || {};
+    const { identifier, username, email, password } = req.body || {};
 
-    const trimmedIdentifier = (identifier || '').trim();
+    const trimmedIdentifier = (identifier || username || email || '').trim();
     const rawPassword = password || '';
 
     if (!trimmedIdentifier || !rawPassword) {

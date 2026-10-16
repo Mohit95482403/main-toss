@@ -85,10 +85,10 @@ assert(htmlContent.includes('aria-labelledby="notifications-title"'), 'Notificat
 // 3. Controller Tests in profile.js
 const jsContent = fs.readFileSync(profileJsPath, 'utf8');
 
-assert(jsContent.includes('const DEFAULT_PROFILE ='), 'DEFAULT_PROFILE constant defined in profile.js');
-assert(jsContent.includes('Rahul Sharma'), 'Default demo user name configured');
-assert(jsContent.includes('ironman_99'), 'Default demo username configured');
-assert(jsContent.includes('UID-2026-8842'), 'Default demo user ID configured');
+assert(jsContent.includes('GUEST_PROFILE') || jsContent.includes('/auth/me'), 'Authentic profile state/sync defined in profile.js');
+assert(jsContent.includes('renderProfileUI'), 'renderProfileUI function defined in profile.js');
+assert(jsContent.includes('loadPersistedState'), 'loadPersistedState function defined');
+assert(jsContent.includes('saveProfileState'), 'saveProfileState function defined');
 assert(jsContent.includes('setupEditProfile'), 'setupEditProfile function defined');
 assert(jsContent.includes('setupChangePassword'), 'setupChangePassword function defined');
 assert(jsContent.includes('setupNotificationPreferences'), 'setupNotificationPreferences function defined');

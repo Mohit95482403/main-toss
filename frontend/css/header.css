@@ -153,6 +153,22 @@
   border-color: var(--color-border, #243042);
 }
 
+/* Balance loading & error states */
+.balance-loading {
+  opacity: 0.65;
+  animation: pulseBalance 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes pulseBalance {
+  0% { opacity: 0.45; }
+  100% { opacity: 0.85; }
+}
+
+.balance-error {
+  color: var(--color-danger, #EF4444) !important;
+  text-decoration: underline dotted;
+}
+
 /* Small mobile responsiveness */
 @media (max-width: 360px) {
   .app-header {

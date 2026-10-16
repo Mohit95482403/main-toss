@@ -35,6 +35,42 @@
     total: 0
   };
 
+  // Active state for Match Monitoring
+  const matchesState = {
+    search: '',
+    status: 'all',
+    hasBets: 'true',
+    settlement: 'all',
+    matches: [],
+    stats: null,
+    activeMatchForBets: null,
+    modalBets: []
+  };
+
+  // Active state for Bet Settlement
+  const settlementState = {
+    eligibleMatches: [],
+    selectedMatch: null,
+    selectedOutcome: null,
+    previewData: null,
+    history: []
+  };
+
+  // Active state for Player Coin Management
+  const coinsState = {
+    searchQuery: '',
+    matchedPlayers: [],
+    selectedPlayer: null,
+    activeAction: null, // 'ADMIN_CREDIT' | 'ADMIN_DEBIT'
+    history: [],
+    historyPage: 1,
+    historyLimit: 15,
+    historyTotal: 0,
+    historyTotalPages: 1,
+    actionFilter: 'ALL',
+    isSubmitting: false
+  };
+
   /**
    * Helper: Get stored auth token
    */
@@ -163,6 +199,9 @@
 
         // Lazy load tab data
         if (tabKey === 'overview') loadOverviewStats();
+        if (tabKey === 'matches') loadMatches();
+        if (tabKey === 'settlement') loadSettlement();
+        if (tabKey === 'coins') loadCoinsManagement();
         if (tabKey === 'users') loadUsers();
         if (tabKey === 'audits') loadAudits();
         if (tabKey === 'system') loadSystemHealth();
@@ -484,6 +523,9 @@
                           </button>`
                         : ''
                     }
+                    <button type="button" class="btn-action-icon btn-danger-action btn-delete-user" data-id="${u.id}" data-username="${escapeHtml(u.username)}" data-balance="${u.wallet?.available_balance || 0}" data-status="${escapeHtml(u.status)}" data-created="${escapeHtml(u.created_at || '')}" title="Permanently delete user account">
+                      Delete User
+                    </button>
                   `
                       : `<span class="text-xs text-muted" style="padding: 4px 8px;">(Current Admin)</span>`
                   }
@@ -535,6 +577,18 @@
         const username = btn.dataset.username;
         const currentRole = btn.dataset.role;
         promptRoleModal(userId, username, currentRole);
+      });
+    });
+
+    // Delete User button
+    document.querySelectorAll('.btn-delete-user').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const userId = parseInt(btn.dataset.id, 10);
+        const username = btn.dataset.username;
+        const balance = parseFloat(btn.dataset.balance || 0);
+        const status = btn.dataset.status;
+        const created = btn.dataset.created;
+        promptDeleteUserModal({ id: userId, username, balance, status, created_at: created });
       });
     });
   }
@@ -604,6 +658,27 @@
           Dark Mode: ${u.preferences?.darkMode ? 'Enabled' : 'Disabled'} • Toss Alerts: ${u.preferences?.tossAlerts ? 'Yes' : 'No'} • Match Reminders: ${u.preferences?.matchReminders ? 'Yes' : 'No'}
         </div>
       `;
+
+      // Configure Delete User button inside inspector modal
+      const btnInspectDelete = document.getElementById('btn-inspect-delete-user');
+      if (btnInspectDelete) {
+        const isSelf = currentAdmin && currentAdmin.id === u.id;
+        if (!isSelf) {
+          btnInspectDelete.style.display = 'inline-flex';
+          btnInspectDelete.onclick = () => {
+            promptDeleteUserModal({
+              id: u.id,
+              username: u.username,
+              balance: u.wallet?.available_balance || 0,
+              status: u.status,
+              created_at: u.created_at
+            });
+          };
+        } else {
+          btnInspectDelete.style.display = 'none';
+          btnInspectDelete.onclick = null;
+        }
+      }
     } catch (err) {
       bodyEl.innerHTML = `<div class="text-danger text-center" style="padding: 20px;">Failed to inspect user: ${escapeHtml(err.message)}</div>`;
     }
@@ -728,6 +803,322 @@
       if (window.SharedLayout?.setButtonLoading) {
         window.SharedLayout.setButtonLoading(confirmBtn, false);
       }
+    }
+  }
+
+  // ===========================================================================
+  // 5B. DELETE USER CONFIRMATION & CONTROLLER
+  // ===========================================================================
+  let deleteUserTarget = null;
+
+  function promptDeleteUserModal(target) {
+    if (!target) return;
+    deleteUserTarget = target;
+
+    const modalTitle = document.getElementById('delete-user-modal-title');
+    const valUsername = document.getElementById('delete-user-val-username');
+    const valId = document.getElementById('delete-user-val-id');
+    const valStatus = document.getElementById('delete-user-val-status');
+    const valBalance = document.getElementById('delete-user-val-balance');
+    const valCreated = document.getElementById('delete-user-val-created');
+    const expectedUsernameEl = document.getElementById('delete-user-expected-username');
+    const confirmInput = document.getElementById('delete-user-confirm-input');
+    const reasonInput = document.getElementById('delete-user-reason-input');
+    const errorBox = document.getElementById('delete-user-error-box');
+    const errorText = document.getElementById('delete-user-error-text');
+    const confirmBtn = document.getElementById('btn-confirm-delete-user');
+    const spinner = document.getElementById('delete-user-spinner');
+    const btnText = document.getElementById('delete-user-btn-text');
+    const hintEl = document.getElementById('delete-user-confirm-hint');
+
+    if (modalTitle) modalTitle.textContent = `Permanently Delete @${target.username}?`;
+    if (valUsername) valUsername.textContent = `@${target.username}`;
+    if (valId) valId.textContent = `#${target.id}`;
+    if (valStatus) valStatus.innerHTML = `<span class="badge-status ${escapeHtml(target.status || 'active')}">${escapeHtml(target.status || 'active')}</span>`;
+    if (valBalance) valBalance.textContent = formatMoney(target.balance || 0);
+    if (valCreated) valCreated.textContent = formatDateStr(target.created_at);
+    if (expectedUsernameEl) expectedUsernameEl.textContent = target.username;
+
+    if (confirmInput) confirmInput.value = '';
+    if (reasonInput) reasonInput.value = '';
+    if (errorBox) errorBox.style.display = 'none';
+    if (errorText) errorText.textContent = '';
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (spinner) spinner.style.display = 'none';
+    if (btnText) btnText.textContent = 'Permanently Delete User';
+    if (hintEl) hintEl.textContent = 'Button remains disabled until the exact username is typed.';
+
+    openModal('modal-delete-user');
+
+    setTimeout(() => {
+      if (confirmInput) confirmInput.focus();
+    }, 100);
+  }
+
+  function handleDeleteUserConfirmInput() {
+    if (!deleteUserTarget) return;
+    const confirmInput = document.getElementById('delete-user-confirm-input');
+    const confirmBtn = document.getElementById('btn-confirm-delete-user');
+    const hintEl = document.getElementById('delete-user-confirm-hint');
+    if (!confirmInput || !confirmBtn) return;
+
+    const entered = confirmInput.value.trim();
+    const matches = entered.toLowerCase() === (deleteUserTarget.username || '').toLowerCase();
+
+    if (matches && entered.length > 0) {
+      confirmBtn.disabled = false;
+      if (hintEl) {
+        hintEl.innerHTML = '<span class="text-success font-medium">✓ Username matched. You may now confirm permanent deletion.</span>';
+      }
+    } else {
+      confirmBtn.disabled = true;
+      if (hintEl) {
+        hintEl.textContent = 'Button remains disabled until the exact username is typed.';
+      }
+    }
+  }
+
+  async function handleConfirmDeleteUser() {
+    if (!deleteUserTarget) return;
+
+    const confirmInput = document.getElementById('delete-user-confirm-input');
+    const reasonInput = document.getElementById('delete-user-reason-input');
+    const confirmBtn = document.getElementById('btn-confirm-delete-user');
+    const spinner = document.getElementById('delete-user-spinner');
+    const btnText = document.getElementById('delete-user-btn-text');
+    const errorBox = document.getElementById('delete-user-error-box');
+    const errorText = document.getElementById('delete-user-error-text');
+
+    const enteredUsername = (confirmInput?.value || '').trim();
+    if (enteredUsername.toLowerCase() !== (deleteUserTarget.username || '').toLowerCase()) {
+      if (errorBox && errorText) {
+        errorText.textContent = `Username mismatch. Please enter "${deleteUserTarget.username}".`;
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
+
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+    if (btnText) btnText.textContent = 'Deleting Account...';
+    if (errorBox) errorBox.style.display = 'none';
+
+    try {
+      const res = await apiFetch(`/admin/users/${deleteUserTarget.id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          confirmUsername: enteredUsername,
+          reason: (reasonInput?.value || '').trim()
+        })
+      });
+
+      notify(res.message || `User account "@${deleteUserTarget.username}" permanently deleted.`, 'success');
+
+      closeModal('modal-delete-user');
+      closeModal('modal-inspect-user');
+      deleteUserTarget = null;
+
+      // Refresh directory, statistics, and audit trail
+      loadUsers();
+      loadOverviewStats();
+      loadRecentAuditPreview();
+    } catch (err) {
+      console.error('[DELETE USER ERROR]', err);
+      const msg = err.message || 'Failed to delete user account.';
+      if (errorBox && errorText) {
+        errorText.textContent = msg;
+        errorBox.style.display = 'flex';
+      }
+      notify(msg, 'error');
+    } finally {
+      if (confirmBtn) confirmBtn.disabled = false;
+      if (spinner) spinner.style.display = 'none';
+      if (btnText) btnText.textContent = 'Permanently Delete User';
+    }
+  }
+
+  // ===========================================================================
+  // 6B. CREATE USER MODAL CONTROLLER (ADMIN ONLY)
+  // ===========================================================================
+  function resetCreateUserForm() {
+    const form = document.getElementById('form-create-user');
+    if (form) form.reset();
+
+    const balanceInput = document.getElementById('input-create-balance');
+    if (balanceInput) balanceInput.value = '0';
+
+    const statusSelect = document.getElementById('select-create-status');
+    if (statusSelect) statusSelect.value = 'active';
+
+    const errorBox = document.getElementById('create-user-error-box');
+    if (errorBox) {
+      errorBox.style.display = 'none';
+      const text = document.getElementById('create-user-error-text');
+      if (text) text.textContent = '';
+    }
+
+    ['displayname', 'fullname', 'username', 'password', 'confirm', 'balance', 'status'].forEach((field) => {
+      const errEl = document.getElementById(`error-create-${field}`);
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+    });
+
+    const pwdInput = document.getElementById('input-create-password');
+    if (pwdInput) pwdInput.type = 'password';
+    const togglePwd = document.getElementById('btn-toggle-create-password');
+    if (togglePwd) togglePwd.textContent = '👁️';
+
+    const confirmInput = document.getElementById('input-create-confirm');
+    if (confirmInput) confirmInput.type = 'password';
+    const toggleConfirm = document.getElementById('btn-toggle-create-confirm');
+    if (toggleConfirm) toggleConfirm.textContent = '👁️';
+  }
+
+  function setCreateUserFieldError(fieldName, message) {
+    const normalized = (fieldName || '').toLowerCase();
+    const targetId = (normalized === 'fullname' || normalized === 'displayname') ? 'displayname' :
+                     (normalized === 'confirmpassword') ? 'confirm' :
+                     (normalized === 'initialcoinbalance' || normalized === 'initialbalance') ? 'balance' :
+                     (normalized === 'accountstatus') ? 'status' : normalized;
+
+    const errEl = document.getElementById(`error-create-${targetId}`) ||
+                  (targetId === 'displayname' ? document.getElementById('error-create-fullname') : null) ||
+                  document.getElementById(`error-create-${normalized}`);
+    if (errEl) {
+      errEl.textContent = message;
+      errEl.style.display = 'block';
+    }
+    const inputEl = document.getElementById(`input-create-${targetId}`) ||
+                    document.getElementById(`select-create-${targetId}`) ||
+                    (targetId === 'displayname' ? document.getElementById('input-create-fullname') : null) ||
+                    document.getElementById(`input-create-${normalized}`);
+    if (inputEl) inputEl.focus();
+  }
+
+  async function handleCreateUserSubmit(e) {
+    e.preventDefault();
+
+    // Clear previous field errors
+    ['displayname', 'fullname', 'username', 'password', 'confirm', 'balance', 'status'].forEach((field) => {
+      const errEl = document.getElementById(`error-create-${field}`);
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+    });
+
+    const errorBox = document.getElementById('create-user-error-box');
+    const errorText = document.getElementById('create-user-error-text');
+    if (errorBox) errorBox.style.display = 'none';
+
+    // The six required fields
+    const displayNameInput = document.getElementById('input-create-displayname') || document.getElementById('input-create-fullname');
+    const usernameInput = document.getElementById('input-create-username');
+    const passwordInput = document.getElementById('input-create-password');
+    const confirmInput = document.getElementById('input-create-confirm');
+    const balanceInput = document.getElementById('input-create-balance');
+    const statusSelect = document.getElementById('select-create-status');
+
+    const displayName = (displayNameInput?.value || '').trim();
+    const username = (usernameInput?.value || '').trim();
+    const password = passwordInput?.value || '';
+    const confirmPassword = confirmInput?.value || '';
+    const rawBalance = balanceInput?.value !== undefined ? balanceInput.value : '';
+    const initialCoinBalance = parseFloat(rawBalance === '' ? 0 : rawBalance);
+    const accountStatus = statusSelect?.value || 'active';
+
+    // Client-side validations
+    // 1. Display Name
+    if (!displayName || displayName.length < 2 || displayName.length > 100) {
+      setCreateUserFieldError('displayname', 'Please enter a valid display name (2–100 characters).');
+      return;
+    }
+
+    // 2. Username
+    if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      setCreateUserFieldError('username', 'Username must be 3-30 characters long (letters, numbers, underscores).');
+      return;
+    }
+
+    // 3. Password
+    if (!password || password.length < 8) {
+      setCreateUserFieldError('password', 'Password must be at least 8 characters long.');
+      return;
+    }
+
+    // 4. Confirm Password
+    if (!confirmPassword) {
+      setCreateUserFieldError('confirm', 'Please confirm the password.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setCreateUserFieldError('confirm', 'Passwords do not match.');
+      return;
+    }
+
+    // 5. Initial Coin Balance
+    if (isNaN(initialCoinBalance) || initialCoinBalance < 0 || initialCoinBalance > 100000000) {
+      setCreateUserFieldError('balance', 'Initial coin balance must be a valid, non-negative amount within supported limits.');
+      return;
+    }
+
+    // 6. Account Status
+    if (!['active', 'suspended'].includes(accountStatus)) {
+      setCreateUserFieldError('status', 'Please select a valid account status.');
+      return;
+    }
+
+    // Set submitting state
+    const submitBtn = document.getElementById('btn-submit-create-user');
+    const spinner = document.getElementById('create-user-spinner');
+    const btnText = document.getElementById('create-user-btn-text');
+
+    if (submitBtn) submitBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+    if (btnText) btnText.textContent = 'Creating Account...';
+
+    try {
+      const payload = {
+        displayName,
+        fullName: displayName,
+        username,
+        password,
+        confirmPassword,
+        initialCoinBalance,
+        initialBalance: initialCoinBalance,
+        accountStatus,
+        status: accountStatus
+      };
+
+      const res = await apiFetch('/admin/users/create', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      notify(res.message || `Player account "@${username}" created successfully.`, 'success');
+      closeModal('modal-create-user');
+      resetCreateUserForm();
+
+      // Refresh directory and stats
+      loadUsers();
+      loadOverviewStats();
+    } catch (err) {
+      console.error('[CREATE USER ERROR]', err);
+      const msg = err.message || 'Failed to create user account.';
+      if (errorBox && errorText) {
+        errorText.textContent = msg;
+        errorBox.style.display = 'flex';
+      }
+      if (err.error && err.error.field) {
+        setCreateUserFieldError(err.error.field, msg);
+      }
+      notify(msg, 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+      if (spinner) spinner.style.display = 'none';
+      if (btnText) btnText.textContent = 'Create Account';
     }
   }
 
@@ -883,7 +1274,1115 @@
   }
 
   // ===========================================================================
-  // 9. EVENT LISTENERS SETUP
+  // 6. MATCH MONITORING & BET INSPECTION CONTROLLER
+  // ===========================================================================
+  async function loadMatches() {
+    const tableBody = document.getElementById('matches-table-body');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="9" class="text-center text-muted" style="padding: 24px;">
+          Fetching matches and wagering statistics from MySQL...
+        </td>
+      </tr>
+    `;
+
+    try {
+      const queryParams = new URLSearchParams({
+        search: matchesState.search,
+        status: matchesState.status,
+        hasBets: matchesState.hasBets,
+        settlement: matchesState.settlement
+      });
+
+      const res = await apiFetch(`/admin/matches?${queryParams.toString()}`);
+      const { summary, matches } = res.data;
+
+      matchesState.matches = matches || [];
+      matchesState.stats = summary || {};
+
+      // Update KPI metrics
+      const kpiMatchesWithBets = document.getElementById('kpi-matches-with-bets');
+      const kpiTotalBets = document.getElementById('kpi-total-bets');
+      const kpiPendingBets = document.getElementById('kpi-pending-bets');
+      const kpiSettledBets = document.getElementById('kpi-settled-bets');
+      const kpiTotalStakes = document.getElementById('kpi-total-stakes');
+
+      if (kpiMatchesWithBets) kpiMatchesWithBets.textContent = summary.matches_with_bets || 0;
+      if (kpiTotalBets) kpiTotalBets.textContent = summary.total_bets || 0;
+      if (kpiPendingBets) kpiPendingBets.textContent = summary.pending_bets || 0;
+      if (kpiSettledBets) kpiSettledBets.textContent = summary.settled_bets || 0;
+      if (kpiTotalStakes) kpiTotalStakes.textContent = formatMoney(summary.total_stakes_placed || 0);
+
+      renderMatchesTable(matchesState.matches);
+    } catch (err) {
+      console.error('[LOAD MATCHES ERROR]', err);
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center text-danger" style="padding: 24px;">
+            Failed to load matches: ${escapeHtml(err.message)}
+          </td>
+        </tr>
+      `;
+      notify(`Failed to load matches: ${err.message}`, 'error');
+    }
+  }
+
+  function renderMatchesTable(matches) {
+    const tableBody = document.getElementById('matches-table-body');
+    if (!tableBody) return;
+
+    if (!matches || matches.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center text-muted" style="padding: 30px;">
+            No matches found matching the specified filters.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = matches.map((m) => {
+      const isSettled = m.settled === 1 || m.settled === true;
+      const statusBadge = `<span class="admin-badge role-${(m.status || 'scheduled').toLowerCase()}">${escapeHtml(m.status || 'Scheduled')}</span>`;
+      const settlementBadge = isSettled
+        ? `<span class="badge-status settled">✓ Settled (${escapeHtml(m.toss_winner || 'Declared')})</span>`
+        : (m.pending_bets > 0
+            ? `<span class="badge-status pending">⏳ Pending (${m.pending_bets})</span>`
+            : `<span class="text-xs text-muted">No Pending</span>`);
+
+      return `
+        <tr>
+          <td class="font-bold">#${m.id}</td>
+          <td>
+            <div class="font-bold text-sm">${escapeHtml(m.match_title)}</div>
+            <div class="text-xs text-muted">${escapeHtml(m.team_one)} vs ${escapeHtml(m.team_two)}</div>
+          </td>
+          <td>
+            <span class="text-xs font-semibold">${escapeHtml(m.competition || 'Cricket')}</span>
+          </td>
+          <td>${statusBadge}</td>
+          <td class="text-right font-bold">${m.total_bets}</td>
+          <td class="text-right text-muted">${m.total_players}</td>
+          <td class="text-right font-bold text-primary">${formatMoney(m.total_stake)}</td>
+          <td>${settlementBadge}</td>
+          <td class="text-center">
+            <div style="display: flex; gap: 6px; justify-content: center;">
+              <button type="button" class="btn btn-secondary btn-xs btn-inspect-match-bets" data-match-id="${m.id}" title="Inspect all player bets">
+                Inspect Bets (${m.total_bets})
+              </button>
+              ${!isSettled && m.pending_bets > 0 ? `
+                <button type="button" class="btn btn-primary btn-xs btn-settle-match-direct" data-match-id="${m.id}" title="Settle this match">
+                  Settle
+                </button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Attach row button clicks
+    tableBody.querySelectorAll('.btn-inspect-match-bets').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const matchId = btn.dataset.matchId;
+        openMatchBetsModal(matchId);
+      });
+    });
+
+    tableBody.querySelectorAll('.btn-settle-match-direct').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const matchId = btn.dataset.matchId;
+        // Switch to settlement tab
+        const settlementTabBtn = document.querySelector('[data-tab="settlement"]');
+        if (settlementTabBtn) settlementTabBtn.click();
+        selectMatchForSettlement(matchId);
+      });
+    });
+  }
+
+  async function openMatchBetsModal(matchId) {
+    const modalStrip = document.getElementById('match-bets-modal-strip');
+    const tableBody = document.getElementById('match-bets-table-body');
+    const titleEl = document.getElementById('match-bets-modal-title');
+
+    if (titleEl) titleEl.textContent = `Match #${matchId} Bets Inspector`;
+    if (modalStrip) modalStrip.innerHTML = '<div class="text-xs text-muted">Loading match metadata...</div>';
+    if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted" style="padding: 24px;">Loading associated bets from MySQL...</td></tr>';
+
+    openModal('modal-match-bets');
+
+    try {
+      const res = await apiFetch(`/admin/matches/${matchId}/bets`);
+      const { match, bets, summary } = res.data;
+
+      matchesState.activeMatchForBets = match;
+      matchesState.modalBets = bets || [];
+
+      if (titleEl) titleEl.textContent = `${match.match_title} (ID #${match.id})`;
+
+      if (modalStrip) {
+        modalStrip.innerHTML = `
+          <div class="meta-strip-item">
+            <span class="meta-strip-label">Competition</span>
+            <span class="meta-strip-value">${escapeHtml(match.competition || 'Cricket')}</span>
+          </div>
+          <div class="meta-strip-item">
+            <span class="meta-strip-label">Teams</span>
+            <span class="meta-strip-value">${escapeHtml(match.team_one)} vs ${escapeHtml(match.team_two)}</span>
+          </div>
+          <div class="meta-strip-item">
+            <span class="meta-strip-label">Status</span>
+            <span class="meta-strip-value">${escapeHtml(match.status)} ${match.settled ? '(Settled)' : '(Unsettled)'}</span>
+          </div>
+          <div class="meta-strip-item">
+            <span class="meta-strip-label">Rates</span>
+            <span class="meta-strip-value">${escapeHtml(match.team_one)}: ${match.rate_team_one || '1.95'} | ${escapeHtml(match.team_two)}: ${match.rate_team_two || '1.95'}</span>
+          </div>
+          <div class="meta-strip-item">
+            <span class="meta-strip-label">Total Stakes</span>
+            <span class="meta-strip-value text-primary">${formatMoney(summary.total_stake || 0)}</span>
+          </div>
+        `;
+      }
+
+      filterAndRenderModalBets();
+    } catch (err) {
+      console.error('[MATCH BETS MODAL ERROR]', err);
+      if (tableBody) {
+        tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-danger" style="padding: 24px;">Failed to load bets: ${escapeHtml(err.message)}</td></tr>`;
+      }
+      notify(`Failed to load bets for match #${matchId}: ${err.message}`, 'error');
+    }
+  }
+
+  function filterAndRenderModalBets() {
+    const tableBody = document.getElementById('match-bets-table-body');
+    if (!tableBody) return;
+
+    const searchInput = document.getElementById('match-bets-search-input');
+    const statusSelect = document.getElementById('match-bets-status-select');
+    const settlementSelect = document.getElementById('match-bets-settlement-select');
+
+    const search = (searchInput?.value || '').toLowerCase().trim();
+    const status = statusSelect?.value || 'all';
+    const settlement = settlementSelect?.value || 'all';
+
+    const filtered = (matchesState.modalBets || []).filter((b) => {
+      const matchSearch = !search ||
+        (b.username && b.username.toLowerCase().includes(search)) ||
+        (b.full_name && b.full_name.toLowerCase().includes(search)) ||
+        String(b.id).includes(search);
+
+      const matchStatus = status === 'all' || b.status === status;
+      const matchSettlement = settlement === 'all' || b.settlement_status === settlement;
+
+      return matchSearch && matchStatus && matchSettlement;
+    });
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-muted" style="padding: 24px;">No player bets match the criteria.</td></tr>`;
+      updateModalFooterSummary(0, 0);
+      return;
+    }
+
+    let sumStake = 0;
+    tableBody.innerHTML = filtered.map((b) => {
+      sumStake += parseFloat(b.stake || 0);
+      const betStatusBadge = `<span class="badge-status ${b.status}">${escapeHtml(b.status)}</span>`;
+      const settlementBadge = `<span class="badge-status ${b.settlement_status}">${escapeHtml(b.settlement_status)}</span>`;
+
+      return `
+        <tr>
+          <td class="font-bold">#${b.id}</td>
+          <td>
+            <div class="font-bold">${escapeHtml(b.username || 'User #' + b.user_id)}</div>
+            <div class="text-xs text-muted">${escapeHtml(b.full_name || '')}</div>
+          </td>
+          <td>
+            <span class="font-bold text-sm">${escapeHtml(b.selection)}</span>
+          </td>
+          <td class="text-right font-bold">${formatMoney(b.stake)}</td>
+          <td class="text-right text-muted">${parseFloat(b.odds).toFixed(2)}</td>
+          <td class="text-right font-bold text-success">${formatMoney(b.potential_return)}</td>
+          <td class="text-xs text-muted">${formatDateStr(b.placed_at)}</td>
+          <td>${betStatusBadge}</td>
+          <td>${settlementBadge}</td>
+          <td class="text-right font-bold ${b.payout > 0 ? 'text-success' : 'text-muted'}">
+            ${b.payout !== null && b.payout !== undefined ? formatMoney(b.payout) : '--'}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    updateModalFooterSummary(filtered.length, sumStake);
+  }
+
+  function updateModalFooterSummary(count, totalStake) {
+    const footerCount = document.getElementById('modal-footer-count');
+    const footerStake = document.getElementById('modal-footer-stake');
+    if (footerCount) footerCount.textContent = count;
+    if (footerStake) footerStake.textContent = formatMoney(totalStake);
+  }
+
+  // ===========================================================================
+  // 7. BET SETTLEMENT CONTROLLER
+  // ===========================================================================
+  async function loadSettlement() {
+    await loadEligibleMatches();
+    await loadSettlementHistory();
+  }
+
+  async function loadEligibleMatches() {
+    const container = document.getElementById('eligible-matches-container');
+    if (!container) return;
+
+    container.innerHTML = '<div class="text-center text-muted" style="padding: 24px; width: 100%;">Searching for matches requiring settlement...</div>';
+
+    try {
+      const res = await apiFetch('/admin/settlement/eligible');
+      const matches = res.data.eligible_matches || [];
+      settlementState.eligibleMatches = matches;
+
+      if (matches.length === 0) {
+        container.innerHTML = `
+          <div class="alert alert-info" style="grid-column: 1 / -1; width: 100%; margin: 0;">
+            <span class="alert-icon">ℹ️</span>
+            <span class="alert-text">
+              <strong>All clear!</strong> There are currently no matches with unsettled player bets awaiting toss declaration.
+            </span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = matches.map((m) => {
+        const isSelected = settlementState.selectedMatch && settlementState.selectedMatch.id === m.id;
+        return `
+          <div class="eligible-match-card ${isSelected ? 'selected' : ''}" id="eligible-match-card-${m.id}">
+            <div>
+              <div class="match-card-meta">
+                <span>${escapeHtml(m.competition || 'Cricket')}</span>
+                <span class="admin-badge role-live">Unsettled</span>
+              </div>
+              <div class="match-card-title">${escapeHtml(m.match_title)}</div>
+              <div class="text-xs text-muted" style="margin-bottom: 8px;">
+                ${escapeHtml(m.team_one)} vs ${escapeHtml(m.team_two)}
+              </div>
+              <div class="match-card-stats">
+                <div class="match-card-stat-item">
+                  <span class="match-card-stat-label">Pending Bets</span>
+                  <span class="match-card-stat-val text-warning">${m.pending_bets_count}</span>
+                </div>
+                <div class="match-card-stat-item">
+                  <span class="match-card-stat-label">Total Stake at Risk</span>
+                  <span class="match-card-stat-val text-primary">${formatMoney(m.total_pending_stake)}</span>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm btn-select-settle-match" data-match-id="${m.id}" style="width: 100%;">
+              Select for Settlement →
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      container.querySelectorAll('.btn-select-settle-match').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const matchId = btn.dataset.matchId;
+          selectMatchForSettlement(matchId);
+        });
+      });
+    } catch (err) {
+      console.error('[LOAD ELIGIBLE MATCHES ERROR]', err);
+      container.innerHTML = `<div class="text-center text-danger" style="padding: 24px; width: 100%;">Failed to load eligible matches: ${escapeHtml(err.message)}</div>`;
+      notify(`Failed to load eligible matches: ${err.message}`, 'error');
+    }
+  }
+
+  async function selectMatchForSettlement(matchId) {
+    const workspace = document.getElementById('settlement-workspace');
+    if (!workspace) return;
+
+    // Highlight card in grid
+    document.querySelectorAll('.eligible-match-card').forEach((c) => c.classList.remove('selected'));
+    const activeCard = document.getElementById(`eligible-match-card-${matchId}`);
+    if (activeCard) activeCard.classList.add('selected');
+
+    workspace.style.display = 'block';
+    workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const titleEl = document.getElementById('workspace-match-title');
+    const metaEl = document.getElementById('workspace-match-meta');
+    const betsCountEl = document.getElementById('workspace-bets-count');
+    const totalStakeEl = document.getElementById('workspace-total-stake');
+    const betsTableBody = document.getElementById('workspace-bets-table-body');
+    const outcomeOptionsContainer = document.getElementById('outcome-options-container');
+
+    betsTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding: 16px;">Loading pending wagers...</td></tr>';
+    outcomeOptionsContainer.innerHTML = '';
+
+    try {
+      const res = await apiFetch(`/admin/matches/${matchId}/bets`);
+      const { match, bets } = res.data;
+
+      const pendingBets = (bets || []).filter((b) => b.settlement_status === 'pending');
+
+      settlementState.selectedMatch = match;
+      settlementState.selectedOutcome = null;
+
+      if (titleEl) titleEl.textContent = `Settlement: ${match.match_title} (ID #${match.id})`;
+      if (metaEl) metaEl.textContent = `${match.competition || 'Cricket'} | ${match.team_one} vs ${match.team_two} | Scheduled: ${formatDateStr(match.start_time || match.created_at)}`;
+      if (betsCountEl) betsCountEl.textContent = pendingBets.length;
+
+      const totalStake = pendingBets.reduce((acc, b) => acc + parseFloat(b.stake || 0), 0);
+      if (totalStakeEl) totalStakeEl.textContent = formatMoney(totalStake);
+
+      if (pendingBets.length === 0) {
+        betsTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding: 16px;">No pending bets found for this match.</td></tr>';
+      } else {
+        betsTableBody.innerHTML = pendingBets.map((b) => `
+          <tr>
+            <td class="font-bold">#${b.id}</td>
+            <td>${escapeHtml(b.username || 'User #' + b.user_id)}</td>
+            <td><span class="font-bold">${escapeHtml(b.selection)}</span></td>
+            <td class="text-right font-bold">${formatMoney(b.stake)}</td>
+            <td class="text-right text-muted">${parseFloat(b.odds).toFixed(2)}</td>
+            <td class="text-right font-bold text-success">${formatMoney(b.potential_return)}</td>
+            <td class="text-xs text-muted">${formatDateStr(b.placed_at)}</td>
+          </tr>
+        `).join('');
+      }
+
+      // Render outcome radio selectors
+      const team1 = match.team_one;
+      const team2 = match.team_two;
+
+      outcomeOptionsContainer.innerHTML = `
+        <label class="outcome-option-card" id="option-card-team1">
+          <input type="radio" name="declared_outcome" value="${escapeHtml(team1)}" class="outcome-option-radio">
+          <div>
+            <div class="outcome-option-label">${escapeHtml(team1)} Won Toss</div>
+            <div class="outcome-option-desc">Declare ${escapeHtml(team1)} as official toss winner</div>
+          </div>
+        </label>
+
+        <label class="outcome-option-card" id="option-card-team2">
+          <input type="radio" name="declared_outcome" value="${escapeHtml(team2)}" class="outcome-option-radio">
+          <div>
+            <div class="outcome-option-label">${escapeHtml(team2)} Won Toss</div>
+            <div class="outcome-option-desc">Declare ${escapeHtml(team2)} as official toss winner</div>
+          </div>
+        </label>
+
+        <label class="outcome-option-card" id="option-card-no-result">
+          <input type="radio" name="declared_outcome" value="NO_RESULT" class="outcome-option-radio">
+          <div>
+            <div class="outcome-option-label">No Result (Refund)</div>
+            <div class="outcome-option-desc">Match abandoned/no toss; refund all stakes to players</div>
+          </div>
+        </label>
+      `;
+
+      outcomeOptionsContainer.querySelectorAll('.outcome-option-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          outcomeOptionsContainer.querySelectorAll('.outcome-option-card').forEach((c) => c.classList.remove('selected'));
+          card.classList.add('selected');
+          const radio = card.querySelector('input[type="radio"]');
+          if (radio) {
+            radio.checked = true;
+            settlementState.selectedOutcome = radio.value;
+          }
+        });
+      });
+    } catch (err) {
+      console.error('[SELECT SETTLE MATCH ERROR]', err);
+      notify(`Failed to load settlement details: ${err.message}`, 'error');
+    }
+  }
+
+  async function openSettlementPreview() {
+    if (!settlementState.selectedMatch) {
+      notify('Please select a match to settle first.', 'warning');
+      return;
+    }
+
+    if (!settlementState.selectedOutcome) {
+      notify('Please select the official declared toss outcome (Team 1, Team 2, or No Result).', 'warning');
+      return;
+    }
+
+    const previewModalContent = document.getElementById('settlement-preview-content');
+    const confirmCheckbox = document.getElementById('checkbox-confirm-settlement');
+    const executeBtn = document.getElementById('btn-confirm-execute-settlement');
+    const errorBox = document.getElementById('settlement-modal-error-box');
+
+    if (errorBox) errorBox.style.display = 'none';
+    if (confirmCheckbox) confirmCheckbox.checked = false;
+    if (executeBtn) executeBtn.disabled = true;
+
+    if (previewModalContent) {
+      previewModalContent.innerHTML = '<div class="text-center text-muted" style="padding: 24px;">Calculating atomic settlement figures...</div>';
+    }
+
+    openModal('modal-settlement-preview');
+
+    try {
+      const matchId = settlementState.selectedMatch.id;
+      const declaredOutcome = settlementState.selectedOutcome;
+
+      const res = await apiFetch('/admin/settlement/preview', {
+        method: 'POST',
+        body: JSON.stringify({ matchId, declaredOutcome })
+      });
+
+      settlementState.previewData = res.data;
+      const p = res.data;
+
+      if (previewModalContent) {
+        previewModalContent.innerHTML = `
+          <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--border-radius-md); padding: 14px 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="font-bold text-sm">${escapeHtml(p.match_title)} (Match #${p.match_id})</span>
+              <span class="badge-status won" style="font-size: 11px;">Declared Winner: ${escapeHtml(p.declared_outcome)}</span>
+            </div>
+            <div class="text-xs text-muted">
+              Total Eligible Bets Pending Settlement: <strong>${p.eligible_bets_count}</strong>
+            </div>
+          </div>
+
+          <div class="settlement-preview-grid">
+            <div class="preview-kpi-card">
+              <span class="preview-kpi-title">Winning Bets</span>
+              <span class="preview-kpi-val text-success">${p.preview.won_bets_count}</span>
+              <span class="text-2xs text-muted">Payout: <strong>${formatMoney(p.preview.total_winning_payout)}</strong></span>
+            </div>
+
+            <div class="preview-kpi-card">
+              <span class="preview-kpi-title">Losing Bets</span>
+              <span class="preview-kpi-val text-danger">${p.preview.lost_bets_count}</span>
+              <span class="text-2xs text-muted">Stake Lost: <strong>${formatMoney(p.preview.total_losing_stake)}</strong></span>
+            </div>
+
+            <div class="preview-kpi-card">
+              <span class="preview-kpi-title">Refunded Bets</span>
+              <span class="preview-kpi-val text-info">${p.preview.refund_bets_count}</span>
+              <span class="text-2xs text-muted">Refunded: <strong>${formatMoney(p.preview.total_refunded_amount)}</strong></span>
+            </div>
+
+            <div class="preview-kpi-card">
+              <span class="preview-kpi-title">Net Player Credits</span>
+              <span class="preview-kpi-val text-primary">${formatMoney(p.preview.net_balance_impact)}</span>
+              <span class="text-2xs text-muted">Credited to player wallets</span>
+            </div>
+          </div>
+
+          <div class="text-xs text-muted" style="margin-top: 4px;">
+            ✓ All locked exposure balances (${formatMoney(p.preview.total_stake_processed)}) will be released automatically upon execution.
+          </div>
+        `;
+      }
+    } catch (err) {
+      console.error('[SETTLEMENT PREVIEW ERROR]', err);
+      if (previewModalContent) {
+        previewModalContent.innerHTML = `<div class="text-center text-danger" style="padding: 24px;">Failed to calculate preview: ${escapeHtml(err.message)}</div>`;
+      }
+      notify(`Preview calculation failed: ${err.message}`, 'error');
+    }
+  }
+
+  async function executeSettlement() {
+    const executeBtn = document.getElementById('btn-confirm-execute-settlement');
+    const errorBox = document.getElementById('settlement-modal-error-box');
+    const errorText = document.getElementById('settlement-modal-error-text');
+
+    if (!settlementState.selectedMatch || !settlementState.selectedOutcome) {
+      notify('Missing match or outcome parameters.', 'error');
+      return;
+    }
+
+    if (errorBox) errorBox.style.display = 'none';
+
+    if (executeBtn && window.SharedLayout?.setButtonLoading) {
+      window.SharedLayout.setButtonLoading(executeBtn, true, 'Settling...');
+    } else if (executeBtn) {
+      executeBtn.disabled = true;
+      executeBtn.textContent = 'Settling...';
+    }
+
+    try {
+      const matchId = settlementState.selectedMatch.id;
+      const declaredOutcome = settlementState.selectedOutcome;
+      const notesInput = document.getElementById('settlement-notes-input');
+      const notes = notesInput ? notesInput.value.trim() : '';
+
+      const res = await apiFetch('/admin/settlement/process', {
+        method: 'POST',
+        body: JSON.stringify({ matchId, declaredOutcome, notes })
+      });
+
+      notify(`Match settled successfully! ${res.data.bets_settled} bets processed.`, 'success');
+
+      // Close modal
+      closeModal('modal-settlement-preview');
+
+      // Hide workspace
+      const workspace = document.getElementById('settlement-workspace');
+      if (workspace) workspace.style.display = 'none';
+
+      // Reset state
+      settlementState.selectedMatch = null;
+      settlementState.selectedOutcome = null;
+      settlementState.previewData = null;
+
+      // Reload settlement data
+      await loadEligibleMatches();
+      await loadSettlementHistory();
+
+      // If matches tab is opened, reload matches too
+      loadMatches();
+    } catch (err) {
+      console.error('[EXECUTE SETTLEMENT ERROR]', err);
+      if (errorBox && errorText) {
+        errorText.textContent = err.message || 'Settlement failed. Database rollback completed.';
+        errorBox.style.display = 'flex';
+      }
+      notify(`Settlement failed: ${err.message}`, 'error');
+    } finally {
+      if (executeBtn && window.SharedLayout?.setButtonLoading) {
+        window.SharedLayout.setButtonLoading(executeBtn, false);
+      } else if (executeBtn) {
+        executeBtn.disabled = false;
+        executeBtn.textContent = 'Execute Settlement';
+      }
+    }
+  }
+
+  async function loadSettlementHistory() {
+    const tableBody = document.getElementById('settlement-history-table-body');
+    if (!tableBody) return;
+
+    try {
+      const res = await apiFetch('/admin/settlement/history?page=1&limit=15');
+      const settlements = res.data.settlements || [];
+
+      if (settlements.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center text-muted" style="padding: 24px;">
+              No settlements have been recorded yet.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableBody.innerHTML = settlements.map((s) => `
+        <tr>
+          <td><code class="text-xs font-mono font-bold">${escapeHtml(s.settlement_uuid.substring(0, 18))}...</code></td>
+          <td>
+            <div class="font-bold text-sm">${escapeHtml(s.match_title)}</div>
+            <div class="text-xs text-muted">ID #${s.match_id}</div>
+          </td>
+          <td>
+            <span class="badge-status won">${escapeHtml(s.declared_outcome)}</span>
+          </td>
+          <td class="text-right font-bold">${s.bets_settled}</td>
+          <td class="text-right text-xs">
+            <span class="text-success font-bold">${s.won_count} W</span> / 
+            <span class="text-danger font-bold">${s.lost_count} L</span> / 
+            <span class="text-info font-bold">${s.refund_count} R</span>
+          </td>
+          <td class="text-right">${formatMoney(s.total_stake)}</td>
+          <td class="text-right font-bold text-success">${formatMoney(s.total_payout)}</td>
+          <td>
+            <div class="font-semibold text-xs">${escapeHtml(s.settled_by_username || 'Admin #' + s.settled_by_admin_id)}</div>
+          </td>
+          <td class="text-xs text-muted">${formatDateStr(s.settled_at)}</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      console.error('[LOAD SETTLEMENT HISTORY ERROR]', err);
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center text-danger" style="padding: 24px;">
+            Failed to load settlement history: ${escapeHtml(err.message)}
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  // ===========================================================================
+  // 7b. PLAYER COIN MANAGEMENT
+  // ===========================================================================
+
+  async function loadCoinsManagement() {
+    if (coinsState.selectedPlayer) {
+      await refreshSelectedPlayer();
+    }
+    await loadCoinHistory();
+  }
+
+  async function searchPlayerForCoins(rawUsername) {
+    const query = (rawUsername || '').trim();
+    const feedbackEl = document.getElementById('coin-search-feedback');
+    const feedbackText = document.getElementById('coin-search-feedback-text');
+    const resultsBox = document.getElementById('coin-search-results-box');
+    const matchesList = document.getElementById('coin-matches-list');
+    const matchesCount = document.getElementById('coin-matches-count');
+    const clearBtn = document.getElementById('btn-clear-player-search');
+
+    if (!query) {
+      notify('Please enter a username to search.', 'warning');
+      return;
+    }
+
+    if (feedbackEl) feedbackEl.style.display = 'none';
+    if (resultsBox) resultsBox.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'inline-flex';
+
+    coinsState.searchQuery = query;
+
+    const searchBtn = document.getElementById('btn-search-player-coin');
+    if (searchBtn && window.SharedLayout?.setButtonLoading) {
+      window.SharedLayout.setButtonLoading(searchBtn, true, 'Searching...');
+    } else if (searchBtn) {
+      searchBtn.disabled = true;
+      searchBtn.textContent = 'Searching...';
+    }
+
+    try {
+      const res = await apiFetch(`/admin/coins/search?username=${encodeURIComponent(query)}`);
+      const players = (res.data && res.data.players) || [];
+      coinsState.matchedPlayers = players;
+
+      if (players.length === 0) {
+        if (feedbackEl && feedbackText) {
+          feedbackEl.className = 'alert alert-warning';
+          feedbackText.innerHTML = `No players found matching <strong>"${escapeHtml(query)}"</strong>. Please verify the username.`;
+          feedbackEl.style.display = 'flex';
+        }
+        notify(`No players found matching "${query}".`, 'warning');
+        return;
+      }
+
+      if (players.length === 1) {
+        // Direct match: display match chip and auto-select player
+        if (resultsBox && matchesList && matchesCount) {
+          matchesCount.textContent = '1';
+          matchesList.innerHTML = renderMatchItemHtml(players[0], true);
+          resultsBox.style.display = 'block';
+        }
+        selectPlayerForCoins(players[0]);
+        notify(`Found player: ${players[0].username}`, 'success');
+      } else {
+        // Multiple matches: show list for manual selection
+        if (resultsBox && matchesList && matchesCount) {
+          matchesCount.textContent = players.length;
+          matchesList.innerHTML = players.map(p => renderMatchItemHtml(p, coinsState.selectedPlayer && coinsState.selectedPlayer.id === p.id)).join('');
+          resultsBox.style.display = 'block';
+        }
+        if (feedbackEl && feedbackText) {
+          feedbackEl.className = 'alert alert-info';
+          feedbackText.innerHTML = `Found <strong>${players.length}</strong> matching accounts. Please select the player you wish to manage.`;
+          feedbackEl.style.display = 'flex';
+        }
+      }
+    } catch (err) {
+      console.error('[COIN SEARCH ERROR]', err);
+      if (feedbackEl && feedbackText) {
+        feedbackEl.className = 'alert alert-danger';
+        feedbackText.textContent = `Search error: ${err.message}`;
+        feedbackEl.style.display = 'flex';
+      }
+      notify(`Search error: ${err.message}`, 'error');
+    } finally {
+      if (searchBtn && window.SharedLayout?.setButtonLoading) {
+        window.SharedLayout.setButtonLoading(searchBtn, false);
+      } else if (searchBtn) {
+        searchBtn.disabled = false;
+        searchBtn.textContent = 'Search Player';
+      }
+    }
+  }
+
+  function renderMatchItemHtml(player, isSelected) {
+    return `
+      <div class="coin-match-item ${isSelected ? 'active' : ''}" data-player-id="${player.id}">
+        <div>
+          <div class="coin-match-user-title">@${escapeHtml(player.username)}</div>
+          <div class="coin-match-user-sub">${escapeHtml(player.fullName || player.email)} • ID #${player.id}</div>
+        </div>
+        <div>
+          <div class="coin-match-user-bal">${formatMoney(player.available_balance)}</div>
+          <div class="coin-match-user-sub">${player.status}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function selectPlayerForCoins(player) {
+    coinsState.selectedPlayer = player;
+
+    // Update active highlight in match list
+    document.querySelectorAll('.coin-match-item').forEach(el => {
+      if (parseInt(el.dataset.playerId, 10) === player.id) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+
+    const card = document.getElementById('card-selected-player');
+    const usernameEl = document.getElementById('selected-player-username');
+    const fullnameEl = document.getElementById('selected-player-fullname');
+    const idEl = document.getElementById('selected-player-id');
+    const uuidEl = document.getElementById('selected-player-uuid');
+    const balanceEl = document.getElementById('selected-player-balance');
+    const exposureEl = document.getElementById('selected-player-exposure');
+    const statusBadgeEl = document.getElementById('selected-player-status-badge');
+    const emailEl = document.getElementById('selected-player-email');
+    const createdEl = document.getElementById('selected-player-created');
+    const roleEl = document.getElementById('selected-player-role');
+
+    if (usernameEl) usernameEl.textContent = `@${player.username}`;
+    if (fullnameEl) fullnameEl.textContent = player.fullName || '--';
+    if (idEl) idEl.textContent = `Player #${player.id}`;
+    if (uuidEl) uuidEl.textContent = player.uuid || '--';
+    if (balanceEl) balanceEl.textContent = Number(player.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (exposureEl) exposureEl.textContent = `Locked Exposure: ${formatMoney(player.exposure_balance || 0)}`;
+    if (statusBadgeEl) {
+      statusBadgeEl.innerHTML = `<span class="badge badge-${player.status === 'active' ? 'success' : 'danger'}">${player.status}</span>`;
+    }
+    if (emailEl) emailEl.textContent = player.email || '--';
+    if (createdEl) createdEl.textContent = formatDateStr(player.createdAt || player.created_at);
+    if (roleEl) roleEl.textContent = `Role: ${player.role}`;
+
+    if (card) {
+      card.style.display = 'block';
+    }
+  }
+
+  async function refreshSelectedPlayer() {
+    if (!coinsState.selectedPlayer) return;
+    try {
+      const res = await apiFetch(`/admin/coins/players/${coinsState.selectedPlayer.id}`);
+      if (res.data && res.data.player) {
+        selectPlayerForCoins(res.data.player);
+      }
+    } catch (err) {
+      console.warn('[REFRESH PLAYER WARN]', err.message);
+    }
+  }
+
+  function openCoinAdjustModal(actionType) {
+    if (!coinsState.selectedPlayer) {
+      notify('Please select a player first.', 'warning');
+      return;
+    }
+
+    coinsState.activeAction = actionType;
+    const isCredit = actionType === 'ADMIN_CREDIT';
+    const player = coinsState.selectedPlayer;
+
+    const modalTitle = document.getElementById('coin-modal-title');
+    const modalSubtitle = document.getElementById('coin-modal-subtitle');
+    const modalUsername = document.getElementById('coin-modal-username');
+    const modalCurrentBal = document.getElementById('coin-modal-current-balance');
+    const labelAmount = document.getElementById('label-coin-amount');
+    const calcActionLabel = document.getElementById('calc-action-label');
+    const amountInput = document.getElementById('input-coin-amount');
+    const reasonInput = document.getElementById('input-coin-reason');
+    const errorBox = document.getElementById('coin-modal-error-box');
+    const confirmBtn = document.getElementById('btn-confirm-coin-adjustment');
+
+    if (modalTitle) modalTitle.textContent = isCredit ? 'Add Coins to Player' : 'Deduct Coins from Player';
+    if (modalSubtitle) modalSubtitle.textContent = isCredit 
+      ? 'Credit coins directly to player available wallet balance' 
+      : 'Remove coins safely from player available balance (balance cannot go negative)';
+    
+    if (modalUsername) modalUsername.textContent = `@${player.username} (ID #${player.id})`;
+    if (modalCurrentBal) modalCurrentBal.textContent = `${Number(player.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Coins`;
+    if (labelAmount) labelAmount.textContent = isCredit ? 'Amount of Coins to Add:' : 'Amount of Coins to Deduct:';
+    if (calcActionLabel) calcActionLabel.textContent = isCredit ? 'Coins to Add:' : 'Coins to Deduct:';
+
+    if (amountInput) amountInput.value = '';
+    if (reasonInput) reasonInput.value = '';
+    if (errorBox) errorBox.style.display = 'none';
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.className = isCredit ? 'btn btn-success btn-sm' : 'btn btn-danger btn-sm';
+      confirmBtn.textContent = isCredit ? 'Confirm Coin Addition' : 'Confirm Coin Deduction';
+    }
+
+    updateCoinCalculation();
+    openModal('modal-coin-adjust');
+    if (amountInput) amountInput.focus();
+  }
+
+  function updateCoinCalculation() {
+    const player = coinsState.selectedPlayer;
+    if (!player) return;
+
+    const isCredit = coinsState.activeAction === 'ADMIN_CREDIT';
+    const currentBal = Number(player.available_balance) || 0;
+    const amountInput = document.getElementById('input-coin-amount');
+    const rawVal = amountInput ? parseFloat(amountInput.value) : 0;
+    const adjustAmount = (!isNaN(rawVal) && rawVal > 0) ? rawVal : 0;
+
+    let newBal = isCredit ? (currentBal + adjustAmount) : (currentBal - adjustAmount);
+    newBal = Math.round(newBal * 100) / 100;
+
+    const calcCurrent = document.getElementById('calc-current-bal');
+    const calcAdjust = document.getElementById('calc-adjust-amount');
+    const calcNew = document.getElementById('calc-new-balance');
+    const errorBox = document.getElementById('coin-modal-error-box');
+    const errorText = document.getElementById('coin-modal-error-text');
+    const confirmBtn = document.getElementById('btn-confirm-coin-adjustment');
+
+    if (calcCurrent) calcCurrent.textContent = `${currentBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Coins`;
+    if (calcAdjust) {
+      calcAdjust.textContent = `${isCredit ? '+' : '-'}${adjustAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Coins`;
+      calcAdjust.className = `calc-val ${isCredit ? 'text-success' : 'text-danger'}`;
+    }
+    if (calcNew) {
+      calcNew.textContent = `${newBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Coins`;
+    }
+
+    // Validation for deduction exceeding balance
+    if (!isCredit && adjustAmount > currentBal) {
+      if (errorBox && errorText) {
+        errorText.textContent = `Insufficient balance: Player only has ${currentBal.toFixed(2)} coins. Cannot deduct ${adjustAmount.toFixed(2)} coins.`;
+        errorBox.style.display = 'flex';
+      }
+      if (confirmBtn) confirmBtn.disabled = true;
+    } else {
+      if (errorBox) errorBox.style.display = 'none';
+      if (confirmBtn) confirmBtn.disabled = false;
+    }
+  }
+
+  async function executeCoinAdjustment() {
+    if (coinsState.isSubmitting) return;
+
+    const player = coinsState.selectedPlayer;
+    const actionType = coinsState.activeAction;
+    if (!player || !actionType) {
+      notify('Missing player or action selection.', 'error');
+      return;
+    }
+
+    const amountInput = document.getElementById('input-coin-amount');
+    const reasonInput = document.getElementById('input-coin-reason');
+    const errorBox = document.getElementById('coin-modal-error-box');
+    const errorText = document.getElementById('coin-modal-error-text');
+    const confirmBtn = document.getElementById('btn-confirm-coin-adjustment');
+
+    const amount = parseFloat(amountInput ? amountInput.value : 0);
+    const reason = (reasonInput ? reasonInput.value : '').trim();
+
+    if (isNaN(amount) || amount <= 0) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Please enter a valid positive coin amount greater than 0.';
+        errorBox.style.display = 'flex';
+      }
+      notify('Please enter a valid coin amount.', 'warning');
+      return;
+    }
+
+    if (!reason || reason.length < 3) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'A clear reason or note (at least 3 characters) is required.';
+        errorBox.style.display = 'flex';
+      }
+      notify('Please provide a reason for this balance adjustment.', 'warning');
+      return;
+    }
+
+    if (actionType === 'ADMIN_DEBIT' && amount > Number(player.available_balance)) {
+      if (errorBox && errorText) {
+        errorText.textContent = `Cannot deduct ${amount.toFixed(2)} coins. Player only has ${Number(player.available_balance).toFixed(2)} coins available.`;
+        errorBox.style.display = 'flex';
+      }
+      notify('Insufficient player balance for deduction.', 'error');
+      return;
+    }
+
+    coinsState.isSubmitting = true;
+    if (confirmBtn && window.SharedLayout?.setButtonLoading) {
+      window.SharedLayout.setButtonLoading(confirmBtn, true, 'Processing...');
+    } else if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Processing...';
+    }
+
+    const idempotencyKey = `coin-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    try {
+      const res = await apiFetch('/admin/coins/adjust', {
+        method: 'POST',
+        body: {
+          userId: player.id,
+          actionType,
+          amount,
+          reason,
+          idempotencyKey
+        }
+      });
+
+      closeModal('modal-coin-adjust');
+      notify(res.message || 'Balance adjusted successfully.', 'success');
+
+      // Update selected player balance in memory and UI
+      player.available_balance = res.data.balanceAfter;
+      selectPlayerForCoins(player);
+
+      // If this adjusted player is currently logged in the active browser tab, update client session
+      if (window.ApiClient && typeof window.ApiClient.getUser === 'function') {
+        const localUser = window.ApiClient.getUser();
+        if (localUser && (localUser.id === player.id || localUser.username === player.username)) {
+          if (localUser.wallet) localUser.wallet.available_balance = res.data.balanceAfter;
+          localUser.available_balance = res.data.balanceAfter;
+          window.ApiClient.setUser(localUser);
+          if (typeof window.ApiClient.refreshBalance === 'function') {
+            window.ApiClient.refreshBalance(true).catch(() => {});
+          }
+        }
+      }
+
+      // Refresh adjustment history
+      await loadCoinHistory();
+
+    } catch (err) {
+      console.error('[COIN ADJUST ERROR]', err);
+      if (errorBox && errorText) {
+        errorText.textContent = err.message || 'Coin adjustment failed.';
+        errorBox.style.display = 'flex';
+      }
+      notify(`Adjustment failed: ${err.message}`, 'error');
+    } finally {
+      coinsState.isSubmitting = false;
+      if (confirmBtn && window.SharedLayout?.setButtonLoading) {
+        window.SharedLayout.setButtonLoading(confirmBtn, false);
+      } else if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = actionType === 'ADMIN_CREDIT' ? 'Confirm Coin Addition' : 'Confirm Coin Deduction';
+      }
+    }
+  }
+
+  async function loadCoinHistory() {
+    const tableBody = document.getElementById('tbody-coin-history');
+    if (!tableBody) return;
+
+    const action = coinsState.actionFilter || 'ALL';
+    const page = coinsState.historyPage || 1;
+    const limit = coinsState.historyLimit || 15;
+
+    let url = `/admin/coins/history?page=${page}&limit=${limit}`;
+    if (action && action !== 'ALL') url += `&actionType=${encodeURIComponent(action)}`;
+    if (coinsState.selectedPlayer) url += `&userId=${coinsState.selectedPlayer.id}`;
+
+    try {
+      const res = await apiFetch(url);
+      const data = res.data || {};
+      const history = data.history || [];
+      const pagination = data.pagination || {};
+
+      coinsState.history = history;
+      coinsState.historyTotal = pagination.total || 0;
+      coinsState.historyTotalPages = pagination.totalPages || 1;
+
+      renderCoinHistory(history);
+      updateCoinPagination(pagination);
+    } catch (err) {
+      console.error('[COIN HISTORY ERROR]', err);
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="10" class="text-center text-danger" style="padding: 24px;">
+            Failed to load coin history: ${escapeHtml(err.message)}
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  function renderCoinHistory(history) {
+    const tableBody = document.getElementById('tbody-coin-history');
+    if (!tableBody) return;
+
+    if (!history || history.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="10" class="text-center text-muted" style="padding: 24px;">
+            No coin adjustment records found.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = history.map(h => {
+      const isCredit = h.action_type === 'ADMIN_CREDIT';
+      const badgeClass = isCredit ? 'badge-status won' : 'badge-status lost';
+      const actionTitle = isCredit ? '+ CREDIT' : '- DEBIT';
+      const amountClass = isCredit ? 'text-success font-bold' : 'text-danger font-bold';
+
+      return `
+        <tr>
+          <td><code class="text-xs font-mono font-bold">${escapeHtml(h.transaction_uuid.substring(0, 16))}...</code></td>
+          <td>
+            <strong class="text-primary">@${escapeHtml(h.username)}</strong>
+            <span class="text-2xs text-muted block">ID #${h.user_id}</span>
+          </td>
+          <td>
+            <span class="${badgeClass}">${actionTitle}</span>
+          </td>
+          <td class="text-right ${amountClass}">
+            ${isCredit ? '+' : '-'}${formatMoney(h.amount)}
+          </td>
+          <td class="text-right text-xs text-muted">${formatMoney(h.balance_before)}</td>
+          <td class="text-right font-bold">${formatMoney(h.balance_after)}</td>
+          <td class="text-xs" style="max-width: 220px; word-break: break-word;">
+            ${escapeHtml(h.reason)}
+          </td>
+          <td class="text-xs">
+            <strong>${escapeHtml(h.admin_username)}</strong>
+          </td>
+          <td class="text-xs text-muted" style="white-space: nowrap;">
+            ${formatDateStr(h.created_at)}
+          </td>
+          <td>
+            <span class="badge badge-success">completed</span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function updateCoinPagination(p) {
+    const container = document.getElementById('coin-history-pagination');
+    const info = document.getElementById('coin-pagination-info');
+    const prevBtn = document.getElementById('btn-coin-prev-page');
+    const nextBtn = document.getElementById('btn-coin-next-page');
+
+    if (!container) return;
+    if (p.totalPages <= 1 && p.total <= p.limit) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'flex';
+    if (info) info.textContent = `Page ${p.page} of ${p.totalPages} (${p.total} records)`;
+    if (prevBtn) prevBtn.disabled = p.page <= 1;
+    if (nextBtn) nextBtn.disabled = p.page >= p.totalPages;
+  }
+
+  // ===========================================================================
+  // 8. EVENT LISTENERS SETUP
   // ===========================================================================
   function setupEventListeners() {
     // 1. Refresh stats
@@ -932,6 +2431,50 @@
       refreshUsersBtn.addEventListener('click', () => {
         loadUsers();
         notify('User directory refreshed.', 'info');
+      });
+    }
+
+    // Create New User Modal Open
+    const openCreateUserBtn = document.getElementById('btn-open-create-user');
+    if (openCreateUserBtn) {
+      openCreateUserBtn.addEventListener('click', () => {
+        resetCreateUserForm();
+        openModal('modal-create-user');
+        setTimeout(() => {
+          const fn = document.getElementById('input-create-displayname') || document.getElementById('input-create-fullname');
+          if (fn) fn.focus();
+        }, 100);
+      });
+    }
+
+    // Create New User Form Submit
+    const createUserForm = document.getElementById('form-create-user');
+    if (createUserForm) {
+      createUserForm.addEventListener('submit', handleCreateUserSubmit);
+    }
+
+    // Password visibility toggles inside Create User Modal
+    const toggleCreatePasswordBtn = document.getElementById('btn-toggle-create-password');
+    if (toggleCreatePasswordBtn) {
+      toggleCreatePasswordBtn.addEventListener('click', () => {
+        const pwdInput = document.getElementById('input-create-password');
+        if (pwdInput) {
+          const isPassword = pwdInput.type === 'password';
+          pwdInput.type = isPassword ? 'text' : 'password';
+          toggleCreatePasswordBtn.textContent = isPassword ? '🙈' : '👁️';
+        }
+      });
+    }
+
+    const toggleCreateConfirmBtn = document.getElementById('btn-toggle-create-confirm');
+    if (toggleCreateConfirmBtn) {
+      toggleCreateConfirmBtn.addEventListener('click', () => {
+        const confirmInput = document.getElementById('input-create-confirm');
+        if (confirmInput) {
+          const isPassword = confirmInput.type === 'password';
+          confirmInput.type = isPassword ? 'text' : 'password';
+          toggleCreateConfirmBtn.textContent = isPassword ? '🙈' : '👁️';
+        }
       });
     }
 
@@ -1035,7 +2578,259 @@
       confirmRoleBtn.addEventListener('click', handleConfirmRoleChange);
     }
 
-    // 8. Admin Sign Out
+    // Delete User Confirmation input listener & action button
+    const deleteUserConfirmInput = document.getElementById('delete-user-confirm-input');
+    if (deleteUserConfirmInput) {
+      deleteUserConfirmInput.addEventListener('input', handleDeleteUserConfirmInput);
+      deleteUserConfirmInput.addEventListener('keyup', (e) => {
+        handleDeleteUserConfirmInput();
+        if (e.key === 'Enter') {
+          const btn = document.getElementById('btn-confirm-delete-user');
+          if (btn && !btn.disabled) handleConfirmDeleteUser();
+        }
+      });
+    }
+
+    const confirmDeleteUserBtn = document.getElementById('btn-confirm-delete-user');
+    if (confirmDeleteUserBtn) {
+      confirmDeleteUserBtn.addEventListener('click', handleConfirmDeleteUser);
+    }
+
+    // 8. Match Monitoring event listeners
+    const refreshMatchesBtn = document.getElementById('btn-refresh-matches');
+    if (refreshMatchesBtn) {
+      refreshMatchesBtn.addEventListener('click', () => {
+        loadMatches();
+        notify('Matches and bets refreshed.', 'info');
+      });
+    }
+
+    const matchesSearch = document.getElementById('matches-search-input');
+    let matchDebounce = null;
+    if (matchesSearch) {
+      matchesSearch.addEventListener('input', (e) => {
+        clearTimeout(matchDebounce);
+        matchDebounce = setTimeout(() => {
+          matchesState.search = e.target.value.trim();
+          loadMatches();
+        }, 300);
+      });
+    }
+
+    const matchesStatusSelect = document.getElementById('matches-status-select');
+    if (matchesStatusSelect) {
+      matchesStatusSelect.addEventListener('change', (e) => {
+        matchesState.status = e.target.value;
+        loadMatches();
+      });
+    }
+
+    const matchesHasBetsSelect = document.getElementById('matches-has-bets-select');
+    if (matchesHasBetsSelect) {
+      matchesHasBetsSelect.addEventListener('change', (e) => {
+        matchesState.hasBets = e.target.value;
+        loadMatches();
+      });
+    }
+
+    const matchesSettlementSelect = document.getElementById('matches-settlement-select');
+    if (matchesSettlementSelect) {
+      matchesSettlementSelect.addEventListener('change', (e) => {
+        matchesState.settlement = e.target.value;
+        loadMatches();
+      });
+    }
+
+    // Match bets modal filters
+    const matchBetsSearch = document.getElementById('match-bets-search-input');
+    if (matchBetsSearch) {
+      matchBetsSearch.addEventListener('input', () => {
+        filterAndRenderModalBets();
+      });
+    }
+
+    const matchBetsStatusSelect = document.getElementById('match-bets-status-select');
+    if (matchBetsStatusSelect) {
+      matchBetsStatusSelect.addEventListener('change', () => {
+        filterAndRenderModalBets();
+      });
+    }
+
+    const matchBetsSettlementSelect = document.getElementById('match-bets-settlement-select');
+    if (matchBetsSettlementSelect) {
+      matchBetsSettlementSelect.addEventListener('change', () => {
+        filterAndRenderModalBets();
+      });
+    }
+
+    // 9. Bet Settlement event listeners
+    const refreshSettlementBtn = document.getElementById('btn-refresh-settlement');
+    if (refreshSettlementBtn) {
+      refreshSettlementBtn.addEventListener('click', () => {
+        loadEligibleMatches();
+        loadSettlementHistory();
+        notify('Eligible settlement matches refreshed.', 'info');
+      });
+    }
+
+    const closeWorkspaceBtn = document.getElementById('btn-close-workspace');
+    if (closeWorkspaceBtn) {
+      closeWorkspaceBtn.addEventListener('click', () => {
+        const workspace = document.getElementById('settlement-workspace');
+        if (workspace) workspace.style.display = 'none';
+        document.querySelectorAll('.eligible-match-card').forEach((c) => c.classList.remove('selected'));
+        settlementState.selectedMatch = null;
+        settlementState.selectedOutcome = null;
+      });
+    }
+
+    const openPreviewBtn = document.getElementById('btn-open-settlement-preview');
+    if (openPreviewBtn) {
+      openPreviewBtn.addEventListener('click', () => {
+        openSettlementPreview();
+      });
+    }
+
+    const confirmSettlementCheckbox = document.getElementById('checkbox-confirm-settlement');
+    const executeSettlementBtn = document.getElementById('btn-confirm-execute-settlement');
+    if (confirmSettlementCheckbox && executeSettlementBtn) {
+      confirmSettlementCheckbox.addEventListener('change', (e) => {
+        executeSettlementBtn.disabled = !e.target.checked;
+      });
+    }
+
+    if (executeSettlementBtn) {
+      executeSettlementBtn.addEventListener('click', () => {
+        executeSettlement();
+      });
+    }
+
+    // 10. Player Coin Management Listeners
+    const searchCoinBtn = document.getElementById('btn-search-player-coin');
+    const searchCoinInput = document.getElementById('input-coin-search-username');
+    const clearCoinSearchBtn = document.getElementById('btn-clear-player-search');
+
+    if (searchCoinBtn && searchCoinInput) {
+      searchCoinBtn.addEventListener('click', () => {
+        searchPlayerForCoins(searchCoinInput.value);
+      });
+      searchCoinInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchPlayerForCoins(searchCoinInput.value);
+        }
+      });
+    }
+
+    if (clearCoinSearchBtn) {
+      clearCoinSearchBtn.addEventListener('click', () => {
+        if (searchCoinInput) searchCoinInput.value = '';
+        const feedbackEl = document.getElementById('coin-search-feedback');
+        const resultsBox = document.getElementById('coin-search-results-box');
+        if (feedbackEl) feedbackEl.style.display = 'none';
+        if (resultsBox) resultsBox.style.display = 'none';
+        clearCoinSearchBtn.style.display = 'none';
+      });
+    }
+
+    // Delegated click for coin match items
+    const matchesList = document.getElementById('coin-matches-list');
+    if (matchesList) {
+      matchesList.addEventListener('click', (e) => {
+        const item = e.target.closest('.coin-match-item');
+        if (item) {
+          const playerId = parseInt(item.dataset.playerId, 10);
+          const player = coinsState.matchedPlayers.find(p => p.id === playerId);
+          if (player) selectPlayerForCoins(player);
+        }
+      });
+    }
+
+    // Coin Action Buttons
+    const addCoinsBtn = document.getElementById('btn-action-add-coins');
+    const deductCoinsBtn = document.getElementById('btn-action-deduct-coins');
+
+    if (addCoinsBtn) {
+      addCoinsBtn.addEventListener('click', () => {
+        openCoinAdjustModal('ADMIN_CREDIT');
+      });
+    }
+
+    if (deductCoinsBtn) {
+      deductCoinsBtn.addEventListener('click', () => {
+        openCoinAdjustModal('ADMIN_DEBIT');
+      });
+    }
+
+    // Live Calculation in Coin Adjustment Modal
+    const coinAmountInput = document.getElementById('input-coin-amount');
+    if (coinAmountInput) {
+      coinAmountInput.addEventListener('input', updateCoinCalculation);
+      coinAmountInput.addEventListener('change', updateCoinCalculation);
+    }
+
+    // Preset Chips (+100, +500, +1000, +5000)
+    const presetContainer = document.getElementById('coin-presets-container');
+    if (presetContainer) {
+      presetContainer.addEventListener('click', (e) => {
+        const chip = e.target.closest('.preset-chip');
+        if (chip && coinAmountInput) {
+          const val = parseFloat(chip.dataset.amount || 0);
+          const currentVal = parseFloat(coinAmountInput.value) || 0;
+          coinAmountInput.value = (currentVal + val).toString();
+          updateCoinCalculation();
+        }
+      });
+    }
+
+    // Confirm Coin Adjustment
+    const confirmCoinAdjustBtn = document.getElementById('btn-confirm-coin-adjustment');
+    if (confirmCoinAdjustBtn) {
+      confirmCoinAdjustBtn.addEventListener('click', () => {
+        executeCoinAdjustment();
+      });
+    }
+
+    // Filter Coin History by Action
+    const filterCoinAction = document.getElementById('filter-coin-action');
+    if (filterCoinAction) {
+      filterCoinAction.addEventListener('change', (e) => {
+        coinsState.actionFilter = e.target.value;
+        coinsState.historyPage = 1;
+        loadCoinHistory();
+      });
+    }
+
+    // Refresh Coins
+    const refreshCoinsBtn = document.getElementById('btn-refresh-coins');
+    if (refreshCoinsBtn) {
+      refreshCoinsBtn.addEventListener('click', () => {
+        loadCoinsManagement();
+        notify('Coin management ledger refreshed.', 'info');
+      });
+    }
+
+    // History Pagination
+    const prevCoinBtn = document.getElementById('btn-coin-prev-page');
+    const nextCoinBtn = document.getElementById('btn-coin-next-page');
+    if (prevCoinBtn) {
+      prevCoinBtn.addEventListener('click', () => {
+        if (coinsState.historyPage > 1) {
+          coinsState.historyPage--;
+          loadCoinHistory();
+        }
+      });
+    }
+    if (nextCoinBtn) {
+      nextCoinBtn.addEventListener('click', () => {
+        if (coinsState.historyPage < coinsState.historyTotalPages) {
+          coinsState.historyPage++;
+          loadCoinHistory();
+        }
+      });
+    }
+
+    // 11. Admin Sign Out
     const logoutBtn = document.getElementById('btn-admin-logout');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {

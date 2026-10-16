@@ -48,7 +48,8 @@ const server = http.createServer((req, res) => {
 
     // Performance: Cache-Control headers for static assets
     const isHtml = ext === '.html';
-    const cacheControl = isHtml ? 'no-cache' : 'public, max-age=86400, stale-while-revalidate=3600';
+    const isDev = process.env.NODE_ENV !== 'production';
+    const cacheControl = isDev ? 'no-cache, no-store, must-revalidate' : (isHtml ? 'no-cache' : 'public, max-age=86400, stale-while-revalidate=3600');
 
     const acceptEncoding = req.headers['accept-encoding'] || '';
     const compressibleExts = ['.html', '.css', '.js', '.json', '.svg'];

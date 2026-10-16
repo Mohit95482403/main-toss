@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="css/reset.css">
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/components.css?v=1.1">
   <link rel="stylesheet" href="css/responsive.css">
 
   <!-- Shared Layout Component CSS -->
@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="css/bottom-navigation.css">
 
   <!-- Home Page CSS (Day 7) -->
-  <link rel="stylesheet" href="css/home.css">
+  <link rel="stylesheet" href="css/home.css?v=1.1">
 </head>
 
 <body data-page="home">
@@ -43,12 +43,42 @@
         <header class="home-intro-section" aria-labelledby="home-heading">
           <div class="flex items-center justify-between">
             <h1 id="home-heading" class="home-title">Toss Markets</h1>
-            <span class="badge badge-success text-xs">Day 8 Active</span>
           </div>
           <p class="text-sm text-secondary">
             Explore active cricket coin tosses, market rates, and match fixtures.
           </p>
         </header>
+
+        <!-- Home Quick Wallet Actions Section (Deposit & Withdrawal) -->
+        <section class="home-wallet-section" aria-label="Account Funds Actions">
+          <div class="home-wallet-card">
+            <div class="home-wallet-balance-row">
+              <div class="home-wallet-balance-info">
+                <span class="home-wallet-label">Available Balance</span>
+                <span class="home-wallet-amount" id="home-wallet-balance">₹0.00</span>
+              </div>
+              <div class="home-wallet-exposure-info">
+                <span class="home-wallet-exposure-label">Exposure</span>
+                <span class="home-wallet-exposure-val" id="home-wallet-exposure">₹0.00</span>
+              </div>
+            </div>
+            <div class="home-wallet-actions" role="group" aria-label="Quick Wallet Actions">
+              <a href="https://t.me/narendra_1306" target="_blank" rel="noopener noreferrer" class="home-wallet-btn btn-deposit" id="home-deposit-btn" aria-label="Deposit funds via Telegram @narendra_1306">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Deposit</span>
+              </a>
+              <a href="https://t.me/narendra_1306" target="_blank" rel="noopener noreferrer" class="home-wallet-btn btn-withdrawal" id="home-withdraw-btn" aria-label="Withdrawal funds via Telegram @narendra_1306">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Withdrawal</span>
+              </a>
+            </div>
+          </div>
+        </section>
 
         <!-- Featured / Highlighted Live Match Card (Navigates to Match Details Page) -->
         <a href="pages/match-details.html?id=MATCH-2026-001" class="featured-match-card" id="featured-match" data-match-id="MATCH-2026-001" aria-label="Featured Match: India vs Australia, Status: Live Toss">
@@ -91,25 +121,24 @@
         <section aria-labelledby="fixtures-heading">
           <div class="flex items-center justify-between" style="margin-bottom: var(--space-xs);">
             <h2 id="fixtures-heading" class="h4">Match Fixtures</h2>
-            <span class="text-xs text-muted">Demo Odds Preview</span>
           </div>
 
           <div class="match-filter-strip" role="toolbar" aria-label="Match Category Filters">
             <button type="button" class="match-filter-btn active" data-category="all" aria-pressed="true">
               <span>All</span>
-              <span class="match-filter-count">6</span>
+              <span class="match-filter-count">0</span>
             </button>
             <button type="button" class="match-filter-btn" data-category="live" aria-pressed="false">
               <span>Live Toss</span>
-              <span class="match-filter-count">1</span>
+              <span class="match-filter-count">0</span>
             </button>
             <button type="button" class="match-filter-btn" data-category="upcoming" aria-pressed="false">
               <span>Upcoming</span>
-              <span class="match-filter-count">3</span>
+              <span class="match-filter-count">0</span>
             </button>
             <button type="button" class="match-filter-btn" data-category="completed" aria-pressed="false">
               <span>Completed</span>
-              <span class="match-filter-count">2</span>
+              <span class="match-filter-count">0</span>
             </button>
           </div>
         </section>
@@ -140,7 +169,6 @@
                 </p>
                 <div class="flex items-center gap-sm" style="flex-wrap: wrap;">
                   <a href="pages/login.html" class="btn btn-primary btn-sm">Sign In</a>
-                  <a href="pages/register.html" class="btn btn-secondary btn-sm">Create Account</a>
                   <a href="pages/forgot-password.html" class="btn btn-outline btn-sm">Forgot Password</a>
                 </div>
               </div>
@@ -282,13 +310,89 @@
     </div>
   </div>
 
+  <!-- Deposit Modal Dialog (Informational Only) -->
+  <div id="deposit-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="deposit-modal-title" aria-hidden="true">
+    <div class="modal-card">
+      <header class="modal-header">
+        <div class="flex items-center gap-xs">
+          <h3 id="deposit-modal-title" class="modal-title">Deposit Funds</h3>
+          <span class="badge badge-primary text-xs">Preview</span>
+        </div>
+        <button type="button" class="modal-close-btn" data-modal-close aria-label="Close deposit dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div class="modal-notice-banner">
+          Deposit functionality will be available in an upcoming update.
+        </div>
+        <div class="modal-balance-preview">
+          <span class="text-xs text-muted">Current Available Balance:</span>
+          <span class="modal-balance-value" id="modal-deposit-current-bal">₹0.00</span>
+        </div>
+        <p>
+          You are currently viewing a development preview of the <strong>IRONMAN TOSS BOOK</strong> wallet interface.
+        </p>
+        <p class="text-xs text-muted">
+          Per our roadmap, automated UPI payment gateways, Instant QR scan, and net banking deposits are scheduled for future release. No real-money transactions or balance changes are executed in this mode.
+        </p>
+      </div>
+      <footer class="modal-footer">
+        <a href="pages/passbook.html" class="btn btn-secondary btn-sm" id="modal-deposit-passbook-btn">
+          View Passbook Ledger
+        </a>
+        <button type="button" class="btn btn-primary btn-sm" data-modal-close>
+          Understood
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Withdrawal Modal Dialog (Informational Only) -->
+  <div id="withdraw-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="withdraw-modal-title" aria-hidden="true">
+    <div class="modal-card">
+      <header class="modal-header">
+        <div class="flex items-center gap-xs">
+          <h3 id="withdraw-modal-title" class="modal-title">Withdrawal Funds</h3>
+          <span class="badge badge-neutral text-xs">Preview</span>
+        </div>
+        <button type="button" class="modal-close-btn" data-modal-close aria-label="Close withdrawal dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div class="modal-notice-banner">
+          Withdrawal functionality will be available in an upcoming update.
+        </div>
+        <div class="modal-balance-preview">
+          <span class="text-xs text-muted">Available for Withdrawal:</span>
+          <span class="modal-balance-value" id="modal-withdraw-current-bal">₹0.00</span>
+        </div>
+        <p>
+          You are currently viewing a development preview of the <strong>IRONMAN TOSS BOOK</strong> wallet interface.
+        </p>
+        <p class="text-xs text-muted">
+          Payout processing, account verification, and automated IMPS/NEFT settlements are scheduled for future release. No funds will be deducted from your account.
+        </p>
+      </div>
+      <footer class="modal-footer">
+        <a href="pages/passbook.html" class="btn btn-secondary btn-sm" id="modal-withdraw-passbook-btn">
+          View Passbook Ledger
+        </a>
+        <button type="button" class="btn btn-primary btn-sm" data-modal-close>
+          Understood
+        </button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Application Logic Scripts -->
   <script src="js/config.js"></script>
   <script src="js/api-client.js"></script>
   <script src="js/shared-layout.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/matches-data.js"></script>
-  <script src="js/home.js"></script>
+  <script src="js/home.js?v=1.1"></script>
   <script src="js/app.js"></script>
 </body>
 

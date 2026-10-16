@@ -16,7 +16,12 @@
     "test:day17": "node scripts/test-day17-e2e.js",
     "test:day19": "node scripts/test-day19-production.js",
     "test:balance": "node scripts/test-balance-consistency.js",
-    "test": "node scripts/test-home.js && node scripts/test-match-details.js && node scripts/test-bets.js && node scripts/test-passbook.js && node scripts/test-profile.js && node scripts/test-day12-consistency.js && node scripts/test-day13-security.js && node scripts/test-day14-admin.js && node scripts/test-day15-integration.js && node scripts/test-day16-performance.js && node scripts/test-day17-e2e.js && node scripts/test-day19-production.js && node scripts/test-balance-consistency.js"
+    "test:monitoring": "node scripts/test-admin-monitoring-settlement.js",
+    "test:coins": "node scripts/test-admin-coin-management.js",
+    "test:telegram": "node scripts/test-telegram-redirect.js",
+    "test:create-user": "node scripts/test-admin-create-user.js",
+    "test:delete-user": "node scripts/test-admin-delete-user.js",
+    "test": "node scripts/test-home.js && node scripts/test-match-details.js && node scripts/test-bets.js && node scripts/test-passbook.js && node scripts/test-profile.js && node scripts/test-day12-consistency.js && node scripts/test-day13-security.js && node scripts/test-day14-admin.js && node scripts/test-day15-integration.js && node scripts/test-day16-performance.js && node scripts/test-day17-e2e.js && node scripts/test-day19-production.js && node scripts/test-balance-consistency.js && node scripts/test-admin-monitoring-settlement.js && node scripts/test-admin-coin-management.js && node scripts/test-telegram-redirect.js && node scripts/test-admin-create-user.js && node scripts/test-admin-delete-user.js"
   },
   "keywords": [
     "ironman",

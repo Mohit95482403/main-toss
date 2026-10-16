@@ -108,10 +108,99 @@
     return Boolean(getToken());
   }
 
+  // Authoritative balance cache and in-flight promise tracker
+  let balanceFetchPromise = null;
+  let lastVerifiedBalance = null;
+
+  function formatCoinAmount(val) {
+    if (typeof val !== 'number' || isNaN(val)) return '0.00';
+    return val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function getCurrencySymbol() {
+    return (window.APP_CONFIG && window.APP_CONFIG.initialBalances && window.APP_CONFIG.initialBalances.currencySymbol) || '₹';
+  }
+
   /**
-   * Retrieves authoritative balance information from the stored session
+   * Resilient DOM updater for every balance presentation across the website.
+   * Handles loading ('loading'), error ('error'), and verified loaded ('loaded') states.
+   */
+  function updateAllBalanceDisplays(available, exposure, state = 'loaded') {
+    const symbol = getCurrencySymbol();
+
+    const targets = [
+      { id: 'header-available-balance', type: 'available' },
+      { id: 'header-exposure-balance', type: 'exposure' },
+      { id: 'home-wallet-balance', type: 'available' },
+      { id: 'home-wallet-exposure', type: 'exposure' },
+      { id: 'hero-available-balance', type: 'available' },
+      { id: 'modal-deposit-current-bal', type: 'available' },
+      { id: 'modal-withdraw-current-bal', type: 'available' }
+    ];
+
+    targets.forEach(({ id, type }) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      if (state === 'loading') {
+        el.classList.add('balance-loading');
+        el.classList.remove('balance-error');
+        if (!lastVerifiedBalance) {
+          el.textContent = `${symbol}...`;
+        }
+      } else if (state === 'error') {
+        el.classList.remove('balance-loading');
+        el.classList.add('balance-error');
+        el.textContent = `${symbol}—`;
+        el.title = 'Unable to retrieve balance from server. Click to retry.';
+        if (!el.dataset.hasRetry) {
+          el.dataset.hasRetry = 'true';
+          el.style.cursor = 'pointer';
+          el.addEventListener('click', () => {
+            refreshBalance(true).catch(() => {});
+          });
+        }
+      } else {
+        el.classList.remove('balance-loading', 'balance-error');
+        el.removeAttribute('title');
+        const num = type === 'available' ? available : exposure;
+        const formatted = formatCoinAmount(num);
+        el.textContent = `${symbol}${formatted}`;
+      }
+    });
+
+    // Also update any elements with data-balance-field
+    document.querySelectorAll('[data-balance-field]').forEach(el => {
+      const field = el.dataset.balanceField;
+      if (state === 'loading') {
+        el.classList.add('balance-loading');
+        if (!lastVerifiedBalance) el.textContent = `${symbol}...`;
+      } else if (state === 'error') {
+        el.classList.add('balance-error');
+        el.textContent = `${symbol}—`;
+      } else {
+        el.classList.remove('balance-loading', 'balance-error');
+        const num = field === 'exposure' ? exposure : available;
+        el.textContent = `${symbol}${formatCoinAmount(num)}`;
+      }
+    });
+  }
+
+  /**
+   * Retrieves authoritative balance information from the stored session or last verified network state
    */
   function getBalance() {
+    if (lastVerifiedBalance) {
+      return {
+        available: lastVerifiedBalance.available,
+        exposure: lastVerifiedBalance.exposure,
+        currency: lastVerifiedBalance.currency,
+        formattedAvailable: formatCoinAmount(lastVerifiedBalance.available),
+        formattedExposure: formatCoinAmount(lastVerifiedBalance.exposure),
+        verified: true
+      };
+    }
+
     const user = getUser();
     if (!user || !user.wallet) {
       return {
@@ -119,18 +208,167 @@
         exposure: 0,
         currency: 'INR',
         formattedAvailable: '0.00',
-        formattedExposure: '0.00'
+        formattedExposure: '0.00',
+        verified: false
       };
     }
+
     const availNum = Number(user.wallet.available_balance !== undefined ? user.wallet.available_balance : user.wallet.available) || 0;
     const expNum = Number(user.wallet.exposure_balance !== undefined ? user.wallet.exposure_balance : user.wallet.exposure) || 0;
     return {
       available: availNum,
       exposure: expNum,
       currency: user.wallet.currency || 'INR',
-      formattedAvailable: availNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      formattedExposure: expNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      formattedAvailable: formatCoinAmount(availNum),
+      formattedExposure: formatCoinAmount(expNum),
+      verified: false
     };
+  }
+
+  /**
+   * Refresh authoritative balance directly from backend MySQL API (/wallet/balance)
+   * Resolves to verified balance metrics and updates all page presentations uniformly.
+   */
+  async function refreshBalance(force = false) {
+    if (!isAuthenticated()) {
+      lastVerifiedBalance = null;
+      updateAllBalanceDisplays(0, 0, 'loaded');
+      return {
+        available: 0,
+        exposure: 0,
+        formattedAvailable: '0.00',
+        formattedExposure: '0.00',
+        currency: 'INR',
+        isAuthenticated: false
+      };
+    }
+
+    if (balanceFetchPromise && !force) {
+      return balanceFetchPromise;
+    }
+
+    balanceFetchPromise = (async () => {
+      try {
+        if (!lastVerifiedBalance) {
+          updateAllBalanceDisplays(null, null, 'loading');
+        }
+
+        let res = null;
+        try {
+          res = await get('/wallet/balance', { noDedupe: true });
+        } catch (walletErr) {
+          if (walletErr.status === 404) {
+            // Fallback to /auth/me if dedicated route is loading
+            res = await get('/auth/me', { noDedupe: true });
+          } else {
+            throw walletErr;
+          }
+        }
+
+        let rawAvail = null;
+        let rawExp = 0;
+        let currency = 'INR';
+
+        if (res) {
+          if (typeof res.balance === 'number') {
+            rawAvail = res.balance;
+          } else if (res.data && typeof res.data.balance === 'number') {
+            rawAvail = res.data.balance;
+          } else if (res.data && res.data.wallet && typeof res.data.wallet.available_balance === 'number') {
+            rawAvail = res.data.wallet.available_balance;
+          } else if (res.user && res.user.wallet && typeof res.user.wallet.available_balance === 'number') {
+            rawAvail = res.user.wallet.available_balance;
+          } else if (res.data && res.data.user && res.data.user.wallet && typeof res.data.user.wallet.available_balance === 'number') {
+            rawAvail = res.data.user.wallet.available_balance;
+          }
+
+          if (typeof res.exposure_balance === 'number') {
+            rawExp = res.exposure_balance;
+          } else if (res.data && typeof res.data.exposureBalance === 'number') {
+            rawExp = res.data.exposureBalance;
+          } else if (res.user && res.user.wallet && typeof res.user.wallet.exposure_balance === 'number') {
+            rawExp = res.user.wallet.exposure_balance;
+          }
+
+          currency = res.currency || (res.data && res.data.currency) || 'INR';
+        }
+
+        if (rawAvail === null || isNaN(rawAvail)) {
+          throw new Error('Invalid balance payload returned by server.');
+        }
+
+        const availNum = parseFloat(rawAvail);
+        const expNum = parseFloat(rawExp || 0);
+
+        lastVerifiedBalance = {
+          available: availNum,
+          exposure: expNum,
+          currency,
+          timestamp: Date.now()
+        };
+
+        // Synchronize in user session storage
+        const current = getUser();
+        if (current) {
+          current.wallet = {
+            available_balance: availNum,
+            exposure_balance: expNum,
+            currency
+          };
+          current.available_balance = availNum;
+          current.exposure_balance = expNum;
+          try {
+            localStorage.setItem(USER_KEY, JSON.stringify(current));
+          } catch (e) {}
+        }
+
+        updateAllBalanceDisplays(availNum, expNum, 'loaded');
+
+        const formattedAvail = formatCoinAmount(availNum);
+        const formattedExp = formatCoinAmount(expNum);
+
+        try {
+          window.dispatchEvent(new CustomEvent('itb:balance-updated', {
+            detail: {
+              available: availNum,
+              exposure: expNum,
+              formattedAvailable: formattedAvail,
+              formattedExposure: formattedExp,
+              currency,
+              verified: true
+            }
+          }));
+        } catch (evtErr) {}
+
+        return {
+          available: availNum,
+          exposure: expNum,
+          formattedAvailable: formattedAvail,
+          formattedExposure: formattedExp,
+          currency,
+          verified: true
+        };
+      } catch (err) {
+        if (err.status === 401) {
+          clearToken();
+          clearUser();
+          updateAllBalanceDisplays(0, 0, 'loaded');
+        } else {
+          console.warn('[API CLIENT] Authoritative balance fetch notice:', err.message);
+          updateAllBalanceDisplays(null, null, 'error');
+          try {
+            window.dispatchEvent(new CustomEvent('itb:balance-error', {
+              detail: { error: err }
+            }));
+          } catch (evtErr) {}
+        }
+        throw err;
+      } finally {
+        balanceFetchPromise = null;
+      }
+    })();
+
+    return balanceFetchPromise;
   }
 
   /**
@@ -144,12 +382,17 @@
     const availNum = Number(wallet.available_balance !== undefined ? wallet.available_balance : wallet.available) || 0;
     const expNum = Number(wallet.exposure_balance !== undefined ? wallet.exposure_balance : wallet.exposure) || 0;
 
-    const formattedAvail = availNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const formattedExp = expNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    lastVerifiedBalance = {
+      available: availNum,
+      exposure: expNum,
+      currency: wallet.currency || 'INR',
+      timestamp: Date.now()
+    };
 
-    if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
-      window.SharedLayout.updateBalances(formattedAvail, formattedExp);
-    }
+    updateAllBalanceDisplays(availNum, expNum, 'loaded');
+
+    const formattedAvail = formatCoinAmount(availNum);
+    const formattedExp = formatCoinAmount(expNum);
 
     try {
       window.dispatchEvent(new CustomEvent('itb:balance-updated', {
@@ -373,18 +616,27 @@
   }
 
   /**
-   * Session Initialization: refresh live user & wallet from backend on load
+   * Session Initialization: refresh live user & authoritative wallet from backend on load
    */
   async function initSession() {
-    if (!isAuthenticated()) return null;
+    if (!isAuthenticated()) {
+      updateAllBalanceDisplays(0, 0, 'loaded');
+      return null;
+    }
 
     try {
-      const res = await get('/auth/me', { cacheTTL: 5000 });
-      const user = res.user || (res.data && res.data.user);
-      if (user) {
-        setUser(user);
-        syncBalancesFromUser(user);
-        return user;
+      // Concurrently synchronize profile info and authoritative wallet balance directly from MySQL
+      const [userRes] = await Promise.allSettled([
+        get('/auth/me', { cacheTTL: 3000 }),
+        refreshBalance(true)
+      ]);
+
+      if (userRes.status === 'fulfilled' && userRes.value) {
+        const user = userRes.value.user || (userRes.value.data && userRes.value.data.user);
+        if (user) {
+          setUser(user);
+          return user;
+        }
       }
     } catch (e) {
       console.warn('[API CLIENT] Background session sync notice:', e.message);
@@ -407,12 +659,17 @@
     clearUser,
     isAuthenticated,
     getBalance,
+    refreshBalance,
+    fetchBalance: refreshBalance,
+    updateAllBalanceDisplays,
     syncBalancesFromUser,
     initSession,
     getBaseUrl,
     debounce,
     getAbortSignal,
-    clearCache
+    clearCache,
+    formatCoinAmount,
+    getLastVerifiedBalance: () => lastVerifiedBalance
   };
 
   // Auto-sync session on DOMContentLoaded if token exists

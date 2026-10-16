@@ -31,9 +31,9 @@ function authenticate(req, res, next) {
   try {
     const payload = verifyToken(token);
     req.user = {
-      id: payload.userId,
+      id: payload.userId !== undefined ? payload.userId : payload.id,
       uuid: payload.uuid,
-      username: payload.username,
+      username: payload.username || (payload.id ? `admin_${payload.id}` : 'admin'),
       email: payload.email,
       role: payload.role || 'user'
     };

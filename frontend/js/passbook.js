@@ -22,127 +22,16 @@
   };
 
   /**
-   * Demonstration Transaction History Records
-   * Strictly identified fictional records matching reference screenshot patterns.
-   * Mathematical Consistency:
-   * Total Credits: ₹5,000 + ₹2,000 + ₹3,000 + ₹5,000 = ₹15,000.00
-   * Total Debits:  ₹1,000 + ₹500 + ₹3,500 = ₹5,000.00
-   * Available Net: ₹15,000.00 - ₹5,000.00 = ₹10,000.00
+   * User Transaction History Records (Loaded dynamically from MySQL /api/passbook/transactions)
    */
-  const DEMO_TRANSACTIONS = [
-    {
-      id: 'DEMO-TXN-001',
-      title: 'Account Credit',
-      subtitle: 'Instant UPI Wallet Top-up',
-      type: 'credit', // 'credit' | 'debit'
-      amount: 5000.00,
-      timestamp: '2026-10-12T10:30:00Z',
-      dateFormatted: '12 Oct 2026',
-      timeFormatted: '10:30 AM',
-      status: 'completed', // 'completed' | 'pending' | 'failed'
-      closingBalance: 10000.00,
-      category: 'Deposit',
-      paymentMethod: 'Instant UPI (Demo)',
-      referenceCode: 'UPI-20261012-9841',
-      remarks: 'Simulated UPI fund deposit via Axis Bank NetBanking gateway'
-    },
-    {
-      id: 'DEMO-TXN-002',
-      title: 'Account Debit',
-      subtitle: 'Toss Stake: India vs Australia',
-      type: 'debit',
-      amount: 1000.00,
-      timestamp: '2026-10-11T16:15:00Z',
-      dateFormatted: '11 Oct 2026',
-      timeFormatted: '04:15 PM',
-      status: 'completed',
-      closingBalance: 5000.00,
-      category: 'Wager Stake',
-      paymentMethod: 'Wager Settlement',
-      referenceCode: 'TOSS-BET-1048-STAKE',
-      remarks: 'Toss winner selection stake debited for India vs Australia T20 fixture'
-    },
-    {
-      id: 'DEMO-TXN-003',
-      title: 'Account Credit',
-      subtitle: 'Toss Winnings: MI vs CSK',
-      type: 'credit',
-      amount: 2000.00,
-      timestamp: '2026-10-10T12:20:00Z',
-      dateFormatted: '10 Oct 2026',
-      timeFormatted: '12:20 PM',
-      status: 'completed',
-      closingBalance: 6000.00,
-      category: 'Wager Win',
-      paymentMethod: 'Wager Settlement',
-      referenceCode: 'TOSS-BET-1048-WIN',
-      remarks: 'Settlement payout credited for Mumbai Indians toss declaration'
-    },
-    {
-      id: 'DEMO-TXN-004',
-      title: 'Account Debit',
-      subtitle: 'Withdrawal Request: IMPS Bank Payout',
-      type: 'debit',
-      amount: 500.00,
-      timestamp: '2026-10-09T18:45:00Z',
-      dateFormatted: '09 Oct 2026',
-      timeFormatted: '06:45 PM',
-      status: 'pending',
-      closingBalance: 4000.00,
-      category: 'Withdrawal',
-      paymentMethod: 'IMPS Payout (Demo)',
-      referenceCode: 'IMPS-REQ-20261009-1123',
-      remarks: 'Pending verification for demo account bank payout request'
-    },
-    {
-      id: 'DEMO-TXN-005',
-      title: 'Account Credit',
-      subtitle: 'Referral Bonus Reward',
-      type: 'credit',
-      amount: 3000.00,
-      timestamp: '2026-10-08T09:10:00Z',
-      dateFormatted: '08 Oct 2026',
-      timeFormatted: '09:10 AM',
-      status: 'completed',
-      closingBalance: 4500.00,
-      category: 'Bonus Reward',
-      paymentMethod: 'Promotional Ledger',
-      referenceCode: 'BONUS-REF-20261008',
-      remarks: 'Affiliate referral bonus credit for active community user onboarding'
-    },
-    {
-      id: 'DEMO-TXN-007',
-      title: 'Account Debit',
-      subtitle: 'Toss Stake: Sydney Sixers vs Scorchers',
-      type: 'debit',
-      amount: 3500.00,
-      timestamp: '2026-10-07T14:00:00Z',
-      dateFormatted: '07 Oct 2026',
-      timeFormatted: '02:00 PM',
-      status: 'completed',
-      closingBalance: 1500.00,
-      category: 'Wager Stake',
-      paymentMethod: 'Wager Settlement',
-      referenceCode: 'TOSS-BET-1042-STAKE',
-      remarks: 'Big Bash League toss wagering stake deduction'
-    },
-    {
-      id: 'DEMO-TXN-006',
-      title: 'Account Credit',
-      subtitle: 'Initial Welcome Promotional Credit',
-      type: 'credit',
-      amount: 5000.00,
-      timestamp: '2026-10-07T11:00:00Z',
-      dateFormatted: '07 Oct 2026',
-      timeFormatted: '11:00 AM',
-      status: 'completed',
-      closingBalance: 5000.00,
-      category: 'Promotional',
-      paymentMethod: 'Promotional Ledger',
-      referenceCode: 'PROMO-INIT-20261007',
-      remarks: 'First deposit registration matching bonus incentive'
-    }
-  ];
+  let userTransactions = [];
+  let passbookSummary = {
+    totalCredits: 0,
+    totalDebits: 0,
+    availableBalance: 0
+  };
+  let transactionsLoaded = false;
+  let transactionsError = null;
 
   /**
    * Currency formatter helper for INR
@@ -277,6 +166,18 @@
    * Render Empty State
    */
   function renderEmptyState(activeFilter, searchQuery) {
+    if (!searchQuery && activeFilter === 'all' && userTransactions.length === 0) {
+      return `
+        <section class="passbook-empty-state empty-state" aria-live="polite">
+          <div class="empty-state-icon" aria-hidden="true">
+            ${ICONS.empty}
+          </div>
+          <h3 class="empty-state-title">No transactions found</h3>
+          <p class="empty-state-desc">No transaction history is available.</p>
+        </section>
+      `;
+    }
+
     let message = 'No transactions match your current search or filter criteria.';
     if (searchQuery) {
       message = `No transactions found matching "${escapeHtml(searchQuery)}". Try another search or reset filters.`;
@@ -327,16 +228,29 @@
       document.body.style.overflow = '';
 
       if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+        lastActiveElement = lastFocusedElement;
         lastFocusedElement.focus();
       }
     }
 
-    if (depositBtn && depositModal) {
-      depositBtn.addEventListener('click', () => openModal(depositModal, depositBtn));
+    const TELEGRAM_PROFILE_URL = 'https://t.me/narendra_1306';
+
+    if (depositBtn) {
+      depositBtn.addEventListener('click', (e) => {
+        if (!depositBtn.href || depositBtn.tagName.toLowerCase() !== 'a') {
+          e.preventDefault();
+          window.open(TELEGRAM_PROFILE_URL, '_blank', 'noopener,noreferrer');
+        }
+      });
     }
 
-    if (withdrawBtn && withdrawModal) {
-      withdrawBtn.addEventListener('click', () => openModal(withdrawModal, withdrawBtn));
+    if (withdrawBtn) {
+      withdrawBtn.addEventListener('click', (e) => {
+        if (!withdrawBtn.href || withdrawBtn.tagName.toLowerCase() !== 'a') {
+          e.preventDefault();
+          window.open(TELEGRAM_PROFILE_URL, '_blank', 'noopener,noreferrer');
+        }
+      });
     }
 
     [depositModal, withdrawModal].forEach(modal => {
@@ -369,6 +283,10 @@
     const searchInput = document.getElementById('txn-search-input');
     const searchClearBtn = document.getElementById('search-clear-btn');
     const filterButtons = document.querySelectorAll('.txn-filter-btn');
+    const demoModeBadge = document.getElementById('demo-mode-badge');
+    if (demoModeBadge) {
+      demoModeBadge.remove();
+    }
 
     // Balance Elements
     const heroAvailableBalance = document.getElementById('hero-available-balance');
@@ -399,7 +317,6 @@
 
     // Dynamically calculate and render balance totals from transaction data
     function updateBalanceCards() {
-      const summary = calculateLedgerSummary(DEMO_TRANSACTIONS);
       const isAuth = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
 
       if (isAuth) {
@@ -417,24 +334,23 @@
           window.SharedLayout.updateBalances(balInfo.formattedAvailable, balInfo.formattedExposure);
         }
       } else {
-        // Unauthenticated demo preview mode
         if (heroAvailableBalance) {
-          heroAvailableBalance.textContent = formatCurrency(summary.availableBalance);
+          heroAvailableBalance.textContent = formatCurrency(0);
+        }
+        const badge = document.querySelector('.hero-account-badge');
+        if (badge) {
+          badge.textContent = 'WALLET';
         }
         if (window.SharedLayout && typeof window.SharedLayout.updateBalances === 'function') {
-          const balFormatted = summary.availableBalance.toLocaleString('en-IN', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          });
-          window.SharedLayout.updateBalances(balFormatted, '0.00');
+          window.SharedLayout.updateBalances('0.00', '0.00');
         }
       }
 
       if (heroTotalCredits) {
-        heroTotalCredits.textContent = `+${formatCurrency(summary.totalCredits)}`;
+        heroTotalCredits.textContent = `+${formatCurrency(passbookSummary.totalCredits)}`;
       }
       if (heroTotalDebits) {
-        heroTotalDebits.textContent = `-${formatCurrency(summary.totalDebits)}`;
+        heroTotalDebits.textContent = `-${formatCurrency(passbookSummary.totalDebits)}`;
       }
     }
 
@@ -448,20 +364,15 @@
       }
     });
 
-    // Sort transactions chronologically (newest first)
-    const sortedTransactions = [...DEMO_TRANSACTIONS].sort((a, b) => {
-      return new Date(b.timestamp) - new Date(a.timestamp);
-    });
-
     // Update filter counts dynamically
     function updateFilterCounts() {
       const counts = {
-        all: sortedTransactions.length,
-        credit: sortedTransactions.filter(t => t.type === 'credit').length,
-        debit: sortedTransactions.filter(t => t.type === 'debit').length,
-        completed: sortedTransactions.filter(t => t.status === 'completed').length,
-        pending: sortedTransactions.filter(t => t.status === 'pending').length,
-        failed: sortedTransactions.filter(t => t.status === 'failed').length
+        all: userTransactions.length,
+        credit: userTransactions.filter(t => t.type === 'credit').length,
+        debit: userTransactions.filter(t => t.type === 'debit').length,
+        completed: userTransactions.filter(t => t.status === 'completed').length,
+        pending: userTransactions.filter(t => t.status === 'pending').length,
+        failed: userTransactions.filter(t => t.status === 'failed').length
       };
 
       filterButtons.forEach(btn => {
@@ -475,7 +386,7 @@
 
     // Filter & search logic
     function getFilteredTransactions() {
-      return sortedTransactions.filter(txn => {
+      return userTransactions.filter(txn => {
         // 1. Filter match (type or status)
         let matchesFilter = true;
         if (currentFilter === 'credit' || currentFilter === 'debit') {
@@ -551,7 +462,7 @@
      * Open Transaction Details Modal
      */
     function openTxnDetailsModal(txnId) {
-      const txn = DEMO_TRANSACTIONS.find(t => t.id === txnId);
+      const txn = userTransactions.find(t => t.id === txnId);
       if (!txn || !txnDetailModal) return;
 
       const isCredit = txn.type === 'credit';
@@ -575,7 +486,7 @@
       if (modalTxnMethod) modalTxnMethod.textContent = txn.paymentMethod || 'System Ledger';
       if (modalTxnDatetime) modalTxnDatetime.textContent = `${txn.dateFormatted}, ${txn.timeFormatted}`;
       if (modalTxnClosing) modalTxnClosing.textContent = formatCurrency(txn.closingBalance);
-      if (modalTxnRemarks) modalTxnRemarks.textContent = txn.remarks || txn.subtitle || 'Transaction recorded in demo ledger.';
+      if (modalTxnRemarks) modalTxnRemarks.textContent = txn.remarks || txn.subtitle || 'Transaction recorded in ledger.';
 
       txnDetailModal.classList.add('open');
       txnDetailModal.setAttribute('aria-hidden', 'false');
@@ -685,20 +596,105 @@
     // Setup Deposit/Withdraw Informational Modals
     setupModals();
 
-    // Initial Dynamic Calculation & Render
-    updateBalanceCards();
-    updateFilterCounts();
-    setFilter('all');
+    /**
+     * Fetch authentic user transactions from backend MySQL API
+     */
+    function loadUserTransactions() {
+      const isAuth = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
+
+      if (!isAuth) {
+        userTransactions = [];
+        passbookSummary = { totalCredits: 0, totalDebits: 0, availableBalance: 0 };
+        updateBalanceCards();
+        updateFilterCounts();
+        feedContainer.innerHTML = `
+          <section class="passbook-empty-state empty-state" aria-live="polite">
+            <div class="empty-state-icon" aria-hidden="true">${ICONS.empty}</div>
+            <h3 class="empty-state-title">Sign In Required</h3>
+            <p class="empty-state-desc">Please sign in to view your authentic wallet transactions and financial ledger.</p>
+            <a href="login.html" class="btn btn-primary btn-sm" style="margin-top: 12px; display: inline-block;">
+              Sign In to Account
+            </a>
+          </section>
+        `;
+        return;
+      }
+
+      feedContainer.innerHTML = `
+        <div style="text-align: center; padding: 48px 16px; color: var(--color-text-muted);">
+          <p>Loading transaction history...</p>
+        </div>
+      `;
+
+      // Show loading placeholder if balance is not yet verified
+      if (heroAvailableBalance && (!window.ApiClient || !window.ApiClient.getLastVerifiedBalance || !window.ApiClient.getLastVerifiedBalance())) {
+        heroAvailableBalance.textContent = '₹...';
+      }
+
+      Promise.allSettled([
+        window.ApiClient.get('/passbook/transactions'),
+        (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function')
+          ? window.ApiClient.refreshBalance()
+          : Promise.resolve()
+      ]).then(([txnsResult]) => {
+        transactionsLoaded = true;
+        if (txnsResult.status === 'fulfilled' && txnsResult.value && txnsResult.value.success && txnsResult.value.data) {
+          transactionsError = null;
+          const data = txnsResult.value.data;
+          userTransactions = Array.isArray(data.transactions) ? data.transactions : [];
+          passbookSummary = data.summary || calculateLedgerSummary(userTransactions);
+
+          // If authoritative wallet object returned, ensure ApiClient and hero balance are updated
+          if (data.wallet && typeof data.wallet.availableBalance === 'number') {
+            passbookSummary.availableBalance = data.wallet.availableBalance;
+            if (window.ApiClient && typeof window.ApiClient.updateAllBalanceDisplays === 'function') {
+              window.ApiClient.updateAllBalanceDisplays(data.wallet.availableBalance, data.wallet.exposureBalance || 0, 'loaded');
+            }
+          }
+        } else {
+          transactionsError = (txnsResult.reason && txnsResult.reason.message) || 'Failed to retrieve transactions';
+          userTransactions = [];
+          passbookSummary = { totalCredits: 0, totalDebits: 0, availableBalance: 0 };
+        }
+
+        updateBalanceCards();
+        updateFilterCounts();
+
+        if (transactionsError) {
+          feedContainer.innerHTML = `
+            <section class="passbook-empty-state empty-state" aria-live="polite">
+              <div class="empty-state-icon" aria-hidden="true">${ICONS.empty}</div>
+              <h3 class="empty-state-title">Unable to Load Transactions</h3>
+              <p class="empty-state-desc">${escapeHtml(transactionsError)}. Please check your connection and try again.</p>
+              <button type="button" class="btn btn-outline btn-sm" id="retry-txns-btn" style="margin-top: 12px;">
+                Retry
+              </button>
+            </section>
+          `;
+          const retryBtn = document.getElementById('retry-txns-btn');
+          if (retryBtn) {
+            retryBtn.addEventListener('click', loadUserTransactions);
+          }
+        } else {
+          renderFeed();
+        }
+      });
+    }
+
+    // Load authentic transactions from backend
+    loadUserTransactions();
 
     // Export controller methods
     window.PassbookController = {
       init: initPassbookPage,
-      getDemoTransactions: () => DEMO_TRANSACTIONS,
+      getUserTransactions: () => userTransactions,
+      getDemoTransactions: () => userTransactions,
       calculateLedgerSummary: calculateLedgerSummary,
       getFilteredTransactions: getFilteredTransactions,
       setFilter: setFilter,
       openTxnDetailsModal: openTxnDetailsModal,
-      closeTxnDetailsModal: closeTxnDetailsModal
+      closeTxnDetailsModal: closeTxnDetailsModal,
+      reload: loadUserTransactions
     };
   }
 

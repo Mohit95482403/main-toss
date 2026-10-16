@@ -369,16 +369,25 @@
         : String(v);
     }
 
+    const homeAvailEl = document.getElementById('home-wallet-balance');
+    const homeExpEl = document.getElementById('home-wallet-exposure');
+
     if (availEl && available !== undefined) {
       const formatted = formatVal(available);
       if (formatted !== null) {
         availEl.textContent = `${symbol}${formatted}`;
+        if (homeAvailEl) {
+          homeAvailEl.textContent = `${symbol}${formatted}`;
+        }
       }
     }
     if (expEl && exposure !== undefined) {
       const formatted = formatVal(exposure);
       if (formatted !== null) {
         expEl.textContent = `${symbol}${formatted}`;
+        if (homeExpEl) {
+          homeExpEl.textContent = `${symbol}${formatted}`;
+        }
       }
     }
   }
@@ -393,9 +402,14 @@
 
     if (headerContainer) {
       renderHeader(headerContainer);
-      if (window.ApiClient && typeof window.ApiClient.getBalance === 'function' && window.ApiClient.isAuthenticated()) {
+      if (window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated()) {
         const b = window.ApiClient.getBalance();
-        updateBalances(b.formattedAvailable, b.formattedExposure);
+        if (b.verified) {
+          updateBalances(b.formattedAvailable, b.formattedExposure);
+        }
+        if (typeof window.ApiClient.refreshBalance === 'function') {
+          window.ApiClient.refreshBalance().catch(() => {});
+        }
       }
     }
     if (tickerContainer) renderTicker(tickerContainer);
@@ -408,6 +422,14 @@
       }
     });
 
+    window.addEventListener('itb:balance-error', () => {
+      const availEl = document.getElementById('header-available-balance');
+      if (availEl && (!window.ApiClient || !window.ApiClient.getLastVerifiedBalance || !window.ApiClient.getLastVerifiedBalance())) {
+        availEl.classList.add('balance-error');
+        availEl.textContent = '₹—';
+      }
+    });
+
     setupGlobalModalAccessibility();
   }
 
@@ -415,6 +437,7 @@
   window.SharedLayout = {
     init,
     updateBalances,
+    refreshBalance: () => (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function' ? window.ApiClient.refreshBalance() : Promise.resolve()),
     renderHeader,
     renderTicker,
     renderBottomNav,

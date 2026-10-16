@@ -8,6 +8,7 @@ const express = require('express');
 const { getPool } = require('../config/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/crypto');
+const { createUserAccount } = require('../services/userService');
 
 const router = express.Router();
 
@@ -256,6 +257,164 @@ router.get('/users', async (req, res, next) => {
     next(err);
   }
 });
+
+// =============================================================================
+// 2B. USER PROVISIONING: CREATE NEW USER ACCOUNT (ADMIN ONLY)
+// =============================================================================
+const handleAdminCreateUser = async (req, res, next) => {
+  try {
+    const {
+      displayName,
+      fullName,
+      username,
+      email,
+      password,
+      confirmPassword,
+      phone,
+      initialCoinBalance,
+      initialBalance,
+      accountStatus,
+      status,
+      role
+    } = req.body || {};
+
+    const rawDisplayName = displayName !== undefined ? displayName : fullName;
+    const trimmedDisplayName = (rawDisplayName || '').trim();
+    if (!trimmedDisplayName || trimmedDisplayName.length < 2 || trimmedDisplayName.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'displayName',
+          message: 'Display Name is required and must be between 2 and 100 characters.'
+        }
+      });
+    }
+
+    const trimmedUsername = (username || '').trim();
+    if (!trimmedUsername || !/^[a-zA-Z0-9_]{3,30}$/.test(trimmedUsername)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'username',
+          message: 'Username is required, must be 3-30 characters long, and contain only letters, numbers, or underscores.'
+        }
+      });
+    }
+
+    const rawPassword = password || '';
+    if (!rawPassword || rawPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'password',
+          message: 'Password is required and must be at least 8 characters long.'
+        }
+      });
+    }
+
+    if (confirmPassword === undefined || confirmPassword === null || confirmPassword === '') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'confirmPassword',
+          message: 'Password confirmation is required.'
+        }
+      });
+    }
+
+    if (rawPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'confirmPassword',
+          message: 'Password and Confirm Password do not match.'
+        }
+      });
+    }
+
+    const rawCoinBalance = initialCoinBalance !== undefined ? initialCoinBalance : initialBalance;
+    if (rawCoinBalance === undefined || rawCoinBalance === null || rawCoinBalance === '') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'initialCoinBalance',
+          message: 'Initial coin balance is required.'
+        }
+      });
+    }
+
+    const parsedBalance = Number(rawCoinBalance);
+    if (isNaN(parsedBalance) || parsedBalance < 0 || parsedBalance > 100000000) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'initialCoinBalance',
+          message: 'Initial coin balance must be a valid, non-negative amount within supported limits.'
+        }
+      });
+    }
+
+    const rawStatus = (accountStatus !== undefined ? accountStatus : (status !== undefined ? status : '')).toString().trim().toLowerCase();
+    const allowedStatuses = ['active', 'suspended'];
+    if (!rawStatus || !allowedStatuses.includes(rawStatus)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'accountStatus',
+          message: `Account status is required and must be one of: ${allowedStatuses.join(', ')}.`
+        }
+      });
+    }
+
+    const registeredUser = await createUserAccount({
+      admin: req.user,
+      displayName: trimmedDisplayName,
+      fullName: trimmedDisplayName,
+      username: trimmedUsername,
+      email: email || null,
+      password: rawPassword,
+      confirmPassword,
+      phone: phone || null,
+      initialCoinBalance: parsedBalance,
+      initialBalance: parsedBalance,
+      accountStatus: rawStatus,
+      status: rawStatus,
+      role,
+      ip: req.ip
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Player account "${registeredUser.username}" created successfully.`,
+      data: {
+        user: registeredUser
+      }
+    });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({
+        success: false,
+        error: {
+          code: err.code || 'VALIDATION_ERROR',
+          field: err.field,
+          message: err.message
+        }
+      });
+    }
+    next(err);
+  }
+};
+
+router.post('/users/create', handleAdminCreateUser);
+router.post('/users', handleAdminCreateUser);
 
 // =============================================================================
 // 3. GET SINGLE USER DETAILS
@@ -519,7 +678,188 @@ router.put('/users/:id/role', requireRole(['super_admin']), async (req, res, nex
 });
 
 // =============================================================================
-// 6. ADMINISTRATIVE AUDIT LOGS HISTORY
+// 6. PERMANENTLY DELETE USER (ADMIN / SUPER_ADMIN)
+// =============================================================================
+const handleAdminDeleteUser = async (req, res, next) => {
+  try {
+    const targetUserId = parseInt(req.params.id, 10);
+    if (isNaN(targetUserId) || targetUserId < 1) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Valid user identifier is required.' }
+      });
+    }
+
+    const { confirmUsername, reason } = req.body || {};
+
+    // 1. Self-deletion prevention
+    if (req.user.id === targetUserId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'SELF_ACTION_BLOCKED',
+          message: 'Security policy: You cannot delete your own currently authenticated administrator account.'
+        }
+      });
+    }
+
+    const pool = getPool();
+
+    // 2. Fetch target user with wallet and account metadata
+    const [targetRows] = await pool.query(
+      `SELECT u.id, u.uuid, u.username, u.email, u.full_name, u.role, u.status, u.created_at,
+              w.available_balance, w.exposure_balance
+       FROM users u
+       LEFT JOIN wallets w ON w.user_id = u.id
+       WHERE u.id = ? LIMIT 1`,
+      [targetUserId]
+    );
+
+    if (targetRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Target user record not found.' }
+      });
+    }
+
+    const targetUser = targetRows[0];
+
+    // 3. Exact username confirmation check (case-insensitive for safety, but must match exact spelling)
+    const trimmedConfirm = (confirmUsername || '').trim();
+    if (!trimmedConfirm || trimmedConfirm.toLowerCase() !== targetUser.username.toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'CONFIRMATION_MISMATCH',
+          message: `Confirmation failed: You must type the exact username "${targetUser.username}" to authorize account deletion.`
+        }
+      });
+    }
+
+    // 4. Administrative account protection & governance constraints
+    if (['admin', 'super_admin'].includes(targetUser.role)) {
+      if (req.user.role !== 'super_admin') {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Only a super_admin possesses authority to manage administrative accounts.'
+          }
+        });
+      }
+
+      // Last active administrator check
+      const [[adminCountResult]] = await pool.query(
+        "SELECT COUNT(*) AS activeAdminCount FROM users WHERE role IN ('admin', 'super_admin') AND status = 'active'"
+      );
+      if (adminCountResult.activeAdminCount <= 1) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'LAST_ADMIN_PROTECTED',
+            message: 'Security policy: Cannot delete the last active administrator account.'
+          }
+        });
+      }
+
+      // Administrative audit logs retention check
+      const [[adminAuditResult]] = await pool.query(
+        'SELECT COUNT(*) AS logCount FROM admin_audit_logs WHERE admin_id = ?',
+        [targetUserId]
+      );
+      if (adminAuditResult.logCount > 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'RETENTION_BLOCKED',
+            message: 'Administrative account is referenced in regulatory audit trails and cannot be permanently deleted. Please suspend or ban the account instead.'
+          }
+        });
+      }
+    }
+
+    // 5. Active wager / liability protection: Check for pending unsettled bets
+    const [[pendingBetsResult]] = await pool.query(
+      "SELECT COUNT(*) AS pendingCount FROM bets WHERE user_id = ? AND settlement_status = 'pending'",
+      [targetUserId]
+    );
+    if (pendingBetsResult.pendingCount > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'ACTIVE_BETS_EXIST',
+          message: `Cannot delete user: Account has ${pendingBetsResult.pendingCount} active or pending wager(s). Matches must be settled before deletion.`
+        }
+      });
+    }
+
+    // 6. Execute atomic deletion within MySQL transaction
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Permanent administrative audit log entry
+      await connection.query(
+        `INSERT INTO admin_audit_logs (admin_id, admin_username, action_type, target_type, target_id, target_identifier, details, ip_address)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          req.user.id,
+          req.user.username,
+          'delete_user',
+          'user',
+          targetUserId,
+          targetUser.username,
+          JSON.stringify({
+            deletedUserId: targetUserId,
+            deletedUsername: targetUser.username,
+            deletedEmail: targetUser.email,
+            deletedFullName: targetUser.full_name,
+            deletedRole: targetUser.role,
+            deletedStatus: targetUser.status,
+            walletBalance: parseFloat(targetUser.available_balance || 0),
+            registeredAt: targetUser.created_at,
+            reason: reason ? String(reason).trim() : 'Permanent account deletion confirmed by admin',
+            deletedAt: new Date().toISOString()
+          }),
+          req.ip || '127.0.0.1'
+        ]
+      );
+
+      // Invalidate active login sessions
+      await connection.query('DELETE FROM sessions WHERE user_id = ?', [targetUserId]);
+
+      // Remove preferences
+      await connection.query('DELETE FROM user_preferences WHERE user_id = ?', [targetUserId]);
+
+      // Permanently remove the user account (wallets and settled bets cascade cleanly)
+      await connection.query('DELETE FROM users WHERE id = ?', [targetUserId]);
+
+      await connection.commit();
+    } catch (txErr) {
+      await connection.rollback();
+      throw txErr;
+    } finally {
+      connection.release();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `User account "${targetUser.username}" and associated account data have been permanently deleted.`,
+      data: {
+        deletedUserId: targetUserId,
+        deletedUsername: targetUser.username
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+router.delete('/users/:id', handleAdminDeleteUser);
+router.post('/users/:id/delete', handleAdminDeleteUser);
+
+// =============================================================================
+// 7. ADMINISTRATIVE AUDIT LOGS HISTORY
 // =============================================================================
 router.get('/audit-logs', async (req, res, next) => {
   try {
@@ -673,4 +1013,1372 @@ router.get('/system/status', async (req, res, next) => {
   }
 });
 
+// =============================================================================
+// 8. MATCH MONITORING: LIST MATCHES WITH BET STATS
+// =============================================================================
+router.get('/matches', async (req, res, next) => {
+  try {
+    const pool = getPool();
+
+    const search = req.query.search ? req.query.search.trim() : '';
+    const statusFilter = req.query.status ? req.query.status.trim() : 'all';
+    const hasBetsFilter = req.query.hasBets ? req.query.hasBets.trim() : 'all';
+    const settlementFilter = req.query.settlement ? req.query.settlement.trim() : 'all';
+
+    const whereClauses = [];
+    const queryParams = [];
+
+    if (search.length > 0) {
+      whereClauses.push('(m.match_title LIKE ? OR m.competition LIKE ? OR m.team_one LIKE ? OR m.team_two LIKE ?)');
+      const pattern = `%${search}%`;
+      queryParams.push(pattern, pattern, pattern, pattern);
+    }
+
+    if (statusFilter !== 'all' && ['live', 'upcoming', 'completed', 'abandoned'].includes(statusFilter)) {
+      whereClauses.push('m.status = ?');
+      queryParams.push(statusFilter);
+    }
+
+    if (settlementFilter === 'settled') {
+      whereClauses.push('m.settled = TRUE');
+    } else if (settlementFilter === 'pending') {
+      whereClauses.push('m.settled = FALSE');
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    // Having clause for hasBets filter
+    let havingSql = '';
+    if (hasBetsFilter === 'true') {
+      havingSql = 'HAVING total_bets > 0';
+    } else if (hasBetsFilter === 'false') {
+      havingSql = 'HAVING total_bets = 0';
+    }
+
+    const matchesQuery = `
+      SELECT 
+        m.id,
+        m.competition,
+        m.stage,
+        m.match_title,
+        m.team_one,
+        m.team_one_abbr,
+        m.team_one_rate,
+        m.team_two,
+        m.team_two_abbr,
+        m.team_two_rate,
+        m.scheduled_time,
+        m.venue,
+        m.status,
+        m.toss_winner,
+        m.settled,
+        m.settled_at,
+        m.created_at,
+        COUNT(b.id) AS total_bets,
+        COUNT(DISTINCT b.user_id) AS total_players,
+        COALESCE(SUM(b.stake), 0.00) AS total_stake,
+        COUNT(CASE WHEN b.settlement_status = 'pending' THEN 1 END) AS pending_bets,
+        COUNT(CASE WHEN b.settlement_status = 'settled' THEN 1 END) AS settled_bets
+      FROM matches m
+      LEFT JOIN bets b ON b.match_id = m.id
+      ${whereSql}
+      GROUP BY m.id
+      ${havingSql}
+      ORDER BY 
+        CASE WHEN m.status = 'live' THEN 1 WHEN m.status = 'upcoming' THEN 2 ELSE 3 END ASC,
+        m.settled ASC,
+        total_bets DESC,
+        m.created_at DESC
+    `;
+
+    // Platform-wide overview summary metrics
+    const summaryQuery = `
+      SELECT 
+        (SELECT COUNT(DISTINCT match_id) FROM bets) AS totalMatchesWithBets,
+        (SELECT COUNT(*) FROM bets) AS totalBets,
+        (SELECT COUNT(*) FROM bets WHERE settlement_status = 'pending') AS pendingBets,
+        (SELECT COUNT(*) FROM bets WHERE settlement_status = 'settled') AS settledBets,
+        (SELECT COALESCE(SUM(stake), 0.00) FROM bets) AS totalStakes,
+        (SELECT COALESCE(SUM(payout), 0.00) FROM bets WHERE settlement_status = 'settled') AS totalSettledPayouts
+    `;
+
+    const [ [matchesRows], [[summaryResult]] ] = await Promise.all([
+      pool.query(matchesQuery, queryParams),
+      pool.query(summaryQuery)
+    ]);
+
+    const formattedMatches = matchesRows.map(row => ({
+      id: row.id,
+      competition: row.competition,
+      stage: row.stage,
+      matchTitle: row.match_title,
+      match_title: row.match_title,
+      teamOne: row.team_one,
+      team_one: row.team_one,
+      teamOneAbbr: row.team_one_abbr,
+      teamOneRate: parseFloat(row.team_one_rate || 0),
+      teamTwo: row.team_two,
+      team_two: row.team_two,
+      teamTwoAbbr: row.team_two_abbr,
+      teamTwoRate: parseFloat(row.team_two_rate || 0),
+      scheduledTime: row.scheduled_time,
+      venue: row.venue,
+      status: row.status,
+      tossWinner: row.toss_winner,
+      toss_winner: row.toss_winner,
+      settled: Boolean(row.settled),
+      settledAt: row.settled_at,
+      settled_at: row.settled_at,
+      createdAt: row.created_at,
+      totalBets: parseInt(row.total_bets || 0, 10),
+      total_bets: parseInt(row.total_bets || 0, 10),
+      totalPlayers: parseInt(row.total_players || 0, 10),
+      total_players: parseInt(row.total_players || 0, 10),
+      totalStake: parseFloat(row.total_stake || 0),
+      total_stake: parseFloat(row.total_stake || 0),
+      pendingBets: parseInt(row.pending_bets || 0, 10),
+      pending_bets: parseInt(row.pending_bets || 0, 10),
+      settledBets: parseInt(row.settled_bets || 0, 10),
+      settled_bets: parseInt(row.settled_bets || 0, 10)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        summary: {
+          totalMatchesWithBets: parseInt(summaryResult.totalMatchesWithBets || 0, 10),
+          matches_with_bets: parseInt(summaryResult.totalMatchesWithBets || 0, 10),
+          totalBets: parseInt(summaryResult.totalBets || 0, 10),
+          total_bets: parseInt(summaryResult.totalBets || 0, 10),
+          pendingBets: parseInt(summaryResult.pendingBets || 0, 10),
+          pending_bets: parseInt(summaryResult.pendingBets || 0, 10),
+          settledBets: parseInt(summaryResult.settledBets || 0, 10),
+          settled_bets: parseInt(summaryResult.settledBets || 0, 10),
+          totalStakes: parseFloat(summaryResult.totalStakes || 0),
+          total_stakes_placed: parseFloat(summaryResult.totalStakes || 0),
+          totalSettledPayouts: parseFloat(summaryResult.totalSettledPayouts || 0)
+        },
+        matches: formattedMatches,
+        count: formattedMatches.length
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// =============================================================================
+// 9. MATCH MONITORING: GET ALL BETS FOR A SPECIFIC MATCH
+// =============================================================================
+router.get('/matches/:id/bets', async (req, res, next) => {
+  try {
+    const matchId = req.params.id ? req.params.id.trim() : '';
+    if (!matchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+      });
+    }
+
+    const pool = getPool();
+
+    // Verify match exists
+    const [matchRows] = await pool.query(
+      'SELECT id, competition, stage, match_title, team_one, team_two, scheduled_time, venue, status, toss_winner, settled, settled_at FROM matches WHERE id = ?',
+      [matchId]
+    );
+
+    if (matchRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: `Match "${matchId}" not found in database.` }
+      });
+    }
+
+    const matchInfo = matchRows[0];
+
+    // Pagination
+    let page = parseInt(req.query.page || '1', 10);
+    let limit = parseInt(req.query.limit || '15', 10);
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 15;
+    if (limit > 100) limit = 100;
+    const offset = (page - 1) * limit;
+
+    // Filters
+    const statusFilter = req.query.status ? req.query.status.trim() : 'all';
+    const settlementFilter = req.query.settlement_status ? req.query.settlement_status.trim() : 'all';
+    const search = req.query.search ? req.query.search.trim() : '';
+
+    const whereClauses = ['b.match_id = ?'];
+    const queryParams = [matchId];
+
+    if (statusFilter !== 'all' && ['pending', 'live', 'won', 'lost', 'no_result'].includes(statusFilter)) {
+      whereClauses.push('b.status = ?');
+      queryParams.push(statusFilter);
+    }
+
+    if (settlementFilter !== 'all' && ['pending', 'settled'].includes(settlementFilter)) {
+      whereClauses.push('b.settlement_status = ?');
+      queryParams.push(settlementFilter);
+    }
+
+    if (search.length > 0) {
+      whereClauses.push('(b.id LIKE ? OR u.username LIKE ? OR u.full_name LIKE ? OR b.selection LIKE ?)');
+      const pattern = `%${search}%`;
+      queryParams.push(pattern, pattern, pattern, pattern);
+    }
+
+    const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+
+    const countQuery = `
+      SELECT COUNT(*) AS total 
+      FROM bets b 
+      JOIN users u ON u.id = b.user_id 
+      ${whereSql}
+    `;
+
+    const dataQuery = `
+      SELECT 
+        b.id,
+        b.user_id,
+        u.username,
+        u.full_name AS player_name,
+        b.match_id,
+        b.market_name,
+        b.selection,
+        b.stake,
+        b.odds,
+        b.potential_return,
+        b.status,
+        b.settlement_status,
+        b.payout,
+        b.created_at,
+        b.settled_at
+      FROM bets b
+      JOIN users u ON u.id = b.user_id
+      ${whereSql}
+      ORDER BY b.created_at DESC, b.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [ [[countResult]], [betsRows] ] = await Promise.all([
+      pool.query(countQuery, queryParams),
+      pool.query(dataQuery, [...queryParams, limit, offset])
+    ]);
+
+    const total = parseInt(countResult.total || 0, 10);
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const formattedBets = betsRows.map(row => ({
+      id: row.id,
+      userId: row.user_id,
+      user_id: row.user_id,
+      username: row.username,
+      playerName: row.player_name,
+      full_name: row.player_name,
+      matchId: row.match_id,
+      match_id: row.match_id,
+      marketName: row.market_name,
+      market_name: row.market_name,
+      selection: row.selection,
+      stake: parseFloat(row.stake || 0),
+      odds: parseFloat(row.odds || 0),
+      potentialReturn: parseFloat(row.potential_return || 0),
+      potential_return: parseFloat(row.potential_return || 0),
+      status: row.status,
+      settlementStatus: row.settlement_status,
+      settlement_status: row.settlement_status,
+      payout: parseFloat(row.payout || 0),
+      createdAt: row.created_at,
+      created_at: row.created_at,
+      placed_at: row.created_at,
+      settledAt: row.settled_at,
+      settled_at: row.settled_at
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        match: {
+          id: matchInfo.id,
+          matchTitle: matchInfo.match_title,
+          competition: matchInfo.competition,
+          stage: matchInfo.stage,
+          teamOne: matchInfo.team_one,
+          teamTwo: matchInfo.team_two,
+          scheduledTime: matchInfo.scheduled_time,
+          venue: matchInfo.venue,
+          status: matchInfo.status,
+          tossWinner: matchInfo.toss_winner,
+          settled: Boolean(matchInfo.settled),
+          settledAt: matchInfo.settled_at
+        },
+        bets: formattedBets,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// =============================================================================
+// 10. BET SETTLEMENT: GET MATCHES ELIGIBLE FOR SETTLEMENT
+// =============================================================================
+router.get('/settlement/eligible', async (req, res, next) => {
+  try {
+    const pool = getPool();
+
+    const query = `
+      SELECT 
+        m.id,
+        m.competition,
+        m.stage,
+        m.match_title,
+        m.team_one,
+        m.team_one_abbr,
+        m.team_one_rate,
+        m.team_two,
+        m.team_two_abbr,
+        m.team_two_rate,
+        m.scheduled_time,
+        m.venue,
+        m.status,
+        m.toss_winner,
+        m.settled,
+        COUNT(b.id) AS pending_bets_count,
+        COALESCE(SUM(b.stake), 0.00) AS pending_total_stake
+      FROM matches m
+      JOIN bets b ON b.match_id = m.id AND b.settlement_status = 'pending'
+      WHERE m.settled = FALSE
+      GROUP BY m.id
+      ORDER BY pending_bets_count DESC, m.created_at DESC
+    `;
+
+    const [rows] = await pool.query(query);
+
+    const eligible = rows.map(r => ({
+      id: r.id,
+      competition: r.competition,
+      stage: r.stage,
+      matchTitle: r.match_title,
+      match_title: r.match_title,
+      teamOne: r.team_one,
+      team_one: r.team_one,
+      teamOneAbbr: r.team_one_abbr,
+      teamOneRate: parseFloat(r.team_one_rate || 0),
+      teamTwo: r.team_two,
+      team_two: r.team_two,
+      teamTwoAbbr: r.team_two_abbr,
+      teamTwoRate: parseFloat(r.team_two_rate || 0),
+      scheduledTime: r.scheduled_time,
+      venue: r.venue,
+      status: r.status,
+      pendingBetsCount: parseInt(r.pending_bets_count || 0, 10),
+      pending_bets_count: parseInt(r.pending_bets_count || 0, 10),
+      pendingTotalStake: parseFloat(r.pending_total_stake || 0),
+      total_pending_stake: parseFloat(r.pending_total_stake || 0)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        matches: eligible,
+        eligible_matches: eligible,
+        totalEligible: eligible.length
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// =============================================================================
+// 11. BET SETTLEMENT: PREVIEW SETTLEMENT CALCULATIONS (READ-ONLY)
+// =============================================================================
+router.post('/settlement/preview', async (req, res, next) => {
+  try {
+    const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
+    const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome;
+
+    if (!rawMatchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'A valid match identifier is required.' }
+      });
+    }
+
+    if (!rawOutcome || typeof rawOutcome !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_OUTCOME', message: 'Declared outcome selection is required.' }
+      });
+    }
+
+    const pool = getPool();
+
+    // Check match
+    const [matchRows] = await pool.query(
+      'SELECT id, match_title, team_one, team_two, status, settled, settled_at FROM matches WHERE id = ?',
+      [rawMatchId.trim()]
+    );
+
+    if (matchRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: `Match "${rawMatchId}" does not exist.` }
+      });
+    }
+
+    const match = matchRows[0];
+    if (match.settled) {
+      return res.status(409).json({
+        success: false,
+        error: { code: 'ALREADY_SETTLED', message: `Match "${match.match_title}" was already settled on ${match.settled_at}.` }
+      });
+    }
+
+    const cleanOutcome = rawOutcome.trim();
+    const validOutcomes = [match.team_one, match.team_two, 'NO_RESULT'];
+    if (!validOutcomes.includes(cleanOutcome)) {
+      return res.status(400).json({
+        success: false,
+        error: { 
+          code: 'OUTCOME_MISMATCH', 
+          message: `Outcome must be "${match.team_one}", "${match.team_two}", or "NO_RESULT". Received: "${cleanOutcome}".` 
+        }
+      });
+    }
+
+    // Retrieve pending bets
+    const [bets] = await pool.query(
+      `SELECT b.id, b.user_id, u.username, u.full_name, b.selection, b.stake, b.odds, b.potential_return
+       FROM bets b
+       JOIN users u ON u.id = b.user_id
+       WHERE b.match_id = ? AND b.settlement_status = 'pending'`,
+      [match.id]
+    );
+
+    if (bets.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'NO_PENDING_BETS', message: 'This match has no pending bets eligible for settlement.' }
+      });
+    }
+
+    let wonCount = 0;
+    let lostCount = 0;
+    let noResultCount = 0;
+    let totalStake = 0;
+    let totalPayout = 0;
+
+    const betPreviews = bets.map(b => {
+      const stakeNum = parseFloat(b.stake);
+      const oddsNum = parseFloat(b.odds);
+      const potentialRetNum = parseFloat(b.potential_return);
+      totalStake += stakeNum;
+
+      let expectedStatus = 'lost';
+      let expectedPayout = 0.00;
+
+      if (cleanOutcome === 'NO_RESULT') {
+        expectedStatus = 'no_result';
+        expectedPayout = stakeNum; // full refund
+        noResultCount++;
+      } else if (b.selection === cleanOutcome) {
+        expectedStatus = 'won';
+        expectedPayout = potentialRetNum;
+        wonCount++;
+      } else {
+        expectedStatus = 'lost';
+        expectedPayout = 0.00;
+        lostCount++;
+      }
+
+      totalPayout += expectedPayout;
+
+      return {
+        betId: b.id,
+        username: b.username,
+        playerName: b.full_name,
+        selection: b.selection,
+        stake: stakeNum,
+        odds: oddsNum,
+        expectedStatus,
+        expectedPayout
+      };
+    });
+
+    const totalWinningPayout = parseFloat(totalPayout.toFixed(2));
+    const totalRefundedAmount = cleanOutcome === 'NO_RESULT' ? parseFloat(totalStake.toFixed(2)) : 0.00;
+    const winningStake = cleanOutcome === 'NO_RESULT' ? 0.00 : bets.filter(b => b.selection === cleanOutcome).reduce((a, b) => a + parseFloat(b.stake), 0);
+    const totalLosingStake = cleanOutcome === 'NO_RESULT' ? 0.00 : parseFloat((totalStake - winningStake).toFixed(2));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        matchId: match.id,
+        match_id: match.id,
+        matchTitle: match.match_title,
+        match_title: match.match_title,
+        declaredOutcome: cleanOutcome,
+        declared_outcome: cleanOutcome,
+        totalEligibleBets: bets.length,
+        eligible_bets_count: bets.length,
+        wonBetsCount: wonCount,
+        lostBetsCount: lostCount,
+        noResultCount: noResultCount,
+        totalStake: parseFloat(totalStake.toFixed(2)),
+        totalExpectedPayout: totalWinningPayout,
+        betPreviews,
+        preview: {
+          won_bets_count: wonCount,
+          lost_bets_count: lostCount,
+          refund_bets_count: noResultCount,
+          total_winning_payout: totalWinningPayout,
+          total_losing_stake: totalLosingStake,
+          total_refunded_amount: totalRefundedAmount,
+          total_stake_processed: parseFloat(totalStake.toFixed(2)),
+          net_balance_impact: totalWinningPayout
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// =============================================================================
+// 12. BET SETTLEMENT: ATOMIC TRANSACTIONAL SETTLEMENT PROCESSING
+// =============================================================================
+router.post('/settlement/process', async (req, res, next) => {
+  const pool = getPool();
+  let connection = null;
+
+  try {
+    const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
+    const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome;
+    const notes = req.body.notes;
+
+    if (!rawMatchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'A valid match identifier is required.' }
+      });
+    }
+
+    if (!rawOutcome || typeof rawOutcome !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_OUTCOME', message: 'Declared outcome selection is required.' }
+      });
+    }
+
+    const cleanMatchId = rawMatchId.trim();
+    const cleanOutcome = rawOutcome.trim();
+    const cleanNotes = notes ? String(notes).trim() : null;
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Row-lock match to prevent concurrent settlements
+    const [matchRows] = await connection.query(
+      'SELECT id, match_title, team_one, team_two, status, settled, settled_at FROM matches WHERE id = ? FOR UPDATE',
+      [cleanMatchId]
+    );
+
+    if (matchRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" does not exist.` }
+      });
+    }
+
+    const match = matchRows[0];
+    if (match.settled) {
+      await connection.rollback();
+      return res.status(409).json({
+        success: false,
+        error: { code: 'ALREADY_SETTLED', message: `Match "${match.match_title}" was already settled on ${match.settled_at}. Duplicate settlement prevented.` }
+      });
+    }
+
+    const validOutcomes = [match.team_one, match.team_two, 'NO_RESULT'];
+    if (!validOutcomes.includes(cleanOutcome)) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { 
+          code: 'OUTCOME_MISMATCH', 
+          message: `Outcome must be "${match.team_one}", "${match.team_two}", or "NO_RESULT". Received: "${cleanOutcome}".` 
+        }
+      });
+    }
+
+    // 2. Row-lock eligible pending bets
+    const [bets] = await connection.query(
+      `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.odds, b.potential_return
+       FROM bets b
+       JOIN users u ON u.id = b.user_id
+       WHERE b.match_id = ? AND b.settlement_status = 'pending'
+       FOR UPDATE`,
+      [match.id]
+    );
+
+    if (bets.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'NO_PENDING_BETS', message: 'This match has no pending bets eligible for settlement.' }
+      });
+    }
+
+    let wonCount = 0;
+    let lostCount = 0;
+    let noResultCount = 0;
+    let totalStake = 0;
+    let totalPayout = 0;
+
+    // 3. Process each bet atomically
+    for (const b of bets) {
+      const stakeNum = parseFloat(b.stake);
+      const potentialRetNum = parseFloat(b.potential_return);
+      totalStake += stakeNum;
+
+      let resultStatus = 'lost';
+      let payoutAmount = 0.00;
+
+      if (cleanOutcome === 'NO_RESULT') {
+        resultStatus = 'no_result';
+        payoutAmount = stakeNum; // refund stake
+        noResultCount++;
+      } else if (b.selection === cleanOutcome) {
+        resultStatus = 'won';
+        payoutAmount = potentialRetNum;
+        wonCount++;
+      } else {
+        resultStatus = 'lost';
+        payoutAmount = 0.00;
+        lostCount++;
+      }
+
+      totalPayout += payoutAmount;
+
+      // Update bet ticket
+      await connection.query(
+        `UPDATE bets 
+         SET status = ?, settlement_status = 'settled', payout = ?, settled_at = NOW(), settled_by = ? 
+         WHERE id = ? AND settlement_status = 'pending'`,
+        [resultStatus, payoutAmount, req.user.id, b.id]
+      );
+
+      // Update player wallet: release exposure and credit payout if won/refunded
+      await connection.query(
+        `UPDATE wallets 
+         SET available_balance = available_balance + ?,
+             exposure_balance = GREATEST(0.00, exposure_balance - ?),
+             version = version + 1
+         WHERE user_id = ?`,
+        [payoutAmount, stakeNum, b.user_id]
+      );
+    }
+
+    // 4. Update match to settled
+    await connection.query(
+      `UPDATE matches 
+       SET status = 'completed', toss_winner = ?, settled = TRUE, settled_at = NOW(), settled_by = ? 
+       WHERE id = ?`,
+      [cleanOutcome, req.user.id, match.id]
+    );
+
+    // 5. Generate settlement audit record in settlements table
+    const crypto = require('crypto');
+    const settlementUuid = crypto.randomUUID();
+
+    await connection.query(
+      `INSERT INTO settlements 
+       (settlement_uuid, match_id, declared_outcome, admin_id, admin_username, total_bets, won_bets, lost_bets, no_result_bets, total_stake, total_payout, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        settlementUuid,
+        match.id,
+        cleanOutcome,
+        req.user.id,
+        req.user.username,
+        bets.length,
+        wonCount,
+        lostCount,
+        noResultCount,
+        totalStake,
+        totalPayout,
+        cleanNotes
+      ]
+    );
+
+    // 6. Record administrative audit log
+    await connection.query(
+      `INSERT INTO admin_audit_logs 
+       (admin_id, admin_username, action_type, target_type, target_id, target_identifier, details, ip_address)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.id,
+        req.user.username,
+        'BET_SETTLEMENT',
+        'MATCH',
+        null,
+        match.id,
+        JSON.stringify({
+          settlementUuid,
+          matchId: match.id,
+          matchTitle: match.match_title,
+          declaredOutcome: cleanOutcome,
+          totalBets: bets.length,
+          wonCount,
+          lostCount,
+          noResultCount,
+          totalStake,
+          totalPayout,
+          notes: cleanNotes
+        }),
+        req.ip || '127.0.0.1'
+      ]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `Match "${match.match_title}" successfully settled with outcome: ${cleanOutcome}.`,
+      data: {
+        settlementUuid,
+        settlement_uuid: settlementUuid,
+        matchId: match.id,
+        match_id: match.id,
+        matchTitle: match.match_title,
+        match_title: match.match_title,
+        declaredOutcome: cleanOutcome,
+        declared_outcome: cleanOutcome,
+        totalBetsSettled: bets.length,
+        bets_settled: bets.length,
+        wonCount,
+        lostCount,
+        noResultCount,
+        totalStake: parseFloat(totalStake.toFixed(2)),
+        totalPayoutCredited: parseFloat(totalPayout.toFixed(2)),
+        settledBy: req.user.username,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {}
+    }
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+// =============================================================================
+// 13. BET SETTLEMENT: GET SETTLEMENT HISTORY
+// =============================================================================
+router.get('/settlement/history', async (req, res, next) => {
+  try {
+    const pool = getPool();
+
+    let page = parseInt(req.query.page || '1', 10);
+    let limit = parseInt(req.query.limit || '10', 10);
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
+    if (limit > 50) limit = 50;
+    const offset = (page - 1) * limit;
+
+    const countQuery = 'SELECT COUNT(*) AS total FROM settlements';
+    const dataQuery = `
+      SELECT 
+        s.id,
+        s.settlement_uuid,
+        s.match_id,
+        m.match_title,
+        m.competition,
+        s.declared_outcome,
+        s.admin_id,
+        s.admin_username,
+        s.total_bets,
+        s.won_bets,
+        s.lost_bets,
+        s.no_result_bets,
+        s.total_stake,
+        s.total_payout,
+        s.notes,
+        s.created_at
+      FROM settlements s
+      LEFT JOIN matches m ON m.id = s.match_id
+      ORDER BY s.created_at DESC, s.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [ [[countResult]], [rows] ] = await Promise.all([
+      pool.query(countQuery),
+      pool.query(dataQuery, [limit, offset])
+    ]);
+
+    const total = parseInt(countResult.total || 0, 10);
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const formattedHistory = rows.map(r => ({
+      id: r.id,
+      settlementUuid: r.settlement_uuid,
+      settlement_uuid: r.settlement_uuid,
+      matchId: r.match_id,
+      match_id: r.match_id,
+      matchTitle: r.match_title || r.match_id,
+      match_title: r.match_title || r.match_id,
+      competition: r.competition || 'Cricket Toss',
+      declaredOutcome: r.declared_outcome,
+      declared_outcome: r.declared_outcome,
+      adminId: r.admin_id,
+      admin_id: r.admin_id,
+      adminUsername: r.admin_username,
+      admin_username: r.admin_username,
+      settled_by_username: r.admin_username,
+      settled_by_admin_id: r.admin_id,
+      settled_at: r.created_at,
+      totalBets: parseInt(r.total_bets || 0, 10),
+      bets_settled: parseInt(r.total_bets || 0, 10),
+      wonBets: parseInt(r.won_bets || 0, 10),
+      won_count: parseInt(r.won_bets || 0, 10),
+      lostBets: parseInt(r.lost_bets || 0, 10),
+      lost_count: parseInt(r.lost_bets || 0, 10),
+      noResultBets: parseInt(r.no_result_bets || 0, 10),
+      refund_count: parseInt(r.no_result_bets || 0, 10),
+      totalStake: parseFloat(r.total_stake || 0),
+      total_stake: parseFloat(r.total_stake || 0),
+      totalPayout: parseFloat(r.total_payout || 0),
+      total_payout: parseFloat(r.total_payout || 0),
+      notes: r.notes,
+      createdAt: r.created_at
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        settlements: formattedHistory,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * ============================================================================
+ * PLAYER COIN MANAGEMENT ROUTES (Admin Player Balance Operations)
+ * ============================================================================
+ */
+
+/**
+ * GET /api/admin/coins/search
+ * Search for players by username (exact or partial match)
+ */
+router.get('/coins/search', async (req, res, next) => {
+  try {
+    const rawUsername = (req.query.username || '').trim();
+    if (!rawUsername) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Please provide a username to search.'
+        }
+      });
+    }
+
+    const pool = getPool();
+    // Case-insensitive match, order by exact match first, then alphabetically
+    const [players] = await pool.query(
+      `SELECT 
+        u.id,
+        u.uuid,
+        u.username,
+        u.full_name,
+        u.email,
+        u.phone,
+        u.role,
+        u.status,
+        u.created_at,
+        COALESCE(w.available_balance, 0.00) AS available_balance,
+        COALESCE(w.exposure_balance, 0.00) AS exposure_balance,
+        COALESCE(w.currency, 'INR') AS currency
+       FROM users u
+       LEFT JOIN wallets w ON u.id = w.user_id
+       WHERE LOWER(u.username) LIKE LOWER(?)
+       ORDER BY (LOWER(u.username) = LOWER(?)) DESC, u.username ASC
+       LIMIT 50`,
+      [`%${rawUsername}%`, rawUsername]
+    );
+
+    const formatted = players.map(p => ({
+      id: p.id,
+      uuid: p.uuid,
+      username: p.username,
+      fullName: p.full_name,
+      email: p.email,
+      phone: p.phone,
+      role: p.role,
+      status: p.status,
+      createdAt: p.created_at,
+      available_balance: parseFloat(p.available_balance || 0),
+      exposure_balance: parseFloat(p.exposure_balance || 0),
+      currency: p.currency
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        players: formatted,
+        count: formatted.length,
+        query: rawUsername
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/admin/coins/players/:id
+ * Retrieve selected player's authoritative account details and latest coin balance
+ */
+router.get('/coins/players/:id', async (req, res, next) => {
+  try {
+    const playerId = parseInt(req.params.id, 10);
+    if (!playerId || isNaN(playerId) || playerId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid player ID provided.'
+        }
+      });
+    }
+
+    const pool = getPool();
+    const [rows] = await pool.query(
+      `SELECT 
+        u.id,
+        u.uuid,
+        u.username,
+        u.full_name,
+        u.email,
+        u.phone,
+        u.role,
+        u.status,
+        u.created_at,
+        COALESCE(w.available_balance, 0.00) AS available_balance,
+        COALESCE(w.exposure_balance, 0.00) AS exposure_balance,
+        COALESCE(w.currency, 'INR') AS currency
+       FROM users u
+       LEFT JOIN wallets w ON u.id = w.user_id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [playerId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Player with ID ${playerId} not found.`
+        }
+      });
+    }
+
+    const p = rows[0];
+    return res.status(200).json({
+      success: true,
+      data: {
+        player: {
+          id: p.id,
+          uuid: p.uuid,
+          username: p.username,
+          fullName: p.full_name,
+          email: p.email,
+          phone: p.phone,
+          role: p.role,
+          status: p.status,
+          createdAt: p.created_at,
+          available_balance: parseFloat(p.available_balance || 0),
+          exposure_balance: parseFloat(p.exposure_balance || 0),
+          currency: p.currency
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/admin/coins/adjust
+ * Add or deduct coins from a player's account atomically with idempotency protection
+ */
+router.post('/coins/adjust', async (req, res, next) => {
+  const pool = getPool();
+  let connection = null;
+
+  try {
+    const { userId, actionType, amount, reason, idempotencyKey } = req.body || {};
+
+    // 1. Validate inputs
+    const parsedUserId = parseInt(userId, 10);
+    if (!parsedUserId || isNaN(parsedUserId) || parsedUserId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Valid player ID is required.'
+        }
+      });
+    }
+
+    if (!['ADMIN_CREDIT', 'ADMIN_DEBIT'].includes(actionType)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: "Action type must be either 'ADMIN_CREDIT' or 'ADMIN_DEBIT'."
+        }
+      });
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || !isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Adjustment amount must be a positive number greater than zero.'
+        }
+      });
+    }
+
+    // Limit precision to 2 decimal places
+    const cleanAmount = Math.round(parsedAmount * 100) / 100;
+    if (cleanAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Adjustment amount must be at least 0.01 coins.'
+        }
+      });
+    }
+
+    const cleanReason = (reason || '').trim();
+    if (!cleanReason || cleanReason.length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'A clear reason or note (minimum 3 characters) is required for every balance adjustment.'
+        }
+      });
+    }
+
+    const cleanIdempotencyKey = idempotencyKey ? String(idempotencyKey).trim() : null;
+
+    // 2. Check for duplicate idempotent submission
+    if (cleanIdempotencyKey) {
+      const [existing] = await pool.query(
+        `SELECT * FROM coin_transactions WHERE idempotency_key = ? LIMIT 1`,
+        [cleanIdempotencyKey]
+      );
+      if (existing.length > 0) {
+        const tx = existing[0];
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: 'DUPLICATE_REQUEST',
+            message: 'Duplicate adjustment prevented. This transaction was already processed.',
+            data: {
+              transactionUuid: tx.transaction_uuid,
+              actionType: tx.action_type,
+              amount: parseFloat(tx.amount),
+              balanceBefore: parseFloat(tx.balance_before),
+              balanceAfter: parseFloat(tx.balance_after),
+              createdAt: tx.created_at
+            }
+          }
+        });
+      }
+    }
+
+    // 3. Begin atomic transaction with row locking
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // Lock player wallet row FOR UPDATE
+    const [userRows] = await connection.query(
+      `SELECT u.id, u.username, u.status, w.available_balance, w.exposure_balance
+       FROM users u
+       JOIN wallets w ON u.id = w.user_id
+       WHERE u.id = ?
+       FOR UPDATE`,
+      [parsedUserId]
+    );
+
+    if (userRows.length === 0) {
+      await connection.rollback();
+      connection.release();
+      connection = null;
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Player with ID ${parsedUserId} does not exist.`
+        }
+      });
+    }
+
+    const player = userRows[0];
+    const currentBalance = parseFloat(player.available_balance || 0);
+    let newBalance;
+
+    if (actionType === 'ADMIN_DEBIT') {
+      if (currentBalance < cleanAmount) {
+        await connection.rollback();
+        connection.release();
+        connection = null;
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INSUFFICIENT_FUNDS',
+            message: `Insufficient balance: Player ${player.username} has ${currentBalance.toFixed(2)} coins available, cannot deduct ${cleanAmount.toFixed(2)} coins.`
+          }
+        });
+      }
+      newBalance = Math.round((currentBalance - cleanAmount) * 100) / 100;
+    } else {
+      newBalance = Math.round((currentBalance + cleanAmount) * 100) / 100;
+    }
+
+    // Update wallet available_balance
+    await connection.query(
+      `UPDATE wallets 
+       SET available_balance = ?, version = version + 1
+       WHERE user_id = ?`,
+      [newBalance, parsedUserId]
+    );
+
+    // Record adjustment in coin_transactions
+    const crypto = require('crypto');
+    const transactionUuid = crypto.randomUUID();
+
+    await connection.query(
+      `INSERT INTO coin_transactions 
+       (transaction_uuid, user_id, username, admin_id, admin_username, action_type, amount, balance_before, balance_after, reason, idempotency_key, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')`,
+      [
+        transactionUuid,
+        parsedUserId,
+        player.username,
+        req.user.id,
+        req.user.username,
+        actionType,
+        cleanAmount,
+        currentBalance,
+        newBalance,
+        cleanReason,
+        cleanIdempotencyKey
+      ]
+    );
+
+    // Commit database changes
+    await connection.commit();
+    connection.release();
+    connection = null;
+
+    // Record audit log entry
+    await logAdminAction(
+      req.user,
+      actionType,
+      'user_wallet',
+      parsedUserId,
+      player.username,
+      {
+        actionType,
+        amount: cleanAmount,
+        balanceBefore: currentBalance,
+        balanceAfter: newBalance,
+        reason: cleanReason,
+        transactionUuid
+      },
+      req.ip
+    );
+
+    const message = `Coins ${actionType === 'ADMIN_CREDIT' ? 'added' : 'deducted'} successfully. Updated balance: ${newBalance.toFixed(2)}`;
+
+    return res.status(200).json({
+      success: true,
+      message,
+      data: {
+        transactionUuid,
+        userId: parsedUserId,
+        username: player.username,
+        actionType,
+        amount: cleanAmount,
+        balanceBefore: currentBalance,
+        balanceAfter: newBalance,
+        reason: cleanReason,
+        adminUsername: req.user.username,
+        createdAt: new Date()
+      }
+    });
+
+  } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {}
+      connection.release();
+    }
+    next(err);
+  }
+});
+
+/**
+ * GET /api/admin/coins/history
+ * Paginated list of coin adjustments with filtering support
+ */
+router.get('/coins/history', async (req, res, next) => {
+  try {
+    const pool = getPool();
+    const page = Math.max(1, parseInt(req.query.page || 1, 10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || 20, 10)));
+    const offset = (page - 1) * limit;
+
+    const usernameFilter = (req.query.username || '').trim();
+    const actionFilter = (req.query.actionType || req.query.action || '').trim().toUpperCase();
+    const userIdFilter = parseInt(req.query.userId, 10);
+    const startDate = (req.query.startDate || '').trim();
+    const endDate = (req.query.endDate || '').trim();
+
+    let whereConditions = ['1=1'];
+    const queryParams = [];
+
+    if (userIdFilter && !isNaN(userIdFilter) && userIdFilter > 0) {
+      whereConditions.push('ct.user_id = ?');
+      queryParams.push(userIdFilter);
+    } else if (usernameFilter) {
+      whereConditions.push('LOWER(ct.username) LIKE LOWER(?)');
+      queryParams.push(`%${usernameFilter}%`);
+    }
+
+    if (actionFilter && ['ADMIN_CREDIT', 'ADMIN_DEBIT'].includes(actionFilter)) {
+      whereConditions.push('ct.action_type = ?');
+      queryParams.push(actionFilter);
+    }
+
+    if (startDate) {
+      whereConditions.push('ct.created_at >= ?');
+      queryParams.push(`${startDate} 00:00:00`);
+    }
+
+    if (endDate) {
+      whereConditions.push('ct.created_at <= ?');
+      queryParams.push(`${endDate} 23:59:59`);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Count total matching adjustments
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM coin_transactions ct WHERE ${whereClause}`,
+      queryParams
+    );
+
+    // Fetch adjustment records
+    const [rows] = await pool.query(
+      `SELECT 
+        ct.id,
+        ct.transaction_uuid,
+        ct.user_id,
+        ct.username,
+        ct.admin_id,
+        ct.admin_username,
+        ct.action_type,
+        ct.amount,
+        ct.balance_before,
+        ct.balance_after,
+        ct.reason,
+        ct.status,
+        ct.created_at
+       FROM coin_transactions ct
+       WHERE ${whereClause}
+       ORDER BY ct.created_at DESC, ct.id DESC
+       LIMIT ? OFFSET ?`,
+      [...queryParams, limit, offset]
+    );
+
+    const formattedHistory = rows.map(r => ({
+      id: r.id,
+      transactionUuid: r.transaction_uuid,
+      transaction_uuid: r.transaction_uuid,
+      userId: r.user_id,
+      user_id: r.user_id,
+      username: r.username,
+      adminId: r.admin_id,
+      admin_id: r.admin_id,
+      adminUsername: r.admin_username,
+      admin_username: r.admin_username,
+      actionType: r.action_type,
+      action_type: r.action_type,
+      amount: parseFloat(r.amount || 0),
+      balanceBefore: parseFloat(r.balance_before || 0),
+      balance_before: parseFloat(r.balance_before || 0),
+      balanceAfter: parseFloat(r.balance_after || 0),
+      balance_after: parseFloat(r.balance_after || 0),
+      reason: r.reason,
+      status: r.status,
+      createdAt: r.created_at,
+      created_at: r.created_at
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        history: formattedHistory,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit) || 1
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
+

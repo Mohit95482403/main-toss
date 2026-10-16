@@ -18,8 +18,10 @@ const APP_CONFIG = Object.freeze({
     authProfile: '/auth/profile',
     authChangePassword: '/auth/change-password',
     authLogout: '/auth/logout',
+    walletBalance: '/wallet/balance',
     adminDashboardStats: '/admin/dashboard/stats',
     adminUsers: '/admin/users',
+    adminUserCreate: '/admin/users/create',
     adminAuditLogs: '/admin/audit-logs',
     adminSystemStatus: '/admin/system/status'
   },

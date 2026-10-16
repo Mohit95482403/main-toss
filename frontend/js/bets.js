@@ -17,106 +17,11 @@
   };
 
   /**
-   * Demonstration Betting History Records
-   * Strictly identified fictional records matching reference screenshot patterns.
+   * User Betting History Records (Loaded from MySQL /api/bets/my-bets)
    */
-  const DEMO_BETS = [
-    {
-      id: 'BET-2026-1049',
-      dateGroup: 'Today - 14 Oct 2026',
-      competition: "ICC MEN'S T20 WORLD CUP",
-      teamOne: 'India',
-      teamTwo: 'Australia',
-      matchTitle: 'India vs Australia',
-      marketName: 'Toss Winner',
-      selectedTeam: 'India',
-      rate: 1.95,
-      stake: 500.00,
-      status: 'live', // live | won | lost | no_result
-      resultText: 'Match in progress • Toss locked • Awaiting live declaration',
-      placedAt: 'Today, 02:45 PM'
-    },
-    {
-      id: 'BET-2026-1048',
-      dateGroup: 'Today - 14 Oct 2026',
-      competition: "IPL 2026 - T20 LEAGUE",
-      teamOne: 'Mumbai Indians',
-      teamTwo: 'Chennai Super Kings',
-      matchTitle: 'Mumbai Indians vs Chennai Super Kings',
-      marketName: 'Toss Winner',
-      selectedTeam: 'Mumbai Indians',
-      rate: 1.90,
-      stake: 1000.00,
-      status: 'won',
-      payout: 1900.00,
-      resultText: 'Mumbai Indians won the toss and elected to field first',
-      placedAt: 'Today, 11:15 AM'
-    },
-    {
-      id: 'BET-2026-1045',
-      dateGroup: 'Yesterday - 13 Oct 2026',
-      competition: "ICC MEN'S T20 WORLD CUP",
-      teamOne: 'England',
-      teamTwo: 'South Africa',
-      matchTitle: 'England vs South Africa',
-      marketName: 'Toss Winner',
-      selectedTeam: 'England',
-      rate: 1.85,
-      stake: 750.00,
-      status: 'lost',
-      payout: 0.00,
-      resultText: 'South Africa won the toss and elected to bat first',
-      placedAt: '13 Oct 2026, 06:30 PM'
-    },
-    {
-      id: 'BET-2026-1042',
-      dateGroup: 'Yesterday - 13 Oct 2026',
-      competition: "BIG BASH LEAGUE 2026",
-      teamOne: 'Sydney Sixers',
-      teamTwo: 'Perth Scorchers',
-      matchTitle: 'Sydney Sixers vs Perth Scorchers',
-      marketName: 'Toss Winner',
-      selectedTeam: 'Perth Scorchers',
-      rate: 1.92,
-      stake: 300.00,
-      status: 'won',
-      payout: 576.00,
-      resultText: 'Perth Scorchers won the toss and chose to bowl',
-      placedAt: '13 Oct 2026, 01:10 PM'
-    },
-    {
-      id: 'BET-2026-1039',
-      dateGroup: '11 Oct 2026',
-      competition: "ASIA CUP T20 2026",
-      teamOne: 'Pakistan',
-      teamTwo: 'Sri Lanka',
-      matchTitle: 'Pakistan vs Sri Lanka',
-      marketName: 'Toss Winner',
-      selectedTeam: 'Pakistan',
-      rate: 1.88,
-      stake: 400.00,
-      status: 'lost',
-      payout: 0.00,
-      resultText: 'Sri Lanka won the toss and elected to bat',
-      placedAt: '11 Oct 2026, 07:00 PM'
-    },
-    {
-      id: 'BET-2026-1035',
-      dateGroup: '11 Oct 2026',
-      competition: "INTERNATIONAL T20 SERIES",
-      teamOne: 'New Zealand',
-      teamTwo: 'West Indies',
-      matchTitle: 'New Zealand vs West Indies',
-      marketName: 'Toss Winner',
-      selectedTeam: 'New Zealand',
-      rate: 1.90,
-      stake: 500.00,
-      status: 'no_result',
-      payout: 500.00,
-      resultText: 'Toss abandoned due to rain/wet outfield • Stake refunded in full',
-      placedAt: '11 Oct 2026, 02:20 PM'
-    }
-  ];
+  let userBets = [];
+  let betsLoaded = false;
+  let betsError = null;
 
   /**
    * Currency and Rate formatting helpers
@@ -329,10 +234,25 @@
    * Render Empty State
    */
   function renderEmptyState(activeFilter, searchQuery) {
+    if (!searchQuery && activeFilter === 'all' && userBets.length === 0) {
+      return `
+        <section class="bets-empty-state empty-state" aria-live="polite">
+          <div class="empty-state-icon" aria-hidden="true">
+            ${ICONS.empty}
+          </div>
+          <h3 class="empty-state-title">No Bets Placed</h3>
+          <p class="empty-state-desc">You haven't placed any bets yet.</p>
+          <a href="../index.html" class="btn btn-primary btn-sm" style="margin-top: 12px; display: inline-block;">
+            Browse Match Fixtures
+          </a>
+        </section>
+      `;
+    }
+
     let filterName = activeFilter.toUpperCase();
     if (filterName === 'NO_RESULT') filterName = 'NO RESULT';
 
-    let desc = `There are currently no demo toss wagers matching the "${escapeHtml(filterName)}" category.`;
+    let desc = `There are currently no toss wagers matching the "${escapeHtml(filterName)}" category.`;
     if (searchQuery) {
       desc = `No toss wagers found matching "${escapeHtml(searchQuery)}" in category "${escapeHtml(filterName)}".`;
     }
@@ -344,7 +264,7 @@
         </div>
         <h3 class="empty-state-title">No Matching Bets Found</h3>
         <p class="empty-state-desc">${desc}</p>
-        <button type="button" class="btn btn-outline btn-sm" id="reset-filter-btn">
+        <button type="button" class="btn btn-outline btn-sm" id="reset-filter-btn" style="margin-top: 12px;">
           Reset Filter & Search
         </button>
       </section>
@@ -360,6 +280,10 @@
     const filterButtons = document.querySelectorAll('.filter-btn');
     const searchInput = document.getElementById('bets-search-input');
     const searchClearBtn = document.getElementById('search-clear-btn');
+    const demoModeBadge = document.getElementById('demo-mode-badge');
+    if (demoModeBadge) {
+      demoModeBadge.remove();
+    }
 
     // Summary Metric Elements
     const summaryTotalCount = document.getElementById('summary-total-count');
@@ -399,7 +323,7 @@
      * Update Dynamic Summary Cards
      */
     function updateSummaryMetrics() {
-      const metrics = calculateMetrics(DEMO_BETS);
+      const metrics = calculateMetrics(userBets);
 
       if (summaryTotalCount) summaryTotalCount.textContent = metrics.totalCount;
       if (summaryTotalStake) summaryTotalStake.textContent = `${formatCurrency(metrics.totalStake)} Staked`;
@@ -423,11 +347,11 @@
      */
     function updateFilterCounts() {
       const counts = {
-        all: DEMO_BETS.length,
-        live: DEMO_BETS.filter(b => b.status === 'live').length,
-        won: DEMO_BETS.filter(b => b.status === 'won').length,
-        lost: DEMO_BETS.filter(b => b.status === 'lost').length,
-        no_result: DEMO_BETS.filter(b => b.status === 'no_result').length
+        all: userBets.length,
+        live: userBets.filter(b => b.status === 'live').length,
+        won: userBets.filter(b => b.status === 'won').length,
+        lost: userBets.filter(b => b.status === 'lost').length,
+        no_result: userBets.filter(b => b.status === 'no_result').length
       };
 
       filterButtons.forEach(btn => {
@@ -443,7 +367,7 @@
      * Filter bets by status and search query
      */
     function getFilteredBets() {
-      let result = DEMO_BETS;
+      let result = userBets;
 
       // 1. Status Filter
       if (currentFilter !== 'all') {
@@ -540,7 +464,7 @@
      * Open Bet Details Modal
      */
     function openBetModal(betId) {
-      const bet = DEMO_BETS.find(b => b.id === betId);
+      const bet = userBets.find(b => b.id === betId);
       if (!bet || !modalBackdrop) return;
 
       if (modalTitle) modalTitle.textContent = `Ticket ${bet.id}`;
@@ -645,20 +569,90 @@
       });
     }
 
-    // Initial render
-    updateSummaryMetrics();
-    updateFilterCounts();
-    setFilter('all');
+    /**
+     * Fetch authentic user bets from backend MySQL API
+     */
+    function loadUserBets() {
+      const isAuth = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
+
+      if (!isAuth) {
+        userBets = [];
+        updateSummaryMetrics();
+        updateFilterCounts();
+        container.innerHTML = `
+          <section class="bets-empty-state empty-state" aria-live="polite">
+            <div class="empty-state-icon" aria-hidden="true">${ICONS.empty}</div>
+            <h3 class="empty-state-title">Sign In Required</h3>
+            <p class="empty-state-desc">Please sign in to view your authentic toss bets and wager history.</p>
+            <a href="login.html" class="btn btn-primary btn-sm" style="margin-top: 12px; display: inline-block;">
+              Sign In to Account
+            </a>
+          </section>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div style="text-align: center; padding: 48px 16px; color: var(--color-text-muted);">
+          <p>Loading your bets...</p>
+        </div>
+      `;
+
+      window.ApiClient.get('/bets/my-bets')
+        .then(res => {
+          betsLoaded = true;
+          betsError = null;
+          if (res && res.success && res.data && Array.isArray(res.data.bets)) {
+            userBets = res.data.bets;
+          } else {
+            userBets = [];
+          }
+          updateSummaryMetrics();
+          updateFilterCounts();
+          renderFeed();
+        })
+        .catch(err => {
+          betsLoaded = true;
+          betsError = err.message || 'Failed to retrieve bet history';
+          userBets = [];
+          updateSummaryMetrics();
+          updateFilterCounts();
+          container.innerHTML = `
+            <section class="bets-empty-state empty-state" aria-live="polite">
+              <div class="empty-state-icon" aria-hidden="true">${ICONS.empty}</div>
+              <h3 class="empty-state-title">Unable to Load Bets</h3>
+              <p class="empty-state-desc">${escapeHtml(betsError)}. Please check your connection and try again.</p>
+              <button type="button" class="btn btn-outline btn-sm" id="retry-bets-btn" style="margin-top: 12px;">
+                Retry
+              </button>
+            </section>
+          `;
+          const retryBtn = document.getElementById('retry-bets-btn');
+          if (retryBtn) {
+            retryBtn.addEventListener('click', loadUserBets);
+          }
+        });
+    }
+
+    // Load bets
+    loadUserBets();
+
+    // Refresh authoritative balance on Bets page
+    if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function' && window.ApiClient.isAuthenticated()) {
+      window.ApiClient.refreshBalance().catch(() => {});
+    }
 
     // Export controller methods
     window.BetsController = {
       init: initBetsPage,
-      getDemoBets: () => DEMO_BETS,
+      getUserBets: () => userBets,
+      getDemoBets: () => userBets,
       getFilteredBets: getFilteredBets,
       setFilter: setFilter,
       calculateMetrics: calculateMetrics,
       openBetModal: openBetModal,
-      closeBetModal: closeBetModal
+      closeBetModal: closeBetModal,
+      reload: loadUserBets
     };
   }
 

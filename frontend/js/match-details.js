@@ -44,7 +44,7 @@
   /**
    * Main Initialization
    */
-  function initMatchDetails() {
+  async function initMatchDetails() {
     const contentView = document.getElementById('match-content-view');
     const notFoundView = document.getElementById('match-not-found-view');
     const backBtn = document.getElementById('back-nav-btn');
@@ -64,7 +64,12 @@
     const matchId = params.get('id');
 
     const matchesApi = window.TossBookMatches;
-    const match = matchesApi ? matchesApi.getById(matchId) : null;
+    let match = null;
+    try {
+      match = matchesApi ? await matchesApi.getById(matchId) : null;
+    } catch (e) {
+      console.warn('[MATCH DETAILS] API fetch error:', e.message);
+    }
 
     if (!match) {
       if (contentView) contentView.style.display = 'none';

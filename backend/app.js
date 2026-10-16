@@ -17,6 +17,10 @@ const { notFoundHandler, centralErrorHandler } = require('./src/middleware/error
 const healthRoutes = require('./src/routes/health');
 const authRoutes = require('./src/routes/auth');
 const adminRoutes = require('./src/routes/admin');
+const matchRoutes = require('./src/routes/matches');
+const betRoutes = require('./src/routes/bets');
+const passbookRoutes = require('./src/routes/passbook');
+const walletRoutes = require('./src/routes/wallet');
 const { initializeDatabase } = require('./src/config/initDb');
 const { seedAdmin } = require('./src/config/seedAdmin');
 const { validateEnvironment } = require('./src/config/envValidator');
@@ -81,6 +85,10 @@ if (SERVE_STATIC_FRONTEND) {
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/matches', matchRoutes);
+app.use('/api/bets', betRoutes);
+app.use('/api/passbook', passbookRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // Root informational endpoint
 app.get('/', (req, res) => {
@@ -103,6 +111,7 @@ app.get('/', (req, res) => {
       authLogout: 'POST /api/auth/logout',
       adminStats: 'GET /api/admin/dashboard/stats',
       adminUsers: 'GET /api/admin/users',
+      adminUserCreate: 'POST /api/admin/users/create',
       adminUserDetail: 'GET /api/admin/users/:id',
       adminUserStatus: 'PUT /api/admin/users/:id/status',
       adminUserRole: 'PUT /api/admin/users/:id/role',

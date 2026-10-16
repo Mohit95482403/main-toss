@@ -15,18 +15,17 @@
   };
 
   /**
-   * Default Demonstration User Profile Data
-   * Clearly identified fictional demonstration account.
+   * Guest Profile Fallback (when not authenticated)
    */
-  const DEFAULT_PROFILE = {
-    fullName: 'Rahul Sharma',
-    username: 'ironman_99',
-    userId: 'UID-2026-8842',
-    email: 'rahul.sharma@example.com',
-    phone: '+91 98765 43210',
-    joinedDate: '15 Aug 2026',
-    accountStatus: 'Verified Demo Account',
-    kycTier: 'KYC Tier 1 (Demo)'
+  const GUEST_PROFILE = {
+    fullName: 'Guest User',
+    username: 'guest',
+    userId: '—',
+    email: '—',
+    phone: '—',
+    joinedDate: '—',
+    accountStatus: 'Not Signed In',
+    kycTier: 'None'
   };
 
   /**
@@ -40,7 +39,7 @@
   };
 
   // State
-  let currentProfile = { ...DEFAULT_PROFILE };
+  let currentProfile = { ...GUEST_PROFILE };
   let currentNotifications = { ...DEFAULT_NOTIFICATIONS };
   let lastFocusedElement = null;
 
@@ -49,10 +48,7 @@
    */
   function loadPersistedState() {
     try {
-      const savedProfile = localStorage.getItem('itb_demo_profile');
-      if (savedProfile) {
-        currentProfile = Object.assign({}, DEFAULT_PROFILE, JSON.parse(savedProfile));
-      }
+      localStorage.removeItem('itb_demo_profile');
 
       const savedPrefs = localStorage.getItem('itb_notification_prefs');
       if (savedPrefs) {
@@ -60,17 +56,19 @@
       }
 
       // Sync with live authenticated profile if available
-      if (window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated()) {
+      const isAuth = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
+
+      if (isAuth) {
         window.ApiClient.get('/auth/me')
           .then((res) => {
             const user = res.user || (res.data && res.data.user);
             if (user) {
-              currentProfile.fullName = user.full_name || user.fullName || currentProfile.fullName;
-              currentProfile.username = user.username || currentProfile.username;
-              currentProfile.email = user.email || currentProfile.email;
-              currentProfile.phone = user.phone || currentProfile.phone;
+              currentProfile.fullName = user.full_name || user.fullName || user.username;
+              currentProfile.username = user.username;
+              currentProfile.email = user.email || '—';
+              currentProfile.phone = user.phone || '—';
               currentProfile.userId = `UID-${user.id}`;
-              currentProfile.accountStatus = user.status === 'active' ? 'Verified Account' : user.status.toUpperCase();
+              currentProfile.accountStatus = user.status === 'active' ? 'Active Account' : user.status.toUpperCase();
               currentProfile.kycTier = user.role === 'admin' || user.role === 'super_admin' ? 'Administrative Access' : 'Standard Player';
               if (user.created_at) {
                 const d = new Date(user.created_at);
@@ -78,9 +76,13 @@
               }
               renderProfileUI();
 
-              // Sync with ApiClient session store
               if (window.ApiClient && typeof window.ApiClient.setUser === 'function') {
                 window.ApiClient.setUser(user);
+              }
+
+              // Synchronize authoritative wallet balance on profile page
+              if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function') {
+                window.ApiClient.refreshBalance().catch(() => {});
               }
 
               // Toggle admin link visibility based on role
@@ -93,20 +95,28 @@
           .catch((e) => {
             console.warn('[PROFILE] Live profile sync notice:', e.message);
           });
+      } else {
+        currentProfile = { ...GUEST_PROFILE };
+        renderProfileUI();
+        const heroStatus = document.getElementById('hero-profile-status');
+        if (heroStatus) {
+          heroStatus.textContent = 'Please Sign In';
+          heroStatus.className = 'badge badge-neutral';
+        }
       }
     } catch (e) {
-      console.warn('Could not read demo profile state from localStorage:', e);
+      console.warn('Could not read profile state:', e);
     }
   }
 
   /**
-   * Save profile state to localStorage
+   * Save profile state (removes legacy demo profile key)
    */
   function saveProfileState() {
     try {
-      localStorage.setItem('itb_demo_profile', JSON.stringify(currentProfile));
+      localStorage.removeItem('itb_demo_profile');
     } catch (e) {
-      console.warn('Could not save demo profile state to localStorage:', e);
+      console.warn('Could not clear demo profile state:', e);
     }
   }
 
@@ -250,7 +260,7 @@
     if (infoEmail) infoEmail.textContent = currentProfile.email || 'Not provided';
     if (infoPhone) infoPhone.textContent = currentProfile.phone || 'Not provided';
     if (infoJoined) infoJoined.textContent = currentProfile.joinedDate || 'Not provided';
-    if (infoKyc) infoKyc.textContent = currentProfile.kycTier || 'Tier 1 (Demo)';
+    if (infoKyc) infoKyc.textContent = currentProfile.kycTier || 'Standard';
   }
 
   /**
