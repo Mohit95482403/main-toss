@@ -281,17 +281,47 @@ async function runTests() {
     assert.strictEqual(wrongConfirmRes.body.error?.code, 'CONFIRMATION_MISMATCH');
     pass('Mismatched confirmation username rejected with HTTP 400 CONFIRMATION_MISMATCH');
 
-    // Verify account was NOT deleted
+    // 3. Different user's username cannot authorize deletion
+    const anotherUserConfirmRes = await apiRequest(`/admin/users/${createdE.id}`, 'DELETE', {
+      confirmUsername: normalUser.username
+    }, adminToken);
+    assert.strictEqual(anotherUserConfirmRes.status, 400, 'Another user username rejected with 400');
+    assert.strictEqual(anotherUserConfirmRes.body.error?.code, 'CONFIRMATION_MISMATCH');
+    pass("Different user's username cannot authorize deletion of the selected account");
+
+    // 4. Verify account was NOT deleted
     const [[stillExistsE]] = await pool.query('SELECT id FROM users WHERE id = ?', [createdE.id]);
     assert(stillExistsE, 'Account remains in database after failed confirmation');
     pass('Account remains intact in MySQL after mismatched confirmation');
 
-    // Clean up with exact username
+    // 5. Clean up with exact username containing accidental leading/trailing whitespace (trimmed)
     const validConfirmRes = await apiRequest(`/admin/users/${createdE.id}`, 'DELETE', {
-      confirmUsername: testUsernameE
+      confirmUsername: `  ${testUsernameE}  `
     }, adminToken);
-    assert.strictEqual(validConfirmRes.status, 200, 'Exact username deletion succeeds');
-    pass('Account successfully deleted when exact username is supplied');
+    assert.strictEqual(validConfirmRes.status, 200, 'Exact username with whitespace deletion succeeds');
+    pass('Accidental leading/trailing whitespace trimmed and allows confirmation to succeed');
+
+    // 6. Test raw fetch without explicit Content-Type header on a new account
+    const tsE2 = Date.now();
+    const testUsernameE2 = `del_conf2_${tsE2}`;
+    const createdE2 = await createUserAccount({
+      admin: adminUser,
+      displayName: 'Confirm Test Player E2',
+      username: testUsernameE2,
+      password: 'StrongPassword@123',
+      initialCoinBalance: 0,
+      accountStatus: 'active'
+    });
+
+    const queryRes = await fetch(`${API_BASE}/admin/users/${createdE2.id}?confirmUsername=${encodeURIComponent(testUsernameE2)}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Accept': 'application/json'
+      }
+    });
+    assert.strictEqual(queryRes.status, 200, `Query param confirmUsername must succeed (got ${queryRes.status})`);
+    pass('Deletion succeeds when confirmation username is provided via query parameter');
 
     // -------------------------------------------------------------------------
     // TEST F: ACTIVE BETS PROTECTION & DATA INTEGRITY
@@ -372,7 +402,7 @@ async function runTests() {
     assert(adminJs.includes('promptDeleteUserModal'), 'admin.js defines promptDeleteUserModal handler');
     assert(adminJs.includes('handleDeleteUserConfirmInput'), 'admin.js defines confirmation username input validator');
     assert(adminJs.includes('handleConfirmDeleteUser'), 'admin.js defines deletion dispatch controller');
-    assert(adminJs.includes("apiFetch(`/admin/users/${deleteUserTarget.id}`"), 'admin.js dispatches DELETE request to backend');
+    assert(adminJs.includes("apiFetch(`/admin/users/${deleteUserTarget.id}"), 'admin.js dispatches DELETE request to backend');
     pass('admin.js: Table row Delete User button, event bindings, input listener, and API call verified');
 
     console.log('\n====================================================');

@@ -500,11 +500,15 @@
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // JSON serialization if body is an object
+    // JSON serialization if body is an object or string
     let body = options.body;
-    if (body !== undefined && body !== null && typeof body === 'object' && !(body instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-      body = JSON.stringify(body);
+    if (body !== undefined && body !== null) {
+      if (typeof body === 'object' && !(body instanceof FormData)) {
+        if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(body);
+      } else if (typeof body === 'string' && !headers['Content-Type'] && (body.trim().startsWith('{') || body.trim().startsWith('['))) {
+        headers['Content-Type'] = 'application/json';
+      }
     }
 
     const config = {

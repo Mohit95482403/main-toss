@@ -82,15 +82,20 @@
    * Helper: Authenticated fetch wrapper
    */
   async function apiFetch(endpoint, options = {}) {
-    if (window.ApiClient && typeof window.ApiClient.request === 'function') {
-      return window.ApiClient.request(endpoint, options);
-    }
     const token = getAuthToken();
     const headers = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     };
+
+    if (window.ApiClient && typeof window.ApiClient.request === 'function') {
+      return window.ApiClient.request(endpoint, {
+        ...options,
+        headers
+      });
+    }
 
     const res = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
@@ -860,20 +865,27 @@
     const confirmInput = document.getElementById('delete-user-confirm-input');
     const confirmBtn = document.getElementById('btn-confirm-delete-user');
     const hintEl = document.getElementById('delete-user-confirm-hint');
+    const errorBox = document.getElementById('delete-user-error-box');
     if (!confirmInput || !confirmBtn) return;
 
     const entered = confirmInput.value.trim();
-    const matches = entered.toLowerCase() === (deleteUserTarget.username || '').toLowerCase();
+    const expected = (deleteUserTarget.username || '').trim();
+    const matches = entered === expected && entered.length > 0;
 
-    if (matches && entered.length > 0) {
+    if (matches) {
       confirmBtn.disabled = false;
+      if (errorBox) errorBox.style.display = 'none';
       if (hintEl) {
         hintEl.innerHTML = '<span class="text-success font-medium">✓ Username matched. You may now confirm permanent deletion.</span>';
       }
     } else {
       confirmBtn.disabled = true;
       if (hintEl) {
-        hintEl.textContent = 'Button remains disabled until the exact username is typed.';
+        if (entered.length > 0) {
+          hintEl.innerHTML = `<span class="text-danger font-medium">Username does not match "${escapeHtml(expected)}".</span>`;
+        } else {
+          hintEl.textContent = 'Button remains disabled until the exact username is typed.';
+        }
       }
     }
   }
@@ -890,9 +902,11 @@
     const errorText = document.getElementById('delete-user-error-text');
 
     const enteredUsername = (confirmInput?.value || '').trim();
-    if (enteredUsername.toLowerCase() !== (deleteUserTarget.username || '').toLowerCase()) {
+    const expectedUsername = (deleteUserTarget.username || '').trim();
+
+    if (!enteredUsername || enteredUsername !== expectedUsername) {
       if (errorBox && errorText) {
-        errorText.textContent = `Username mismatch. Please enter "${deleteUserTarget.username}".`;
+        errorText.textContent = `Confirmation failed: You must type the exact username "${expectedUsername}" to authorize account deletion.`;
         errorBox.style.display = 'flex';
       }
       return;
@@ -904,15 +918,18 @@
     if (errorBox) errorBox.style.display = 'none';
 
     try {
-      const res = await apiFetch(`/admin/users/${deleteUserTarget.id}`, {
+      const res = await apiFetch(`/admin/users/${deleteUserTarget.id}?confirmUsername=${encodeURIComponent(enteredUsername)}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           confirmUsername: enteredUsername,
           reason: (reasonInput?.value || '').trim()
         })
       });
 
-      notify(res.message || `User account "@${deleteUserTarget.username}" permanently deleted.`, 'success');
+      notify(res.message || `User account "@${expectedUsername}" permanently deleted.`, 'success');
 
       closeModal('modal-delete-user');
       closeModal('modal-inspect-user');
@@ -2564,6 +2581,7 @@
           m.setAttribute('aria-hidden', 'true');
         });
         document.body.style.overflow = '';
+        deleteUserTarget = null;
       });
     });
 

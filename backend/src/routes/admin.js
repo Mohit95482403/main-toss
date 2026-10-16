@@ -690,7 +690,22 @@ const handleAdminDeleteUser = async (req, res, next) => {
       });
     }
 
-    const { confirmUsername, reason } = req.body || {};
+    let { confirmUsername, reason } = req.body || {};
+
+    // Robust fallbacks for confirmUsername
+    if (!confirmUsername && req.query?.confirmUsername) {
+      confirmUsername = req.query.confirmUsername;
+    }
+    if (!reason && req.query?.reason) {
+      reason = req.query.reason;
+    }
+    if (!confirmUsername && typeof req.body === 'string' && req.body.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(req.body);
+        if (parsed.confirmUsername) confirmUsername = parsed.confirmUsername;
+        if (parsed.reason) reason = parsed.reason;
+      } catch (e) {}
+    }
 
     // 1. Self-deletion prevention
     if (req.user.id === targetUserId) {
@@ -724,9 +739,9 @@ const handleAdminDeleteUser = async (req, res, next) => {
 
     const targetUser = targetRows[0];
 
-    // 3. Exact username confirmation check (case-insensitive for safety, but must match exact spelling)
+    // 3. Exact username confirmation check (trimmed for accidental leading/trailing spaces)
     const trimmedConfirm = (confirmUsername || '').trim();
-    if (!trimmedConfirm || trimmedConfirm.toLowerCase() !== targetUser.username.toLowerCase()) {
+    if (!trimmedConfirm || trimmedConfirm !== targetUser.username) {
       return res.status(400).json({
         success: false,
         error: {
