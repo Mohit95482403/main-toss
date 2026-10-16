@@ -1344,6 +1344,168 @@ router.get('/matches/:id/bets', async (req, res, next) => {
 });
 
 // =============================================================================
+// 9. MATCH MANAGEMENT: CREATE & DELETE MATCH
+// =============================================================================
+async function handleAdminCreateMatch(req, res, next) {
+  try {
+    const pool = getPool();
+    const admin = req.user;
+
+    const competition = (req.body.competition || '').trim();
+    const stage = (req.body.stage || '').trim() || 'Fixture';
+    const teamOne = (req.body.team_one || req.body.teamOne || '').trim();
+    const teamOneAbbr = (req.body.team_one_abbr || req.body.teamOneAbbr || '').trim() || teamOne.substring(0, 4).toUpperCase();
+    const teamOneRate = parseFloat(req.body.team_one_rate || req.body.teamOneRate || 1.90);
+
+    const teamTwo = (req.body.team_two || req.body.teamTwo || '').trim();
+    const teamTwoAbbr = (req.body.team_two_abbr || req.body.teamTwoAbbr || '').trim() || teamTwo.substring(0, 4).toUpperCase();
+    const teamTwoRate = parseFloat(req.body.team_two_rate || req.body.teamTwoRate || 1.90);
+
+    const scheduledTime = (req.body.scheduled_time || req.body.scheduledTime || '').trim() || 'Schedule TBA';
+    const venue = (req.body.venue || '').trim() || 'Cricket Stadium';
+    const status = (req.body.status || 'upcoming').trim().toLowerCase();
+
+    // Validation
+    const validationErrors = [];
+    if (!competition) validationErrors.push({ field: 'competition', message: 'Competition / tournament name is required.' });
+    if (!teamOne) validationErrors.push({ field: 'team_one', message: 'First team name is required.' });
+    if (!teamTwo) validationErrors.push({ field: 'team_two', message: 'Second team name is required.' });
+    if (isNaN(teamOneRate) || teamOneRate < 1.01 || teamOneRate > 99.99) {
+      validationErrors.push({ field: 'team_one_rate', message: 'Team 1 toss rate must be between 1.01 and 99.99.' });
+    }
+    if (isNaN(teamTwoRate) || teamTwoRate < 1.01 || teamTwoRate > 99.99) {
+      validationErrors.push({ field: 'team_two_rate', message: 'Team 2 toss rate must be between 1.01 and 99.99.' });
+    }
+    if (!['upcoming', 'live'].includes(status)) {
+      validationErrors.push({ field: 'status', message: "Status must be either 'upcoming' or 'live'." });
+    }
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: validationErrors.map(e => e.message).join(' '),
+          details: validationErrors
+        }
+      });
+    }
+
+    const matchTitle = `${teamOne} vs ${teamTwo}`;
+    const matchId = `MATCH-${Date.now()}`;
+
+    await pool.query(
+      `INSERT INTO matches (
+        id, competition, stage, match_title,
+        team_one, team_one_abbr, team_one_rate,
+        team_two, team_two_abbr, team_two_rate,
+        scheduled_time, venue, status, toss_winner, settled, settled_at, settled_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
+      [
+        matchId,
+        competition,
+        stage,
+        matchTitle,
+        teamOne,
+        teamOneAbbr,
+        teamOneRate,
+        teamTwo,
+        teamTwoAbbr,
+        teamTwoRate,
+        scheduledTime,
+        venue,
+        status
+      ]
+    );
+
+    // Immutable audit trail recording
+    await logAdminAction(
+      admin,
+      'create_match',
+      'match',
+      null,
+      matchId,
+      {
+        matchId,
+        matchTitle,
+        competition,
+        teamOne,
+        teamTwo,
+        teamOneRate,
+        teamTwoRate,
+        scheduledTime,
+        venue,
+        status
+      },
+      req.ip
+    );
+
+    const createdMatch = {
+      id: matchId,
+      competition,
+      stage,
+      matchTitle,
+      teamOne,
+      teamOneAbbr,
+      teamOneRate,
+      teamTwo,
+      teamTwoAbbr,
+      teamTwoRate,
+      scheduledTime,
+      venue,
+      status,
+      settled: false
+    };
+
+    return res.status(201).json({
+      success: true,
+      message: 'Match fixture created successfully in database.',
+      data: {
+        match: createdMatch
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/matches', handleAdminCreateMatch);
+router.post('/matches/create', handleAdminCreateMatch);
+
+router.delete('/matches/:id', async (req, res, next) => {
+  try {
+    const matchId = req.params.id ? req.params.id.trim() : '';
+    const pool = getPool();
+
+    const [matches] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
+    if (matches.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Match fixture not found.' }
+      });
+    }
+
+    const [bets] = await pool.query('SELECT COUNT(*) as count FROM bets WHERE match_id = ?', [matchId]);
+    if (bets[0].count > 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'HAS_BETS', message: 'Cannot delete match with existing player wagers. Settle or cancel bets first.' }
+      });
+    }
+
+    await pool.query('DELETE FROM matches WHERE id = ?', [matchId]);
+    await logAdminAction(req.user, 'delete_match', 'match', null, matchId, { matchId }, req.ip);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Match fixture deleted successfully.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// =============================================================================
 // 10. BET SETTLEMENT: GET MATCHES ELIGIBLE FOR SETTLEMENT
 // =============================================================================
 router.get('/settlement/eligible', async (req, res, next) => {

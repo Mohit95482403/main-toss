@@ -141,4 +141,206 @@ router.get('/my-bets', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /api/bets/place (alias: POST /api/bets)
+ * Secure, transactional player wager placement.
+ * Validates match state, selection, stake, and available balance with row locks.
+ */
+async function handlePlaceBet(req, res, next) {
+  const pool = getPool();
+  let connection = null;
+
+  try {
+    const userId = req.user.id;
+    const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
+    const rawSelection = req.body.selection || req.body.selectedTeam || req.body.team;
+    const rawStake = req.body.stake !== undefined ? req.body.stake : (req.body.amount !== undefined ? req.body.amount : 0);
+
+    const matchId = (rawMatchId || '').trim();
+    const selection = typeof rawSelection === 'string' ? rawSelection.trim() : '';
+    const stake = parseFloat(rawStake);
+
+    // 1. Basic Input Validation
+    if (!matchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+      });
+    }
+
+    if (!selection) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_SELECTION', message: 'Please select a team to win the toss.' }
+      });
+    }
+
+    if (isNaN(stake) || stake <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_STAKE', message: 'Stake amount must be a positive number greater than 0.' }
+      });
+    }
+
+    // Min & Max bounds (e.g. min 1 coin, max 500,000 coins)
+    if (stake < 1) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MIN_STAKE_ERROR', message: 'Minimum stake is ₹1.00.' }
+      });
+    }
+
+    if (stake > 500000) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MAX_STAKE_ERROR', message: 'Maximum stake is ₹500,000.00.' }
+      });
+    }
+
+    // 2. Transactional validation & atomic placement
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 2a. Row-lock match to verify current status
+    const [matchRows] = await connection.query(
+      'SELECT id, match_title, competition, team_one, team_one_rate, team_two, team_two_rate, status, settled FROM matches WHERE id = ? FOR UPDATE',
+      [matchId]
+    );
+
+    if (matchRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: 'Match fixture not found in database.' }
+      });
+    }
+
+    const match = matchRows[0];
+
+    // Check if match is closed or settled
+    if (match.settled || match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BETTING_CLOSED', message: 'Betting on this match is closed.' }
+      });
+    }
+
+    // Check if selection matches team_one or team_two
+    let rate = 0;
+    if (selection.toLowerCase() === match.team_one.toLowerCase()) {
+      rate = parseFloat(match.team_one_rate || 1.90);
+    } else if (selection.toLowerCase() === match.team_two.toLowerCase()) {
+      rate = parseFloat(match.team_two_rate || 1.90);
+    } else {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_TEAM_SELECTION',
+          message: `Selection "${selection}" is invalid. Must choose either "${match.team_one}" or "${match.team_two}".`
+        }
+      });
+    }
+
+    // 2b. Row-lock player wallet
+    const [walletRows] = await connection.query(
+      'SELECT id, available_balance, exposure_balance, currency, version FROM wallets WHERE user_id = ? FOR UPDATE',
+      [userId]
+    );
+
+    if (walletRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'WALLET_NOT_FOUND', message: 'Player wallet record not found.' }
+      });
+    }
+
+    const wallet = walletRows[0];
+    const availableBalance = parseFloat(wallet.available_balance || 0);
+
+    if (availableBalance < stake) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_BALANCE',
+          message: `Insufficient available balance. Required: ₹${stake.toFixed(2)}, Available: ₹${availableBalance.toFixed(2)}.`
+        }
+      });
+    }
+
+    // 2c. Calculate potential return & profit
+    const potentialReturn = parseFloat((stake * rate).toFixed(2));
+    const betId = `BET-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+    // 2d. Insert Bet Ticket
+    await connection.query(
+      `INSERT INTO bets (
+        id, user_id, match_id, market_name, selection,
+        stake, odds, potential_return, status, settlement_status,
+        payout, settled_at, settled_by, created_at, updated_at
+      ) VALUES (?, ?, ?, 'Toss Winner', ?, ?, ?, ?, 'pending', 'pending', 0.00, NULL, NULL, NOW(), NOW())`,
+      [betId, userId, match.id, selection, stake, rate, potentialReturn]
+    );
+
+    // 2e. Deduct Stake from Available Balance, Increase Exposure
+    await connection.query(
+      `UPDATE wallets
+       SET available_balance = available_balance - ?,
+           exposure_balance = exposure_balance + ?,
+           version = version + 1,
+           updated_at = NOW()
+       WHERE user_id = ?`,
+      [stake, stake, userId]
+    );
+
+    // 2f. Query authoritative new balance
+    const [updatedWalletRows] = await connection.query(
+      'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
+      [userId]
+    );
+    const newWallet = updatedWalletRows[0];
+
+    await connection.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: `Bet of ₹${stake.toFixed(2)} placed successfully on ${selection}!`,
+      data: {
+        bet: {
+          id: betId,
+          matchId: match.id,
+          matchTitle: match.match_title,
+          selection,
+          rate,
+          stake,
+          potentialReturn,
+          potentialProfit: parseFloat((potentialReturn - stake).toFixed(2)),
+          status: 'pending'
+        },
+        wallet: {
+          availableBalance: parseFloat(newWallet.available_balance),
+          exposureBalance: parseFloat(newWallet.exposure_balance),
+          currency: newWallet.currency || 'INR'
+        }
+      }
+    });
+  } catch (err) {
+    if (connection) {
+      try { await connection.rollback(); } catch (rbErr) {}
+    }
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+}
+
+router.post('/place', handlePlaceBet);
+router.post('/', handlePlaceBet);
+
 module.exports = router;
+

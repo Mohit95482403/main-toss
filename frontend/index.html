@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="css/bottom-navigation.css">
 
   <!-- Home Page CSS (Day 7) -->
-  <link rel="stylesheet" href="css/home.css?v=1.1">
+  <link rel="stylesheet" href="css/home.css?v=1.2">
 </head>
 
 <body data-page="home">
@@ -386,13 +386,141 @@
     </div>
   </div>
 
+  <!-- Bet on Toss Modal Dialog (Conforms strictly to reference screenshot) -->
+  <div id="bet-modal-popup" class="bet-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bet-popup-title" aria-hidden="true" style="display: none;">
+    <div class="bet-modal-card" id="bet-modal-card">
+      <!-- Modal Top Drag Handle for mobile / sheet touch -->
+      <div class="bet-modal-drag-handle" aria-hidden="true"></div>
+
+      <!-- Modal Header -->
+      <header class="bet-modal-header">
+        <div class="bet-header-text">
+          <h2 id="bet-popup-title" class="bet-popup-title">PLACE YOUR BET</h2>
+          <p id="bet-popup-match-subtitle" class="bet-popup-subtitle">Loading match fixture...</p>
+        </div>
+        <button type="button" class="bet-modal-close-btn" id="bet-modal-close-btn" aria-label="Close betting popup">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </header>
+
+      <!-- Modal Body -->
+      <div class="bet-modal-body">
+        <!-- Error & Validation Alert Banner -->
+        <div id="bet-popup-error-box" class="bet-popup-alert bet-popup-error" role="alert" style="display: none;">
+          <span class="bet-alert-icon" aria-hidden="true">⚠️</span>
+          <span id="bet-popup-error-msg" class="bet-alert-text"></span>
+        </div>
+
+        <!-- Success Alert Banner -->
+        <div id="bet-popup-success-box" class="bet-popup-alert bet-popup-success" role="status" style="display: none;">
+          <span class="bet-alert-icon" aria-hidden="true">✅</span>
+          <span id="bet-popup-success-msg" class="bet-alert-text"></span>
+        </div>
+
+        <!-- Team Toss Selection Options List -->
+        <div class="bet-section-block">
+          <div class="bet-team-options-list" role="radiogroup" aria-label="Toss Winner Selection">
+            <!-- Team 1 Button -->
+            <button type="button" class="bet-team-option-btn selected" id="bet-team-one-btn" role="radio" aria-checked="true" data-team="">
+              <div class="bet-team-btn-info">
+                <span class="bet-team-btn-name" id="bet-team-one-name">Team One</span>
+                <span class="bet-team-btn-rate" id="bet-team-one-rate">Rate 1.90</span>
+              </div>
+              <div class="bet-team-check-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+            </button>
+
+            <!-- Team 2 Button -->
+            <button type="button" class="bet-team-option-btn" id="bet-team-two-btn" role="radio" aria-checked="false" data-team="">
+              <div class="bet-team-btn-info">
+                <span class="bet-team-btn-name" id="bet-team-two-name">Team Two</span>
+                <span class="bet-team-btn-rate" id="bet-team-two-rate">Rate 1.90</span>
+              </div>
+              <div class="bet-team-check-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Stake Amount Header: Label & Available Balance -->
+        <div class="bet-amount-header-row">
+          <span class="bet-amount-title">AMOUNT</span>
+          <span class="bet-user-balance-indicator">
+            Balance: <strong id="bet-popup-balance-display">₹0.00</strong>
+          </span>
+        </div>
+
+        <!-- Stake Input Box with Rupee Symbol and MAX Button -->
+        <div class="bet-stake-input-container">
+          <span class="bet-currency-prefix" aria-hidden="true">₹</span>
+          <input
+            type="number"
+            id="bet-stake-input"
+            class="bet-stake-input"
+            placeholder="0"
+            min="1"
+            max="500000"
+            step="any"
+            inputmode="decimal"
+            autocomplete="off"
+            aria-label="Stake amount in Rupees"
+          />
+          <button type="button" class="bet-max-btn" id="bet-max-btn" aria-label="Set stake to available balance">
+            MAX
+          </button>
+        </div>
+
+        <!-- Quick Stake Presets -->
+        <div class="bet-presets-row" role="group" aria-label="Quick stake presets">
+          <button type="button" class="bet-preset-btn" data-preset="100">+₹100</button>
+          <button type="button" class="bet-preset-btn" data-preset="500">+₹500</button>
+          <button type="button" class="bet-preset-btn" data-preset="1000">+₹1000</button>
+        </div>
+
+        <!-- Summary Card: Your Choice, Potential Return, Potential Profit -->
+        <div class="bet-summary-card">
+          <div class="bet-summary-row">
+            <span class="bet-summary-label">Your Choice</span>
+            <span class="bet-summary-value choice-highlight" id="bet-summary-choice">—</span>
+          </div>
+          <div class="bet-summary-row">
+            <span class="bet-summary-label">Potential Return</span>
+            <span class="bet-summary-value" id="bet-summary-return">₹0.00</span>
+          </div>
+          <div class="bet-summary-row">
+            <span class="bet-summary-label">Potential Profit</span>
+            <span class="bet-summary-value profit-highlight" id="bet-summary-profit">₹0.00</span>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="bet-action-container">
+          <button type="button" class="btn-confirm-bet" id="bet-confirm-btn">
+            <span class="btn-confirm-text" id="bet-confirm-text">CONFIRM BET &rarr;</span>
+            <span class="btn-spinner" id="bet-confirm-spinner" style="display: none;" aria-hidden="true"></span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Application Logic Scripts -->
   <script src="js/config.js"></script>
   <script src="js/api-client.js"></script>
   <script src="js/shared-layout.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/matches-data.js"></script>
-  <script src="js/home.js?v=1.1"></script>
+  <script src="js/home.js?v=1.2"></script>
   <script src="js/app.js"></script>
 </body>
 

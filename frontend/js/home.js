@@ -47,56 +47,129 @@
   }
 
   /**
-   * Render Match Card
+   * Parse scheduled time strings (e.g. 'Today, 07:30 PM', 'Tomorrow, 02:30 PM', ISO dates)
+   */
+  function parseScheduledDateTime(str) {
+    if (!str) return null;
+    const now = new Date();
+    const timeRegex = /(today|tomorrow),?\s*(\d{1,2}):(\d{2})\s*(am|pm)/i;
+    const m = str.match(timeRegex);
+    if (m) {
+      const isTomorrow = m[1].toLowerCase() === 'tomorrow';
+      let h = parseInt(m[2], 10);
+      const min = parseInt(m[3], 10);
+      const isPm = m[4].toLowerCase() === 'pm';
+      if (isPm && h < 12) h += 12;
+      if (!isPm && h === 12) h = 0;
+      const d = new Date(now);
+      if (isTomorrow) d.setDate(d.getDate() + 1);
+      d.setHours(h, min, 0, 0);
+      return d;
+    }
+    const parsed = new Date(str);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  /**
+   * Calculate and format dynamic countdown pill
+   */
+  function getCountdownDisplay(scheduledStr, status) {
+    if (status === 'live') {
+      return `<span class="match-live-pill"><span class="live-pulse-dot" aria-hidden="true"></span> LIVE TOSS</span>`;
+    }
+    if (status === 'completed') {
+      return `<span class="match-status-pill status-completed">COMPLETED</span>`;
+    }
+    if (status === 'abandoned') {
+      return `<span class="match-status-pill status-closed">CLOSED</span>`;
+    }
+    const targetDate = parseScheduledDateTime(scheduledStr);
+    if (!targetDate) {
+      return `<span class="match-countdown-pill"><span class="countdown-clock-icon" aria-hidden="true">⏱️</span> <span>${escapeHtml(scheduledStr || 'SCHEDULED')}</span></span>`;
+    }
+    const diff = targetDate.getTime() - Date.now();
+    if (diff <= 0) {
+      return `<span class="match-live-pill"><span class="live-pulse-dot" aria-hidden="true"></span> TOSS IN PROGRESS</span>`;
+    }
+    const hours = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    const timeText = hours > 0
+      ? `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+      : `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+    return `<span class="match-countdown-pill"><span class="countdown-clock-icon" aria-hidden="true">⏱️</span> <span class="countdown-text">Starts in ${timeText}</span></span>`;
+  }
+
+  /**
+   * Render Match Card based on provided screenshot specification:
+   * Clean white card, countdown header, blue CRICKET badge, competition header,
+   * two light-gray team panels, centered circular VS divider, two info boxes (ENDTIME & TOSS RATE),
+   * and prominent blue BET ON TOSS button.
    */
   function renderMatchCard(match) {
     const detailsUrl = `pages/match-details.html?id=${encodeURIComponent(match.id)}`;
+    const isClosed = match.status === 'completed' || match.status === 'abandoned';
+    const rateVal = parseFloat(match.teamOneRate || 1.90).toFixed(2);
 
     return `
-      <a href="${detailsUrl}" class="match-card" data-match-id="${escapeHtml(match.id)}" aria-label="${escapeHtml(match.matchTitle)}, ${escapeHtml(match.competition)}, Status: ${escapeHtml(match.status)}">
-        <!-- Card Header: Tournament & Status -->
-        <header class="match-card-header">
-          <span class="match-tournament" title="${escapeHtml(match.competition)}">
-            ${escapeHtml(match.competition)}
-          </span>
-          ${renderStatusBadge(match.status)}
+      <article class="match-card modern-match-card" data-match-id="${escapeHtml(match.id)}" aria-label="Match: ${escapeHtml(match.matchTitle || (match.teamOne + ' vs ' + match.teamTwo))}, ${escapeHtml(match.competition)}">
+        <!-- Top: Countdown / Live Status & Sport Badge -->
+        <header class="match-card-top-bar">
+          <div class="match-time-indicator" data-match-id="${escapeHtml(match.id)}" data-scheduled="${escapeHtml(match.scheduledTime || '')}" data-status="${escapeHtml(match.status)}">
+            ${getCountdownDisplay(match.scheduledTime, match.status)}
+          </div>
+          <span class="match-sport-badge">CRICKET</span>
         </header>
 
-        <!-- Card Body: Teams, Crests & Rate Preview -->
-        <div class="match-card-body">
-          <div class="match-team team-left">
-            <div class="team-crest" aria-hidden="true">${escapeHtml(match.teamOneAbbr || match.teamOne.substring(0, 3).toUpperCase())}</div>
-            <div class="team-meta">
-              <span class="team-name" title="${escapeHtml(match.teamOne)}">${escapeHtml(match.teamOne)}</span>
-              <span class="team-rate-preview">Rate ${parseFloat(match.teamOneRate || 1.90).toFixed(2)}</span>
-            </div>
-          </div>
+        <!-- Tournament / Competition Heading -->
+        <div class="match-competition-bar">
+          <span class="match-competition-title">${escapeHtml(match.competition || 'CRICKET TOURNAMENT')}</span>
+          ${match.stage ? `<span class="match-stage-title">&bull; ${escapeHtml(match.stage)}</span>` : ''}
+        </div>
 
-          <div class="match-vs-divider" aria-hidden="true">
-            <span class="vs-circle">VS</span>
-          </div>
+        <!-- First Team Panel -->
+        <div class="match-team-panel">
+          <span class="match-team-panel-name">${escapeHtml(match.teamOne)}</span>
+        </div>
 
-          <div class="match-team team-right">
-            <div class="team-crest" aria-hidden="true">${escapeHtml(match.teamTwoAbbr || match.teamTwo.substring(0, 3).toUpperCase())}</div>
-            <div class="team-meta">
-              <span class="team-name" title="${escapeHtml(match.teamTwo)}">${escapeHtml(match.teamTwo)}</span>
-              <span class="team-rate-preview">Rate ${parseFloat(match.teamTwoRate || 1.90).toFixed(2)}</span>
-            </div>
+        <!-- Centered VS Divider with extending line -->
+        <div class="match-vs-divider-row" aria-hidden="true">
+          <div class="match-vs-line"></div>
+          <div class="match-vs-circle">VS</div>
+          <div class="match-vs-line"></div>
+        </div>
+
+        <!-- Second Team Panel -->
+        <div class="match-team-panel">
+          <span class="match-team-panel-name">${escapeHtml(match.teamTwo)}</span>
+        </div>
+
+        <!-- Two Equal-Width Info Boxes: ENDTIME & TOSS RATE -->
+        <div class="match-info-boxes-grid">
+          <div class="match-info-box">
+            <span class="info-box-label">ENDTIME</span>
+            <span class="info-box-value" title="${escapeHtml(match.scheduledTime || 'TBA')}">${escapeHtml(match.scheduledTime || 'TBA')}</span>
+          </div>
+          <div class="match-info-box">
+            <span class="info-box-label">TOSS RATE</span>
+            <span class="info-box-value">${rateVal}</span>
           </div>
         </div>
 
-        <!-- Card Footer: Schedule & View Action -->
-        <footer class="match-card-footer">
-          <div class="match-schedule-info">
-            ${ICONS.clock}
-            <span>${escapeHtml(match.scheduledTime || 'Schedule TBA')}</span>
-          </div>
-          <span class="match-view-action">
-            <span>Details</span>
-            ${ICONS.chevronRight}
-          </span>
-        </footer>
-      </a>
+        <!-- Prominent Blue Button: BET ON TOSS -->
+        <div class="match-action-row">
+          ${isClosed ? `
+            <button type="button" class="btn-bet-on-toss btn-disabled" disabled aria-disabled="true">
+              ${match.status === 'completed' ? 'MATCH COMPLETED' : 'TOSS CLOSED'}
+            </button>
+          ` : `
+            <button type="button" class="btn-bet-on-toss" data-action="bet" data-match-id="${escapeHtml(match.id)}" aria-label="Bet on toss: ${escapeHtml(match.teamOne)} vs ${escapeHtml(match.teamTwo)}">
+              BET ON TOSS
+            </button>
+          `}
+        </div>
+      </article>
     `;
   }
 
@@ -104,15 +177,14 @@
    * Render Empty State
    */
   function renderEmptyState(category) {
-    let categoryName = category === 'all' ? 'Matches' : `${category.toUpperCase()} Matches`;
     return `
       <section class="match-empty-state empty-state" aria-live="polite">
         <div class="empty-state-icon" aria-hidden="true">
           ${ICONS.empty}
         </div>
-        <h3 class="empty-state-title">No ${escapeHtml(categoryName)} Available</h3>
+        <h3 class="empty-state-title">No matches available right now.</h3>
         <p class="empty-state-desc">
-          There are currently no active matches listed in this category from the database.
+          There are currently no active toss matches listed in this category from the database.
         </p>
         ${category !== 'all' ? `
           <button type="button" class="btn btn-outline btn-sm" id="reset-category-btn">
@@ -217,13 +289,17 @@
     if (!feedContainer) return;
 
     // Load authentic matches from MySQL API
-    async function loadMatchesData() {
+    async function loadMatchesData(silent = false) {
+      if (isLoading) return;
       isLoading = true;
-      feedContainer.innerHTML = `
-        <div class="text-center text-muted" style="padding: 40px 20px;">
-          <span class="btn-spinner" style="margin-right: 8px;"></span> Loading authentic match fixtures from database...
-        </div>
-      `;
+
+      if (!silent && (!matchesState || matchesState.length === 0)) {
+        feedContainer.innerHTML = `
+          <div class="text-center text-muted" style="padding: 40px 20px;">
+            <span class="btn-spinner" style="margin-right: 8px;"></span> Loading authentic match fixtures from database...
+          </div>
+        `;
+      }
 
       try {
         const result = await window.TossBookMatches.getAll(currentCategory);
@@ -235,9 +311,11 @@
         renderFeed();
       } catch (err) {
         console.error('[HOME MATCHES ERROR]', err);
-        feedContainer.innerHTML = renderErrorState(err.message);
-        const retryBtn = document.getElementById('retry-matches-btn');
-        if (retryBtn) retryBtn.addEventListener('click', loadMatchesData);
+        if (!silent || matchesState.length === 0) {
+          feedContainer.innerHTML = renderErrorState(err.message);
+          const retryBtn = document.getElementById('retry-matches-btn');
+          if (retryBtn) retryBtn.addEventListener('click', () => loadMatchesData(false));
+        }
       } finally {
         isLoading = false;
       }
@@ -278,7 +356,7 @@
         btn.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
       });
 
-      loadMatchesData();
+      loadMatchesData(false);
     }
 
     // Bind filter clicks
@@ -289,14 +367,45 @@
       });
     });
 
+    // Real-time countdown timer ticker every 1 second
+    setInterval(() => {
+      document.querySelectorAll('.match-time-indicator').forEach(el => {
+        const scheduled = el.dataset.scheduled;
+        const status = el.dataset.status;
+        if (status === 'upcoming') {
+          el.innerHTML = getCountdownDisplay(scheduled, status);
+        }
+      });
+    }, 1000);
+
+    // Periodic match background refresh (every 20s) and window focus revalidation
+    setInterval(() => {
+      if (!document.hidden) {
+        loadMatchesData(true);
+      }
+    }, 20000);
+
+    window.addEventListener('focus', () => {
+      loadMatchesData(true);
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        loadMatchesData(true);
+      }
+    });
+
     // Setup Diagnostics
     setupDiagnostics();
 
     // Setup Home Wallet Actions (Deposit & Withdrawal)
     setupWalletActions();
 
+    // Setup Bet On Toss Modal Popup
+    setupBetModal();
+
     // Initial load
-    loadMatchesData();
+    loadMatchesData(false);
   }
 
   /**
@@ -382,6 +491,421 @@
     if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function' && window.ApiClient.isAuthenticated()) {
       window.ApiClient.refreshBalance().then(syncDisplayBalances).catch(() => {});
     }
+  }
+
+  /**
+   * Setup Bet On Toss Modal Popup
+   * Strictly matches the provided reference screenshot with full transactional betting integration.
+   */
+  function setupBetModal() {
+    const modal = document.getElementById('bet-modal-popup');
+    const card = document.getElementById('bet-modal-card');
+    const closeBtn = document.getElementById('bet-modal-close-btn');
+    const titleEl = document.getElementById('bet-popup-title');
+    const subtitleEl = document.getElementById('bet-popup-match-subtitle');
+    const errorBox = document.getElementById('bet-popup-error-box');
+    const errorMsg = document.getElementById('bet-popup-error-msg');
+    const successBox = document.getElementById('bet-popup-success-box');
+    const successMsg = document.getElementById('bet-popup-success-msg');
+    const teamOneBtn = document.getElementById('bet-team-one-btn');
+    const teamOneName = document.getElementById('bet-team-one-name');
+    const teamOneRate = document.getElementById('bet-team-one-rate');
+    const teamTwoBtn = document.getElementById('bet-team-two-btn');
+    const teamTwoName = document.getElementById('bet-team-two-name');
+    const teamTwoRate = document.getElementById('bet-team-two-rate');
+    const balanceDisplay = document.getElementById('bet-popup-balance-display');
+    const stakeInput = document.getElementById('bet-stake-input');
+    const maxBtn = document.getElementById('bet-max-btn');
+    const presetBtns = document.querySelectorAll('.bet-preset-btn');
+    const summaryChoice = document.getElementById('bet-summary-choice');
+    const summaryReturn = document.getElementById('bet-summary-return');
+    const summaryProfit = document.getElementById('bet-summary-profit');
+    const confirmBtn = document.getElementById('bet-confirm-btn');
+    const confirmText = document.getElementById('bet-confirm-text');
+    const confirmSpinner = document.getElementById('bet-confirm-spinner');
+
+    if (!modal || !confirmBtn) return;
+
+    let activeMatch = null;
+    let selectedTeamKey = 'teamOne'; // 'teamOne' or 'teamTwo'
+    let isSubmitting = false;
+
+    function formatCurrency(val) {
+      const num = Number(val) || 0;
+      return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function clearAlerts() {
+      if (errorBox) errorBox.style.display = 'none';
+      if (errorMsg) errorMsg.textContent = '';
+      if (successBox) successBox.style.display = 'none';
+      if (successMsg) successMsg.textContent = '';
+    }
+
+    function showError(msg) {
+      if (!errorBox || !errorMsg) return;
+      errorMsg.innerHTML = msg;
+      errorBox.style.display = 'flex';
+      if (successBox) successBox.style.display = 'none';
+    }
+
+    function showSuccess(msg) {
+      if (!successBox || !successMsg) return;
+      successMsg.innerHTML = msg;
+      successBox.style.display = 'flex';
+      if (errorBox) errorBox.style.display = 'none';
+    }
+
+    function getAuthoritativeAvailableBalance() {
+      if (window.ApiClient && typeof window.ApiClient.getBalance === 'function') {
+        const b = window.ApiClient.getBalance();
+        return typeof b.available === 'number' ? b.available : 0;
+      }
+      return 0;
+    }
+
+    function updateBalanceDisplay() {
+      if (!balanceDisplay) return;
+      const avail = getAuthoritativeAvailableBalance();
+      balanceDisplay.textContent = `₹${formatCurrency(avail)}`;
+    }
+
+    function recalculateSummary() {
+      if (!activeMatch) return;
+      const teamName = activeMatch[selectedTeamKey] || (selectedTeamKey === 'teamOne' ? activeMatch.teamOne : activeMatch.teamTwo);
+      const rawRate = selectedTeamKey === 'teamOne' ? activeMatch.teamOneRate : activeMatch.teamTwoRate;
+      const rate = parseFloat(rawRate || 1.90);
+
+      if (summaryChoice) {
+        summaryChoice.textContent = teamName || '—';
+      }
+
+      const stake = parseFloat(stakeInput.value) || 0;
+      if (stake > 0) {
+        const potReturn = stake * rate;
+        const potProfit = Math.max(0, potReturn - stake);
+        if (summaryReturn) summaryReturn.textContent = `₹${formatCurrency(potReturn)}`;
+        if (summaryProfit) summaryProfit.textContent = `₹${formatCurrency(potProfit)}`;
+      } else {
+        if (summaryReturn) summaryReturn.textContent = '₹0.00';
+        if (summaryProfit) summaryProfit.textContent = '₹0.00';
+      }
+    }
+
+    function setSelectedTeam(teamKey) {
+      selectedTeamKey = teamKey;
+      if (teamKey === 'teamOne') {
+        if (teamOneBtn) {
+          teamOneBtn.classList.add('selected');
+          teamOneBtn.setAttribute('aria-checked', 'true');
+        }
+        if (teamTwoBtn) {
+          teamTwoBtn.classList.remove('selected');
+          teamTwoBtn.setAttribute('aria-checked', 'false');
+        }
+      } else {
+        if (teamTwoBtn) {
+          teamTwoBtn.classList.add('selected');
+          teamTwoBtn.setAttribute('aria-checked', 'true');
+        }
+        if (teamOneBtn) {
+          teamOneBtn.classList.remove('selected');
+          teamOneBtn.setAttribute('aria-checked', 'false');
+        }
+      }
+      clearAlerts();
+      recalculateSummary();
+    }
+
+    async function openBetModal(matchId) {
+      if (!matchId) return;
+
+      // 1. Locate match from cache or API
+      let match = matchesState.find(m => String(m.id) === String(matchId));
+      if (!match && window.TossBookMatches && typeof window.TossBookMatches.getCached === 'function') {
+        const cached = window.TossBookMatches.getCached();
+        match = cached.find(m => String(m.id) === String(matchId));
+      }
+
+      if (!match) {
+        try {
+          const res = await window.ApiClient.get(`/matches/${encodeURIComponent(matchId)}`);
+          match = res.match || res.data || res;
+        } catch (err) {
+          console.error('[BET POPUP] Failed to load match fixture:', err);
+        }
+      }
+
+      if (!match) {
+        alert('Unable to load match information for betting.');
+        return;
+      }
+
+      activeMatch = match;
+      clearAlerts();
+      isSubmitting = false;
+
+      // 2. Populate UI fields
+      if (titleEl) titleEl.textContent = 'PLACE YOUR BET';
+      if (subtitleEl) {
+        subtitleEl.textContent = `${match.teamOne} vs ${match.teamTwo}${match.competition ? ` • ${match.competition}` : ''}`;
+      }
+
+      const rateOne = parseFloat(match.teamOneRate || 1.90).toFixed(2);
+      const rateTwo = parseFloat(match.teamTwoRate || 1.90).toFixed(2);
+
+      if (teamOneName) teamOneName.textContent = match.teamOne;
+      if (teamOneRate) teamOneRate.textContent = `Rate ${rateOne}`;
+      if (teamOneBtn) teamOneBtn.setAttribute('data-team', match.teamOne);
+
+      if (teamTwoName) teamTwoName.textContent = match.teamTwo;
+      if (teamTwoRate) teamTwoRate.textContent = `Rate ${rateTwo}`;
+      if (teamTwoBtn) teamTwoBtn.setAttribute('data-team', match.teamTwo);
+
+      // Default to teamOne
+      setSelectedTeam('teamOne');
+
+      // Reset stake input
+      if (stakeInput) {
+        stakeInput.value = '';
+      }
+
+      // Authoritative Balance display
+      updateBalanceDisplay();
+      if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function' && window.ApiClient.isAuthenticated()) {
+        window.ApiClient.refreshBalance().then(() => updateBalanceDisplay()).catch(() => {});
+      }
+
+      // Reset confirm button state
+      if (confirmBtn) confirmBtn.disabled = false;
+      if (confirmText) confirmText.style.display = 'inline-block';
+      if (confirmSpinner) confirmSpinner.style.display = 'none';
+
+      recalculateSummary();
+
+      // Show modal & prevent background scrolling
+      modal.style.display = 'flex';
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+
+      // Focus input on open for quick interaction
+      setTimeout(() => {
+        if (stakeInput) stakeInput.focus();
+      }, 100);
+    }
+
+    function closeBetModal() {
+      if (isSubmitting) return; // Prevent closing while in flight
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+      clearAlerts();
+      activeMatch = null;
+    }
+
+    // Modal Event Bindings
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeBetModal);
+    }
+
+    modal.addEventListener('click', (e) => {
+      // If clicking the backdrop overlay (outside card), close
+      if (e.target === modal) {
+        closeBetModal();
+      }
+    });
+
+    if (card) {
+      card.addEventListener('click', (e) => {
+        // Prevent accidental closing when clicking within card
+        e.stopPropagation();
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.style.display === 'flex') {
+        closeBetModal();
+      }
+    });
+
+    // Team selection buttons
+    if (teamOneBtn) {
+      teamOneBtn.addEventListener('click', () => setSelectedTeam('teamOne'));
+    }
+    if (teamTwoBtn) {
+      teamTwoBtn.addEventListener('click', () => setSelectedTeam('teamTwo'));
+    }
+
+    // Stake input live calculation & validation clearing
+    if (stakeInput) {
+      stakeInput.addEventListener('input', () => {
+        clearAlerts();
+        recalculateSummary();
+      });
+    }
+
+    // Quick Presets
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = parseFloat(btn.dataset.preset) || 0;
+        const current = parseFloat(stakeInput.value) || 0;
+        stakeInput.value = (current + preset).toFixed(0);
+        clearAlerts();
+        recalculateSummary();
+      });
+    });
+
+    // MAX Button
+    if (maxBtn) {
+      maxBtn.addEventListener('click', () => {
+        const avail = getAuthoritativeAvailableBalance();
+        const maxAllowed = Math.min(avail, 500000);
+        stakeInput.value = maxAllowed > 0 ? Math.floor(maxAllowed).toString() : '0';
+        clearAlerts();
+        recalculateSummary();
+      });
+    }
+
+    // Confirm Bet Submission
+    confirmBtn.addEventListener('click', async () => {
+      if (isSubmitting) return;
+      clearAlerts();
+
+      // 1. Authentication Check
+      if (!window.ApiClient || !window.ApiClient.isAuthenticated()) {
+        showError('Please <a href="pages/login.html" style="text-decoration: underline; font-weight: 700; color: #B91C1C;">sign in</a> to place your bet.');
+        return;
+      }
+
+      // 2. Active Match Check
+      if (!activeMatch) {
+        showError('No active match fixture selected. Please refresh.');
+        return;
+      }
+
+      if (activeMatch.settled || activeMatch.status === 'completed' || activeMatch.status === 'abandoned') {
+        showError('Betting is closed for this match.');
+        return;
+      }
+
+      // 3. Selection Check
+      const teamName = activeMatch[selectedTeamKey] || (selectedTeamKey === 'teamOne' ? activeMatch.teamOne : activeMatch.teamTwo);
+      if (!teamName) {
+        showError('Please select a valid team to win the toss.');
+        return;
+      }
+
+      // 4. Stake Check
+      const stake = parseFloat(stakeInput.value);
+      if (isNaN(stake) || stake <= 0) {
+        showError('Please enter a valid stake amount greater than 0.');
+        if (stakeInput) stakeInput.focus();
+        return;
+      }
+
+      if (stake < 1) {
+        showError('Minimum stake amount is ₹1.00.');
+        if (stakeInput) stakeInput.focus();
+        return;
+      }
+
+      if (stake > 500000) {
+        showError('Maximum stake amount is ₹500,000.00.');
+        if (stakeInput) stakeInput.focus();
+        return;
+      }
+
+      // 5. Available Balance Check
+      const avail = getAuthoritativeAvailableBalance();
+      if (stake > avail) {
+        showError(`Insufficient balance. Your available balance is ₹${formatCurrency(avail)}.`);
+        return;
+      }
+
+      // 6. Submit via Transactional Backend API
+      isSubmitting = true;
+      confirmBtn.disabled = true;
+      if (confirmText) confirmText.style.display = 'none';
+      if (confirmSpinner) confirmSpinner.style.display = 'inline-block';
+
+      try {
+        const payload = {
+          matchId: activeMatch.id,
+          selection: teamName,
+          stake: stake
+        };
+
+        const res = await window.ApiClient.post('/bets/place', payload);
+
+        // 7. Success handling
+        const betData = res.data && res.data.bet;
+        const walletData = res.data && res.data.wallet;
+
+        showSuccess(`✅ Bet of ₹${formatCurrency(stake)} placed successfully on ${escapeHtml(teamName)}!`);
+
+        // Authoritative balance sync across all pages and headers
+        if (walletData && typeof walletData.availableBalance === 'number') {
+          window.ApiClient.updateAllBalanceDisplays(walletData.availableBalance, walletData.exposureBalance, 'loaded');
+          updateBalanceDisplay();
+
+          // Also update cached user wallet object
+          const user = window.ApiClient.getUser();
+          if (user && user.wallet) {
+            user.wallet.available_balance = walletData.availableBalance;
+            user.wallet.exposure_balance = walletData.exposureBalance;
+            window.ApiClient.setUser(user);
+          }
+
+          try {
+            window.dispatchEvent(new CustomEvent('itb:balance-updated', {
+              detail: {
+                available: walletData.availableBalance,
+                exposure: walletData.exposureBalance,
+                formattedAvailable: `₹${formatCurrency(walletData.availableBalance)}`,
+                formattedExposure: `₹${formatCurrency(walletData.exposureBalance)}`
+              }
+            }));
+          } catch (evtErr) {}
+        }
+
+        // Reset input
+        stakeInput.value = '';
+        recalculateSummary();
+
+        // Gracefully close after showing confirmation
+        setTimeout(() => {
+          isSubmitting = false;
+          closeBetModal();
+        }, 1800);
+
+      } catch (err) {
+        console.error('[BET PLACEMENT ERROR]', err);
+        const errMsg = err.message || (err.error && err.error.message) || 'Unable to place bet. Please try again.';
+        showError(escapeHtml(errMsg));
+        isSubmitting = false;
+        confirmBtn.disabled = false;
+        if (confirmText) confirmText.style.display = 'inline-block';
+        if (confirmSpinner) confirmSpinner.style.display = 'none';
+      }
+    });
+
+    // Delegate "BET ON TOSS" click on match cards
+    const feedContainer = document.getElementById('match-feed-container');
+    if (feedContainer) {
+      feedContainer.addEventListener('click', (e) => {
+        const betBtn = e.target.closest('.btn-bet-on-toss[data-action="bet"]');
+        if (betBtn) {
+          e.preventDefault();
+          const matchId = betBtn.getAttribute('data-match-id');
+          if (matchId) {
+            openBetModal(matchId);
+          }
+        }
+      });
+    }
+
+    // Expose openBetModal globally if needed
+    window.openBetModal = openBetModal;
   }
 
   // Lifecycle

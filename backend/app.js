@@ -67,8 +67,8 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(compression);
 
-// 6. Optional Static Frontend Serving (Standalone or Monorepo Container Deployment)
-const SERVE_STATIC_FRONTEND = process.env.SERVE_STATIC_FRONTEND === 'true';
+// 6. Static Frontend Serving (Serves user interface and static assets)
+const SERVE_STATIC_FRONTEND = process.env.SERVE_STATIC_FRONTEND !== 'false';
 const frontendDir = path.resolve(__dirname, '../frontend');
 if (SERVE_STATIC_FRONTEND) {
   app.use(express.static(frontendDir, {
@@ -92,6 +92,9 @@ app.use('/api/wallet', walletRoutes);
 
 // Root informational endpoint
 app.get('/', (req, res) => {
+  if (SERVE_STATIC_FRONTEND && req.accepts('html')) {
+    return res.sendFile(path.join(frontendDir, 'index.html'));
+  }
   res.status(200).json({
     service: 'IRONMAN TOSS BOOK API',
     status: 'active',

@@ -39,7 +39,7 @@
   const matchesState = {
     search: '',
     status: 'all',
-    hasBets: 'true',
+    hasBets: 'all',
     settlement: 'all',
     matches: [],
     stats: null,
@@ -1395,6 +1395,11 @@
                   Settle
                 </button>
               ` : ''}
+              ${m.total_bets === 0 ? `
+                <button type="button" class="btn btn-danger btn-xs btn-delete-match" data-match-id="${m.id}" title="Delete un-wagered match fixture">
+                  Delete
+                </button>
+              ` : ''}
             </div>
           </td>
         </tr>
@@ -1418,6 +1423,132 @@
         selectMatchForSettlement(matchId);
       });
     });
+
+    tableBody.querySelectorAll('.btn-delete-match').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const matchId = btn.dataset.matchId;
+        if (!confirm(`Are you sure you want to delete match fixture #${matchId}? This action cannot be undone.`)) return;
+        try {
+          await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}`, { method: 'DELETE' });
+          notify('Match fixture deleted successfully.', 'success');
+          loadMatches();
+        } catch (err) {
+          notify(`Failed to delete match: ${err.message}`, 'error');
+        }
+      });
+    });
+  }
+
+  function resetCreateMatchForm() {
+    const form = document.getElementById('form-create-match');
+    if (form) form.reset();
+    const errorBox = document.getElementById('create-match-error-box');
+    if (errorBox) errorBox.style.display = 'none';
+    const rate1 = document.getElementById('match-input-team-one-rate');
+    const rate2 = document.getElementById('match-input-team-two-rate');
+    if (rate1) rate1.value = '1.90';
+    if (rate2) rate2.value = '1.90';
+    const statusSelect = document.getElementById('match-input-status');
+    if (statusSelect) statusSelect.value = 'upcoming';
+  }
+
+  async function handleCreateMatchSubmit(e) {
+    e.preventDefault();
+    const errorBox = document.getElementById('create-match-error-box');
+    const errorText = document.getElementById('create-match-error-text');
+    if (errorBox) errorBox.style.display = 'none';
+
+    const competition = document.getElementById('match-input-competition')?.value.trim();
+    const stage = document.getElementById('match-input-stage')?.value.trim() || 'Fixture';
+    const teamOne = document.getElementById('match-input-team-one')?.value.trim();
+    const teamOneAbbr = document.getElementById('match-input-team-one-abbr')?.value.trim() || (teamOne ? teamOne.substring(0, 4).toUpperCase() : '');
+    const teamOneRate = parseFloat(document.getElementById('match-input-team-one-rate')?.value || '1.90');
+    const teamTwo = document.getElementById('match-input-team-two')?.value.trim();
+    const teamTwoAbbr = document.getElementById('match-input-team-two-abbr')?.value.trim() || (teamTwo ? teamTwo.substring(0, 4).toUpperCase() : '');
+    const teamTwoRate = parseFloat(document.getElementById('match-input-team-two-rate')?.value || '1.90');
+    const scheduledTime = document.getElementById('match-input-schedule')?.value.trim();
+    const venue = document.getElementById('match-input-venue')?.value.trim() || 'Cricket Stadium';
+    const status = document.getElementById('match-input-status')?.value || 'upcoming';
+
+    if (!competition) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Competition / Tournament name is required.';
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
+    if (!teamOne) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Team One name is required.';
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
+    if (!teamTwo) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Team Two name is required.';
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
+    if (!scheduledTime) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Scheduled time is required.';
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
+
+    const submitBtn = document.getElementById('btn-submit-create-match');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating Match...';
+    }
+
+    try {
+      const payload = {
+        competition,
+        stage,
+        team_one: teamOne,
+        team_one_abbr: teamOneAbbr,
+        team_one_rate: teamOneRate,
+        team_two: teamTwo,
+        team_two_abbr: teamTwoAbbr,
+        team_two_rate: teamTwoRate,
+        scheduled_time: scheduledTime,
+        venue,
+        status
+      };
+
+      const res = await apiFetch('/admin/matches', {
+        method: 'POST',
+        body: payload
+      });
+
+      if (!res.success) {
+        throw new Error(res.error?.message || 'Failed to create match fixture.');
+      }
+
+      notify(`Match "${teamOne} vs ${teamTwo}" created and published successfully!`, 'success');
+      closeModal('modal-create-match');
+      resetCreateMatchForm();
+      loadMatches();
+    } catch (err) {
+      if (errorBox && errorText) {
+        errorText.textContent = err.message || 'Error occurred while creating match.';
+        errorBox.style.display = 'flex';
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Create &amp; Publish Match</span>
+        `;
+      }
+    }
   }
 
   async function openMatchBetsModal(matchId) {
@@ -2614,7 +2745,24 @@
       confirmDeleteUserBtn.addEventListener('click', handleConfirmDeleteUser);
     }
 
-    // 8. Match Monitoring event listeners
+    // 8. Match Monitoring & Creation event listeners
+    const openCreateMatchBtn = document.getElementById('btn-open-create-match');
+    if (openCreateMatchBtn) {
+      openCreateMatchBtn.addEventListener('click', () => {
+        resetCreateMatchForm();
+        openModal('modal-create-match');
+        setTimeout(() => {
+          const compInput = document.getElementById('match-input-competition');
+          if (compInput) compInput.focus();
+        }, 100);
+      });
+    }
+
+    const createMatchForm = document.getElementById('form-create-match');
+    if (createMatchForm) {
+      createMatchForm.addEventListener('submit', handleCreateMatchSubmit);
+    }
+
     const refreshMatchesBtn = document.getElementById('btn-refresh-matches');
     if (refreshMatchesBtn) {
       refreshMatchesBtn.addEventListener('click', () => {
