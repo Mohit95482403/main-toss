@@ -1937,6 +1937,12 @@
       const timeStr = defaultEndTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
       schedInput.value = `Today, ${timeStr}`;
     }
+
+    // Default active preset chip to +2h
+    document.querySelectorAll('.preset-end-chip').forEach(b => {
+      if (b.dataset.mins === '120') b.classList.add('active');
+      else b.classList.remove('active');
+    });
   }
 
   async function handleCreateMatchSubmit(e) {
@@ -3466,6 +3472,8 @@
     // Quick-preset chips for create match modal
     document.querySelectorAll('.preset-end-chip').forEach(btn => {
       btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-end-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
         const mins = parseInt(btn.dataset.mins, 10) || 60;
         const targetDate = new Date(Date.now() + mins * 60000);
         const input = document.getElementById('match-input-end-time');
@@ -3480,9 +3488,18 @@
       });
     });
 
+    const matchEndTimeInput = document.getElementById('match-input-end-time');
+    if (matchEndTimeInput) {
+      matchEndTimeInput.addEventListener('input', () => {
+        document.querySelectorAll('.preset-end-chip').forEach(b => b.classList.remove('active'));
+      });
+    }
+
     // Quick-preset chips for edit schedule modal
     document.querySelectorAll('.preset-edit-end-chip').forEach(btn => {
       btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-edit-end-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
         const mins = parseInt(btn.dataset.mins, 10) || 60;
         const targetDate = new Date(Date.now() + mins * 60000);
         const input = document.getElementById('edit-match-input-end-time');
@@ -3496,6 +3513,13 @@
         }
       });
     });
+
+    const editEndTimeInput = document.getElementById('edit-match-input-end-time');
+    if (editEndTimeInput) {
+      editEndTimeInput.addEventListener('input', () => {
+        document.querySelectorAll('.preset-edit-end-chip').forEach(b => b.classList.remove('active'));
+      });
+    }
 
     const refreshMatchesBtn = document.getElementById('btn-refresh-matches');
     if (refreshMatchesBtn) {

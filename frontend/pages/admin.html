@@ -1585,11 +1585,11 @@
           <div class="create-match-grid-2">
             <div class="field-group">
               <label for="match-input-competition" class="field-label">Competition / Tournament *</label>
-              <input type="text" id="match-input-competition" class="admin-search-input" placeholder="e.g. ICC MEN'S T20 WORLD CUP" required />
+              <input type="text" id="match-input-competition" class="admin-form-input" placeholder="e.g. ICC MEN'S T20 WORLD CUP" required />
             </div>
             <div class="field-group">
               <label for="match-input-stage" class="field-label">Stage / Round</label>
-              <input type="text" id="match-input-stage" class="admin-search-input" placeholder="e.g. Super 8 - Match 12" />
+              <input type="text" id="match-input-stage" class="admin-form-input" placeholder="e.g. Super 8 - Match 12" />
             </div>
           </div>
 
@@ -1602,15 +1602,15 @@
             <div class="create-match-grid-3">
               <div class="field-group">
                 <label for="match-input-team-one" class="field-label">Team Name *</label>
-                <input type="text" id="match-input-team-one" class="admin-search-input" placeholder="e.g. India" required />
+                <input type="text" id="match-input-team-one" class="admin-form-input" placeholder="e.g. India" required />
               </div>
               <div class="field-group">
                 <label for="match-input-team-one-abbr" class="field-label">Abbreviation</label>
-                <input type="text" id="match-input-team-one-abbr" class="admin-search-input" placeholder="e.g. IND" maxlength="6" />
+                <input type="text" id="match-input-team-one-abbr" class="admin-form-input" placeholder="e.g. IND" maxlength="6" />
               </div>
               <div class="field-group">
                 <label for="match-input-team-one-rate" class="field-label">Toss Rate *</label>
-                <input type="number" step="0.01" min="1.01" max="99.99" id="match-input-team-one-rate" class="admin-search-input" value="1.90" required />
+                <input type="number" step="0.01" min="1.01" max="99.99" id="match-input-team-one-rate" class="admin-form-input" value="1.90" required />
               </div>
             </div>
           </div>
@@ -1624,15 +1624,15 @@
             <div class="create-match-grid-3">
               <div class="field-group">
                 <label for="match-input-team-two" class="field-label">Team Name *</label>
-                <input type="text" id="match-input-team-two" class="admin-search-input" placeholder="e.g. Australia" required />
+                <input type="text" id="match-input-team-two" class="admin-form-input" placeholder="e.g. Australia" required />
               </div>
               <div class="field-group">
                 <label for="match-input-team-two-abbr" class="field-label">Abbreviation</label>
-                <input type="text" id="match-input-team-two-abbr" class="admin-search-input" placeholder="e.g. AUS" maxlength="6" />
+                <input type="text" id="match-input-team-two-abbr" class="admin-form-input" placeholder="e.g. AUS" maxlength="6" />
               </div>
               <div class="field-group">
                 <label for="match-input-team-two-rate" class="field-label">Toss Rate *</label>
-                <input type="number" step="0.01" min="1.01" max="99.99" id="match-input-team-two-rate" class="admin-search-input" value="1.90" required />
+                <input type="number" step="0.01" min="1.01" max="99.99" id="match-input-team-two-rate" class="admin-form-input" value="1.90" required />
               </div>
             </div>
           </div>
@@ -1704,42 +1704,54 @@
             </div>
           </div>
 
-          <!-- Schedule, End Time, Venue & Status Row -->
-          <div class="create-match-grid-2">
-            <div class="field-group">
-              <label for="match-input-end-time" class="field-label">Match End Time (Auto-Expiry from Home) *</label>
-              <input type="datetime-local" id="match-input-end-time" class="admin-search-input" required />
-              <div class="quick-preset-chips" style="margin-top: 6px;">
-                <button type="button" class="preset-chip preset-end-chip" data-mins="15">+15m</button>
-                <button type="button" class="preset-chip preset-end-chip" data-mins="30">+30m</button>
-                <button type="button" class="preset-chip preset-end-chip" data-mins="60">+1h</button>
-                <button type="button" class="preset-chip preset-end-chip" data-mins="120">+2h</button>
-                <button type="button" class="preset-chip preset-end-chip" data-mins="1440">+1d</button>
-              </div>
-              <div class="text-2xs text-muted" style="margin-top: 4px;">
-                Match will automatically disappear from the user's Home page at this exact moment.
-              </div>
+          <!-- Match Schedule, Expiry Automation & Settings Card -->
+          <div class="create-match-timing-card">
+            <div class="create-match-team-title">
+              <span>Match Schedule &amp; Expiry Automation</span>
+              <span class="badge badge-primary" style="font-size: 10px; padding: 2px 6px;">LIFECYCLE</span>
             </div>
-            <div class="field-group">
-              <label for="match-input-schedule" class="field-label">Display Schedule / Time *</label>
-              <input type="text" id="match-input-schedule" class="admin-search-input" placeholder="e.g. Today, 07:30 PM" required />
-              <div class="text-2xs text-muted" style="margin-top: 4px;">
-                Human-friendly label displayed on cards (auto-filled when selecting end time).
-              </div>
-            </div>
-          </div>
 
-          <div class="create-match-grid-2">
-            <div class="field-group">
-              <label for="match-input-venue" class="field-label">Venue</label>
-              <input type="text" id="match-input-venue" class="admin-search-input" placeholder="e.g. Melbourne Cricket Ground" />
+            <!-- Schedule & End Time Row -->
+            <div class="create-match-grid-2">
+              <div class="field-group">
+                <label for="match-input-end-time" class="field-label">Match End Time (Auto-Expiry from Home) *</label>
+                <input type="datetime-local" id="match-input-end-time" class="admin-form-input" required />
+                <div class="quick-preset-chips">
+                  <button type="button" class="preset-chip preset-end-chip" data-mins="15">+15m</button>
+                  <button type="button" class="preset-chip preset-end-chip" data-mins="30">+30m</button>
+                  <button type="button" class="preset-chip preset-end-chip" data-mins="60">+1h</button>
+                  <button type="button" class="preset-chip preset-end-chip" data-mins="120">+2h</button>
+                  <button type="button" class="preset-chip preset-end-chip" data-mins="1440">+1d</button>
+                </div>
+                <div class="field-helper-text">
+                  <span class="field-helper-icon">ℹ</span>
+                  <span>Match will automatically disappear from the user's Home page at this exact moment.</span>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label for="match-input-schedule" class="field-label">Display Schedule / Time *</label>
+                <input type="text" id="match-input-schedule" class="admin-form-input" placeholder="e.g. Today, 07:30 PM" required />
+                <div class="field-helper-text">
+                  <span class="field-helper-icon">ℹ</span>
+                  <span>Human-friendly label displayed on cards (auto-filled when selecting end time).</span>
+                </div>
+              </div>
             </div>
-            <div class="field-group">
-              <label for="match-input-status" class="field-label">Status *</label>
-              <select id="match-input-status" class="admin-select" style="width: 100%;">
-                <option value="upcoming" selected>Upcoming</option>
-                <option value="live">Live Toss</option>
-              </select>
+
+            <!-- Venue & Status Row -->
+            <div class="create-match-grid-2">
+              <div class="field-group">
+                <label for="match-input-venue" class="field-label">Venue</label>
+                <input type="text" id="match-input-venue" class="admin-form-input" placeholder="e.g. Melbourne Cricket Ground" />
+              </div>
+              <div class="field-group">
+                <label for="match-input-status" class="field-label">Status *</label>
+                <select id="match-input-status" class="admin-form-select">
+                  <option value="upcoming" selected>Upcoming</option>
+                  <option value="live">Live Toss</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -1779,22 +1791,23 @@
 
           <div class="field-group">
             <label for="edit-match-input-end-time" class="field-label">Configured End Time (Auto-Expiry from Home) *</label>
-            <input type="datetime-local" id="edit-match-input-end-time" class="admin-search-input" required />
-            <div class="quick-preset-chips" style="margin-top: 6px;">
+            <input type="datetime-local" id="edit-match-input-end-time" class="admin-form-input" required />
+            <div class="quick-preset-chips">
               <button type="button" class="preset-chip preset-edit-end-chip" data-mins="15">+15m</button>
               <button type="button" class="preset-chip preset-edit-end-chip" data-mins="30">+30m</button>
               <button type="button" class="preset-chip preset-edit-end-chip" data-mins="60">+1h</button>
               <button type="button" class="preset-chip preset-edit-end-chip" data-mins="120">+2h</button>
               <button type="button" class="preset-chip preset-edit-end-chip" data-mins="1440">+1d</button>
             </div>
-            <div class="text-2xs text-muted" style="margin-top: 4px;">
-              Setting a past time will instantly hide this match from the user Home page. Setting a future time will keep or restore its visibility.
+            <div class="field-helper-text">
+              <span class="field-helper-icon">ℹ</span>
+              <span>Setting a past time will instantly hide this match from the user Home page. Setting a future time will keep or restore its visibility.</span>
             </div>
           </div>
 
           <div class="field-group">
             <label for="edit-match-input-schedule" class="field-label">Display Schedule / Time Label *</label>
-            <input type="text" id="edit-match-input-schedule" class="admin-search-input" placeholder="e.g. Today, 07:30 PM" required />
+            <input type="text" id="edit-match-input-schedule" class="admin-form-input" placeholder="e.g. Today, 07:30 PM" required />
           </div>
 
           <!-- Team Logos Edit Row -->

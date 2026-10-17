@@ -1808,6 +1808,178 @@
   margin-bottom: 12px;
 }
 
+/* ==========================================================================
+   Admin Form Controls & Settings Cards (Dedicated Premium Pink Theme)
+   ========================================================================== */
+.admin-form-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--pink-border, #F2D3DF);
+  border-radius: var(--radius-md, 12px);
+  font-size: var(--font-size-sm, 13px);
+  background: #FFFFFF;
+  color: var(--color-text, #352631);
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.admin-form-input:focus {
+  outline: none;
+  border-color: var(--pink-primary, #E75480);
+  box-shadow: 0 0 0 3px rgba(231, 84, 128, 0.18);
+  background: #FFFFFF;
+}
+
+.admin-form-input::placeholder {
+  color: var(--text-muted, #A895A2);
+  font-weight: 400;
+}
+
+/* Datetime-local Input Styling */
+input[type="datetime-local"].admin-form-input {
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--color-text, #352631);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+input[type="datetime-local"].admin-form-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(45%) sepia(60%) saturate(1200%) hue-rotate(305deg) brightness(95%) contrast(92%);
+  opacity: 0.85;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  padding: 2px 4px;
+}
+
+input[type="datetime-local"].admin-form-input::-webkit-calendar-picker-indicator:hover {
+  transform: scale(1.18);
+  opacity: 1;
+}
+
+/* Modern Select Dropdown with custom SVG arrow */
+.admin-form-select {
+  width: 100%;
+  padding: 10px 38px 10px 14px;
+  border: 1.5px solid var(--pink-border, #F2D3DF);
+  border-radius: var(--radius-md, 12px);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 600;
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E75480' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px 14px;
+  color: var(--color-text, #352631);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.admin-form-select:focus {
+  outline: none;
+  border-color: var(--pink-primary, #E75480);
+  box-shadow: 0 0 0 3px rgba(231, 84, 128, 0.18);
+}
+
+/* Quick Preset Chips */
+.quick-preset-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.preset-chip.preset-end-chip,
+.preset-chip.preset-edit-end-chip {
+  background: #FFFFFF;
+  border: 1.5px solid var(--pink-border, #F3D5E0);
+  color: var(--pink-primary, #E75480);
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(231, 84, 128, 0.08);
+  user-select: none;
+}
+
+.preset-chip.preset-end-chip:hover,
+.preset-chip.preset-edit-end-chip:hover {
+  background: var(--pink-primary, #E75480);
+  color: #FFFFFF;
+  border-color: var(--pink-primary, #E75480);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(231, 84, 128, 0.25);
+}
+
+.preset-chip.preset-end-chip:active,
+.preset-chip.preset-edit-end-chip:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(231, 84, 128, 0.2);
+}
+
+.preset-chip.preset-end-chip.active,
+.preset-chip.preset-edit-end-chip.active {
+  background: var(--pink-primary, #E75480);
+  color: #FFFFFF;
+  border-color: var(--pink-primary, #E75480);
+  box-shadow: 0 2px 6px rgba(231, 84, 128, 0.35);
+}
+
+/* Helper text below inputs */
+.field-helper-text {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted, #7E6B79);
+  margin-top: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.field-helper-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+  font-weight: 800;
+  border-radius: 50%;
+  background: var(--pink-soft, #FCE4EC);
+  color: var(--pink-primary, #E75480);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Match Lifecycle / Timing Card */
+.create-match-timing-card {
+  background: var(--pink-bg-secondary, #FFF0F5);
+  border: 1.5px solid var(--pink-border, #F3D5E0);
+  border-radius: var(--radius-md, 14px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.15s ease;
+}
+
+.create-match-timing-card:focus-within {
+  border-color: var(--pink-primary, #E75480);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(231, 84, 128, 0.12);
+}
+
 
 /* ==========================================================================
    Player Coin Management System Styles
