@@ -2380,3 +2380,247 @@ input[type="datetime-local"].admin-form-input::-webkit-calendar-picker-indicator
   text-transform: uppercase;
 }
 
+/* =============================================================================
+   PLAYER TOSS REPORT IN ADMIN USER INSPECTOR
+   ============================================================================= */
+
+.player-toss-report-section {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #F2D3DF);
+  border-radius: var(--border-radius-lg, 12px);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(231, 84, 128, 0.04);
+}
+
+.toss-report-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--pink-border, #F3D5E0);
+}
+
+.toss-report-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toss-report-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text, #1E1B18);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.toss-report-subtitle {
+  font-size: 12px;
+  color: var(--color-text-muted, #71717A);
+}
+
+.toss-report-filters {
+  display: inline-flex;
+  background: var(--pink-bg-subtle, #FFF7FA);
+  border: 1px solid var(--pink-border, #F3D5E0);
+  border-radius: 30px;
+  padding: 3px;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.toss-filter-btn {
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted, #71717A);
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.toss-filter-btn:hover {
+  color: var(--pink-primary, #E75480);
+  background: rgba(231, 84, 128, 0.08);
+}
+
+.toss-filter-btn.active {
+  background: linear-gradient(135deg, var(--pink-primary, #E75480), var(--pink-dark, #D03B68));
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(231, 84, 128, 0.35);
+}
+
+/* 8 Summary KPI Cards Grid */
+.toss-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .toss-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .toss-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.toss-kpi-card {
+  background: var(--pink-bg-subtle, #FFF7FA);
+  border: 1px solid var(--pink-border, #F3D5E0);
+  border-radius: var(--border-radius-md, 10px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform var(--transition-fast, 0.15s ease), box-shadow var(--transition-fast, 0.15s ease);
+}
+
+.toss-kpi-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(231, 84, 128, 0.08);
+}
+
+.toss-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted, #71717A);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toss-kpi-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text, #1E1B18);
+  font-family: var(--font-family-mono, monospace);
+  line-height: 1.2;
+}
+
+.toss-kpi-card.kpi-success .toss-kpi-val {
+  color: var(--success, #16865C);
+}
+
+.toss-kpi-card.kpi-danger .toss-kpi-val {
+  color: var(--danger, #D64550);
+}
+
+.toss-kpi-card.kpi-warning .toss-kpi-val {
+  color: var(--warning, #A96F16);
+}
+
+.toss-kpi-card.kpi-primary .toss-kpi-val {
+  color: var(--pink-primary, #E75480);
+}
+
+/* Toss-wise Breakdown Container */
+.toss-breakdown-box {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--pink-border, #F3D5E0);
+  border-radius: var(--border-radius-md, 10px);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toss-breakdown-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text, #1E1B18);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+/* Table Wrappers and Horizontal Scroll */
+.toss-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--color-border, #F2D3DF);
+  border-radius: var(--border-radius-md, 10px);
+  background: var(--color-surface, #FFFFFF);
+}
+
+.toss-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+.toss-table-container::-webkit-scrollbar-track {
+  background: var(--pink-bg-subtle, #FFF7FA);
+}
+.toss-table-container::-webkit-scrollbar-thumb {
+  background: var(--pink-border, #F3D5E0);
+  border-radius: 4px;
+}
+.toss-table-container::-webkit-scrollbar-thumb:hover {
+  background: var(--pink-primary, #E75480);
+}
+
+.toss-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.toss-data-table th {
+  background: var(--pink-bg-subtle, #FFF7FA);
+  color: var(--color-text-muted, #71717A);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border, #F2D3DF);
+}
+
+.toss-data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border, #F2D3DF);
+  color: var(--color-text, #1E1B18);
+  vertical-align: middle;
+}
+
+.toss-data-table tbody tr:hover {
+  background: rgba(231, 84, 128, 0.03);
+}
+
+/* Pagination Bar */
+.toss-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--pink-bg-subtle, #FFF7FA);
+  border-top: 1px solid var(--color-border, #F2D3DF);
+  border-radius: 0 0 var(--border-radius-md, 10px) var(--border-radius-md, 10px);
+  font-size: 12px;
+  color: var(--color-text-muted, #71717A);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+

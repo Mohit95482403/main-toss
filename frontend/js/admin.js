@@ -677,13 +677,22 @@
   }
 
   // ===========================================================================
-  // 4. USER DETAILS INSPECTOR MODAL
+  // 4. USER DETAILS INSPECTOR & PLAYER TOSS REPORT MODAL
   // ===========================================================================
+  let activeInspectUserId = null;
+  let activeInspectPeriod = '7d';
+  let activeInspectPage = 1;
+  let activeInspectRequestId = 0;
+
   async function inspectUserDetails(userId) {
     const bodyEl = document.getElementById('inspect-modal-body');
     if (!bodyEl) return;
 
-    bodyEl.innerHTML = `<div class="text-center text-muted" style="padding: 24px;"><span class="btn-spinner"></span> Fetching record from MySQL...</div>`;
+    activeInspectUserId = userId;
+    activeInspectPeriod = '7d';
+    activeInspectPage = 1;
+
+    bodyEl.innerHTML = `<div class="text-center text-muted" style="padding: 24px;"><span class="btn-spinner"></span> Fetching user record and toss ledger from MySQL...</div>`;
     openModal('modal-inspect-user');
 
     try {
@@ -691,56 +700,115 @@
       const u = res.data;
 
       bodyEl.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--color-border);">
-          <div class="user-cell-avatar" style="width: 48px; height: 48px; font-size: var(--font-size-base);">
-            ${(u.username || 'U').substring(0, 2).toUpperCase()}
+        <!-- Top Profile Summary Card -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border);">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div class="user-cell-avatar" style="width: 52px; height: 52px; font-size: var(--font-size-md); font-weight: 800; background: linear-gradient(135deg, var(--pink-primary, #E75480), var(--pink-dark, #D03B68)); color: #fff;">
+              ${escapeHtml((u.username || 'U').substring(0, 2).toUpperCase())}
+            </div>
+            <div>
+              <div class="text-base font-bold" style="font-size: 17px; color: var(--color-text);">${escapeHtml(u.full_name || u.username)}</div>
+              <div class="text-xs text-muted" style="margin-top: 2px;">
+                <span class="font-bold" style="color: var(--pink-primary);">@${escapeHtml(u.username)}</span> • ID: #${u.id} • UUID: <span class="font-mono">${escapeHtml(u.uuid)}</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <div class="text-base font-bold">${escapeHtml(u.full_name || u.username)}</div>
-            <div class="text-xs text-muted">@${escapeHtml(u.username)} • UUID: ${escapeHtml(u.uuid)}</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="admin-role-badge ${escapeHtml(u.role)}">${escapeHtml(u.role)}</span>
+            <span class="badge-status ${escapeHtml(u.status)}">${escapeHtml(u.status)}</span>
           </div>
         </div>
 
-        <div class="system-metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; font-size: var(--font-size-sm);">
+        <!-- Account Core Info Grid -->
+        <div class="system-metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; font-size: var(--font-size-sm); background: var(--pink-bg-subtle, #FFF7FA); padding: 12px 16px; border-radius: var(--border-radius-md); border: 1px solid var(--pink-border, #F3D5E0);">
           <div>
-            <span class="text-muted text-xs">EMAIL</span>
-            <div class="font-bold">${escapeHtml(u.email || '—')}</div>
+            <span class="text-muted text-xs font-bold" style="letter-spacing: 0.04em;">EMAIL</span>
+            <div class="font-bold text-truncate" title="${escapeHtml(u.email || '—')}">${escapeHtml(u.email || '—')}</div>
           </div>
           <div>
-            <span class="text-muted text-xs">PHONE</span>
+            <span class="text-muted text-xs font-bold" style="letter-spacing: 0.04em;">PHONE</span>
             <div class="font-bold">${escapeHtml(u.phone || '—')}</div>
           </div>
           <div>
-            <span class="text-muted text-xs">ROLE</span>
-            <div><span class="admin-role-badge ${escapeHtml(u.role)}">${escapeHtml(u.role)}</span></div>
-          </div>
-          <div>
-            <span class="text-muted text-xs">STATUS</span>
-            <div><span class="badge-status ${escapeHtml(u.status)}">${escapeHtml(u.status)}</span></div>
-          </div>
-          <div>
-            <span class="text-muted text-xs">AVAILABLE BALANCE</span>
+            <span class="text-muted text-xs font-bold" style="letter-spacing: 0.04em;">AVAILABLE COINS</span>
             <div class="font-bold text-success">${formatMoney(u.wallet?.available_balance || 0)}</div>
           </div>
           <div>
-            <span class="text-muted text-xs">ACTIVE EXPOSURE</span>
+            <span class="text-muted text-xs font-bold" style="letter-spacing: 0.04em;">ACTIVE EXPOSURE</span>
             <div class="font-bold text-danger">${formatMoney(u.wallet?.exposure_balance || 0)}</div>
           </div>
           <div>
-            <span class="text-muted text-xs">ACTIVE SESSIONS</span>
-            <div class="font-bold">${u.activeSessions || 0} active token(s)</div>
-          </div>
-          <div>
-            <span class="text-muted text-xs">REGISTERED ON</span>
-            <div class="text-xs">${formatDateStr(u.created_at)}</div>
+            <span class="text-muted text-xs font-bold" style="letter-spacing: 0.04em;">REGISTERED ON</span>
+            <div class="text-xs font-medium">${formatDateStr(u.created_at)}</div>
           </div>
         </div>
 
-        <div style="background: var(--color-surface-subtle); padding: 10px 14px; border-radius: var(--border-radius-md); font-size: var(--font-size-xs);">
-          <span class="text-muted font-bold">Preferences:</span>
-          Dark Mode: ${u.preferences?.darkMode ? 'Enabled' : 'Disabled'} • Toss Alerts: ${u.preferences?.tossAlerts ? 'Yes' : 'No'} • Match Reminders: ${u.preferences?.matchReminders ? 'Yes' : 'No'}
+        <!-- Player Toss Report Section -->
+        <div class="player-toss-report-section" id="player-toss-report-container">
+          <div class="toss-report-header">
+            <div class="toss-report-title-group">
+              <h3 class="toss-report-title">
+                <span>🎯</span>
+                <span>Player Toss Report</span>
+              </h3>
+              <div class="toss-report-subtitle">
+                Complete toss wager analytics, settled payouts, and net profit/loss for <strong>@${escapeHtml(u.username)}</strong>
+              </div>
+            </div>
+
+            <!-- 4 Period Filters -->
+            <div class="toss-report-filters" role="group" aria-label="Toss report date range filters">
+              <button type="button" class="toss-filter-btn ${activeInspectPeriod === '7d' ? 'active' : ''}" data-period="7d">
+                <span>📅</span>
+                <span>7 Days</span>
+              </button>
+              <button type="button" class="toss-filter-btn ${activeInspectPeriod === '15d' ? 'active' : ''}" data-period="15d">
+                <span>📅</span>
+                <span>15 Days</span>
+              </button>
+              <button type="button" class="toss-filter-btn ${activeInspectPeriod === '30d' ? 'active' : ''}" data-period="30d">
+                <span>📅</span>
+                <span>30 Days</span>
+              </button>
+              <button type="button" class="toss-filter-btn ${activeInspectPeriod === 'lifetime' ? 'active' : ''}" data-period="lifetime">
+                <span>♾️</span>
+                <span>Lifetime</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Toss Content Container -->
+          <div id="toss-report-dynamic-content">
+            <div class="text-center text-muted" style="padding: 24px;">
+              <span class="btn-spinner"></span>
+              <span style="margin-left: 8px;">Loading toss report data...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preferences Footer Note -->
+        <div style="background: var(--color-surface-subtle); padding: 8px 14px; border-radius: var(--border-radius-md); font-size: var(--font-size-xs); color: var(--color-text-muted);">
+          <span class="font-bold">Preferences:</span>
+          Dark Mode: ${u.preferences?.darkMode ? 'Enabled' : 'Disabled'} • Toss Alerts: ${u.preferences?.tossAlerts ? 'Yes' : 'No'} • Match Reminders: ${u.preferences?.matchReminders ? 'Yes' : 'No'} • Active Sessions: ${u.activeSessions || 0}
         </div>
       `;
+
+      // Attach Filter Button Listeners
+      const filterBtns = bodyEl.querySelectorAll('.toss-filter-btn');
+      filterBtns.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const selectedPeriod = btn.dataset.period;
+          if (selectedPeriod === activeInspectPeriod) return;
+
+          filterBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          activeInspectPeriod = selectedPeriod;
+          activeInspectPage = 1;
+          loadPlayerTossReport(activeInspectUserId, activeInspectPeriod, activeInspectPage);
+        });
+      });
 
       // Configure Delete User button inside inspector modal
       const btnInspectDelete = document.getElementById('btn-inspect-delete-user');
@@ -762,8 +830,349 @@
           btnInspectDelete.onclick = null;
         }
       }
+
+      // Load initial report (7 Days default)
+      loadPlayerTossReport(activeInspectUserId, activeInspectPeriod, activeInspectPage);
     } catch (err) {
       bodyEl.innerHTML = `<div class="text-danger text-center" style="padding: 20px;">Failed to inspect user: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  /**
+   * Load and render the player toss report for the selected user, period, and page
+   */
+  async function loadPlayerTossReport(userId, period, page) {
+    const container = document.getElementById('toss-report-dynamic-content');
+    if (!container) return;
+
+    const currentReq = ++activeInspectRequestId;
+
+    const periodLabels = {
+      '7d': 'Last 7 Days',
+      '15d': 'Last 15 Days',
+      '30d': 'Last 30 Days',
+      'lifetime': 'Lifetime History'
+    };
+    const periodLabel = periodLabels[period] || period;
+
+    container.innerHTML = `
+      <div class="text-center text-muted" style="padding: 30px;">
+        <span class="btn-spinner"></span>
+        <span style="margin-left: 8px;">Loading report for ${periodLabel}...</span>
+      </div>
+    `;
+
+    try {
+      const res = await apiFetch(`/admin/users/${userId}/toss-report?period=${encodeURIComponent(period)}&page=${page}&limit=10`);
+      
+      // Guard against superseded asynchronous responses
+      if (currentReq !== activeInspectRequestId || userId !== activeInspectUserId) {
+        return;
+      }
+
+      const { summary, breakdown, records, pagination } = res.data;
+
+      // Net profit / loss formatting
+      const netPL = Number(summary.netProfitLoss || 0);
+      let netPLDisplay = '';
+      let netPLClass = '';
+      if (netPL > 0) {
+        netPLDisplay = `+${formatMoney(netPL)}`;
+        netPLClass = 'kpi-success';
+      } else if (netPL < 0) {
+        netPLDisplay = `-${formatMoney(Math.abs(netPL))}`;
+        netPLClass = 'kpi-danger';
+      } else {
+        netPLDisplay = formatMoney(0);
+        netPLClass = '';
+      }
+
+      // 1. KPI Cards HTML
+      const kpiCardsHtml = `
+        <div class="toss-kpi-grid">
+          <!-- 1. Total Bets -->
+          <div class="toss-kpi-card kpi-primary">
+            <span class="toss-kpi-label"><span>🎲</span> Total Bets</span>
+            <div class="toss-kpi-val">${summary.totalBets.toLocaleString('en-IN')}</div>
+          </div>
+
+          <!-- 2. Total Stake -->
+          <div class="toss-kpi-card">
+            <span class="toss-kpi-label"><span>💰</span> Total Stake</span>
+            <div class="toss-kpi-val">${formatMoney(summary.totalStake)}</div>
+          </div>
+
+          <!-- 3. Won Bets -->
+          <div class="toss-kpi-card kpi-success">
+            <span class="toss-kpi-label"><span>🏆</span> Won Bets</span>
+            <div class="toss-kpi-val">${summary.wonBets.toLocaleString('en-IN')}</div>
+          </div>
+
+          <!-- 4. Lost Bets -->
+          <div class="toss-kpi-card kpi-danger">
+            <span class="toss-kpi-label"><span>❌</span> Lost Bets</span>
+            <div class="toss-kpi-val">${summary.lostBets.toLocaleString('en-IN')}</div>
+          </div>
+
+          <!-- 5. Pending Bets -->
+          <div class="toss-kpi-card kpi-warning">
+            <span class="toss-kpi-label"><span>⏳</span> Pending Bets</span>
+            <div class="toss-kpi-val">${summary.pendingBets.toLocaleString('en-IN')}</div>
+          </div>
+
+          <!-- 6. No Result / Void -->
+          <div class="toss-kpi-card">
+            <span class="toss-kpi-label"><span>🔄</span> No Result / Void</span>
+            <div class="toss-kpi-val">${summary.noResultBets.toLocaleString('en-IN')}</div>
+          </div>
+
+          <!-- 7. Total Payout -->
+          <div class="toss-kpi-card kpi-success">
+            <span class="toss-kpi-label"><span>💵</span> Total Payout</span>
+            <div class="toss-kpi-val">${formatMoney(summary.totalPayout)}</div>
+          </div>
+
+          <!-- 8. Net Profit / Loss -->
+          <div class="toss-kpi-card ${netPLClass}">
+            <span class="toss-kpi-label"><span>📊</span> Net Profit / Loss</span>
+            <div class="toss-kpi-val">${netPLDisplay}</div>
+          </div>
+        </div>
+      `;
+
+      // 2. Toss-Wise Breakdown HTML
+      let breakdownHtml = '';
+      if (breakdown && breakdown.length > 0) {
+        const breakdownRows = breakdown.map(item => {
+          const itemPL = Number(item.netProfitLoss || 0);
+          let itemPLDisplay = '';
+          let itemPLStyle = '';
+          if (itemPL > 0) {
+            itemPLDisplay = `+${formatMoney(itemPL)}`;
+            itemPLStyle = 'color: var(--success, #16865C); font-weight: 700;';
+          } else if (itemPL < 0) {
+            itemPLDisplay = `-${formatMoney(Math.abs(itemPL))}`;
+            itemPLStyle = 'color: var(--danger, #D64550); font-weight: 700;';
+          } else {
+            itemPLDisplay = formatMoney(0);
+            itemPLStyle = 'color: var(--color-text-muted);';
+          }
+
+          return `
+            <tr>
+              <td><strong style="color: var(--pink-primary);">${escapeHtml(item.selection)}</strong></td>
+              <td class="font-bold">${item.totalBets}</td>
+              <td style="color: var(--success, #16865C); font-weight: 600;">${item.wonBets}</td>
+              <td style="color: var(--danger, #D64550); font-weight: 600;">${item.lostBets}</td>
+              <td class="font-mono">${formatMoney(item.totalStake)}</td>
+              <td class="font-mono">${formatMoney(item.totalPayout)}</td>
+              <td class="font-mono" style="${itemPLStyle}">${itemPLDisplay}</td>
+            </tr>
+          `;
+        }).join('');
+
+        breakdownHtml = `
+          <div class="toss-breakdown-box">
+            <h4 class="toss-breakdown-title">
+              <span>📈</span>
+              <span>Toss-Wise Performance Breakdown (${periodLabel})</span>
+            </h4>
+            <div class="toss-table-container">
+              <table class="toss-data-table">
+                <thead>
+                  <tr>
+                    <th>Toss Selection</th>
+                    <th>Total Bets</th>
+                    <th>Won</th>
+                    <th>Lost</th>
+                    <th>Total Stake</th>
+                    <th>Total Payout</th>
+                    <th>Net Profit / Loss</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${breakdownRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } else {
+        breakdownHtml = `
+          <div class="toss-breakdown-box" style="text-align: center; color: var(--color-text-muted); padding: 14px; font-size: 13px;">
+            No toss selections recorded for this player in ${periodLabel}.
+          </div>
+        `;
+      }
+
+      // 3. Detailed Bet Records Table HTML
+      let recordsTableHtml = '';
+      if (records && records.length > 0) {
+        const recordsRows = records.map(r => {
+          // Status badge
+          let badgeClass = 'pending';
+          let statusText = r.status ? r.status.toUpperCase() : 'PENDING';
+          if (r.status === 'won') {
+            badgeClass = 'won';
+            statusText = 'WON';
+          } else if (r.status === 'lost') {
+            badgeClass = 'lost';
+            statusText = 'LOST';
+          } else if (r.status === 'no_result') {
+            badgeClass = 'no_result';
+            statusText = 'NO RESULT';
+          } else if (r.status === 'pending' || r.status === 'live') {
+            badgeClass = 'pending';
+            statusText = 'PENDING';
+          }
+
+          // Team logos / match display
+          const team1LogoHtml = r.teamOneLogo
+            ? `<img src="${escapeHtml(r.teamOneLogo)}" alt="${escapeHtml(r.teamOne || 'T1')}" class="admin-match-team-logo">`
+            : `<span class="admin-match-team-fallback">${escapeHtml((r.teamOne || 'T1').substring(0, 2))}</span>`;
+
+          const team2LogoHtml = r.teamTwoLogo
+            ? `<img src="${escapeHtml(r.teamTwoLogo)}" alt="${escapeHtml(r.teamTwo || 'T2')}" class="admin-match-team-logo">`
+            : `<span class="admin-match-team-fallback">${escapeHtml((r.teamTwo || 'T2').substring(0, 2))}</span>`;
+
+          const matchDisplay = r.teamOne && r.teamTwo
+            ? `<div style="display: flex; flex-direction: column; gap: 2px;">
+                 <div style="display: flex; align-items: center; gap: 6px;">
+                   ${team1LogoHtml} <span class="font-bold">${escapeHtml(r.teamOne)}</span> <span class="text-xs text-muted">vs</span> ${team2LogoHtml} <span class="font-bold">${escapeHtml(r.teamTwo)}</span>
+                 </div>
+                 <div class="text-xs text-muted text-truncate" style="max-width: 220px;" title="${escapeHtml(r.matchTitle)}">${escapeHtml(r.competition || r.matchTitle)}</div>
+               </div>`
+            : `<div class="font-bold text-truncate" style="max-width: 220px;" title="${escapeHtml(r.matchTitle)}">${escapeHtml(r.matchTitle)}</div>`;
+
+          return `
+            <tr>
+              <td>
+                <span class="font-mono text-xs font-bold" style="color: var(--pink-primary);">${escapeHtml(r.id)}</span>
+              </td>
+              <td>${matchDisplay}</td>
+              <td>
+                <div class="font-bold" style="color: var(--color-text);">${escapeHtml(r.selection)}</div>
+                <div class="text-xs text-muted">${escapeHtml(r.marketName || 'Toss Winner')}</div>
+              </td>
+              <td class="font-mono font-bold">${formatMoney(r.stake)}</td>
+              <td class="font-mono">${Number(r.odds).toFixed(2)}x</td>
+              <td class="font-mono text-muted">${formatMoney(r.potentialReturn)}</td>
+              <td class="font-mono font-bold" style="${r.status === 'won' ? 'color: var(--success, #16865C);' : ''}">${formatMoney(r.payout)}</td>
+              <td>
+                <span class="badge-status ${badgeClass}">${statusText}</span>
+              </td>
+              <td class="text-xs text-muted">${formatDateStr(r.createdAt)}</td>
+              <td class="text-xs text-muted">${r.settledAt ? formatDateStr(r.settledAt) : '—'}</td>
+            </tr>
+          `;
+        }).join('');
+
+        // Pagination buttons
+        const totalPages = pagination.totalPages || 1;
+        const currentPage = pagination.page || 1;
+        const total = pagination.total || 0;
+        const startRecord = (currentPage - 1) * pagination.limit + 1;
+        const endRecord = Math.min(currentPage * pagination.limit, total);
+
+        recordsTableHtml = `
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <h4 class="toss-breakdown-title">
+                <span>📋</span>
+                <span>Toss Bet Ledger (${periodLabel})</span>
+              </h4>
+              <span class="text-xs text-muted font-mono">Showing ${total > 0 ? `${startRecord}–${endRecord} of ${total}` : '0'} records</span>
+            </div>
+            
+            <div class="toss-table-container">
+              <table class="toss-data-table">
+                <thead>
+                  <tr>
+                    <th>Bet ID</th>
+                    <th>Match Fixture</th>
+                    <th>Toss Selection</th>
+                    <th>Stake</th>
+                    <th>Rate</th>
+                    <th>Potential</th>
+                    <th>Payout</th>
+                    <th>Result</th>
+                    <th>Placed At</th>
+                    <th>Settled At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recordsRows}
+                </tbody>
+              </table>
+
+              <!-- Pagination Controls -->
+              <div class="toss-pagination-bar">
+                <span>Page <strong>${currentPage}</strong> of <strong>${totalPages}</strong></span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-toss-prev" ${currentPage <= 1 ? 'disabled' : ''}>
+                    ← Prev
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-toss-next" ${currentPage >= totalPages ? 'disabled' : ''}>
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        recordsTableHtml = `
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <h4 class="toss-breakdown-title">
+              <span>📋</span>
+              <span>Toss Bet Ledger (${periodLabel})</span>
+            </h4>
+            <div class="toss-table-container" style="padding: 30px; text-align: center; color: var(--color-text-muted);">
+              <div style="font-size: 28px; margin-bottom: 8px;">🎯</div>
+              <div class="font-bold">No toss bets found in ${periodLabel}</div>
+              <div class="text-xs" style="margin-top: 4px;">This player has not placed any toss wagers during the selected time period.</div>
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          ${kpiCardsHtml}
+          ${breakdownHtml}
+          ${recordsTableHtml}
+        </div>
+      `;
+
+      // Attach pagination event listeners
+      const btnPrev = document.getElementById('btn-toss-prev');
+      const btnNext = document.getElementById('btn-toss-next');
+      if (btnPrev) {
+        btnPrev.onclick = () => {
+          if (activeInspectPage > 1) {
+            activeInspectPage--;
+            loadPlayerTossReport(activeInspectUserId, activeInspectPeriod, activeInspectPage);
+          }
+        };
+      }
+      if (btnNext) {
+        btnNext.onclick = () => {
+          if (activeInspectPage < pagination.totalPages) {
+            activeInspectPage++;
+            loadPlayerTossReport(activeInspectUserId, activeInspectPeriod, activeInspectPage);
+          }
+        };
+      }
+    } catch (err) {
+      if (currentReq !== activeInspectRequestId) return;
+      container.innerHTML = `
+        <div class="text-danger text-center" style="padding: 24px; border: 1px dashed var(--danger); border-radius: var(--border-radius-md);">
+          <div>Failed to load player toss report: ${escapeHtml(err.message)}</div>
+          <button type="button" class="btn btn-secondary btn-sm" style="margin-top: 10px;" onclick="loadPlayerTossReport(${userId}, '${period}', ${page})">
+            Retry
+          </button>
+        </div>
+      `;
     }
   }
 

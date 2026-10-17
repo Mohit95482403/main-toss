@@ -491,6 +491,255 @@ router.get('/users/:id', async (req, res, next) => {
 });
 
 // =============================================================================
+// 3B. GET PLAYER TOSS & BETTING REPORT (ADMIN USER INSPECTOR)
+// =============================================================================
+router.get('/users/:id/toss-report', async (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId) || userId < 1) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Valid user identifier is required.' }
+      });
+    }
+
+    const pool = getPool();
+
+    // Verify user exists and retrieve core profile details
+    const [userRows] = await pool.query(
+      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.created_at,
+              w.available_balance, w.exposure_balance, w.currency
+       FROM users u
+       LEFT JOIN wallets w ON w.user_id = u.id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User record not found.' }
+      });
+    }
+
+    const targetUser = userRows[0];
+
+    // Validate period parameter
+    const periodRaw = (req.query.period || '7d').toString().trim().toLowerCase();
+    const periodMap = {
+      '7d': 7,
+      '7days': 7,
+      '7_days': 7,
+      '15d': 15,
+      '15days': 15,
+      '15_days': 15,
+      '30d': 30,
+      '30days': 30,
+      '30_days': 30,
+      'lifetime': null,
+      'all': null
+    };
+
+    if (!(periodRaw in periodMap)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_PERIOD',
+          message: 'Period must be one of: 7d, 15d, 30d, lifetime.'
+        }
+      });
+    }
+
+    const days = periodMap[periodRaw];
+    const canonicalPeriod = days ? `${days}d` : 'lifetime';
+
+    // Parse and validate pagination
+    let page = parseInt(req.query.page || '1', 10);
+    let limit = parseInt(req.query.limit || '10', 10);
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
+    if (limit > 100) limit = 100;
+    const offset = (page - 1) * limit;
+
+    // Date filtering clause based on bet placement time (b.created_at)
+    let dateFilterSql = '';
+    const baseParams = [userId];
+    if (days !== null) {
+      dateFilterSql = 'AND b.created_at >= NOW() - INTERVAL ? DAY';
+      baseParams.push(days);
+    }
+
+    // 1. Summary Statistics Aggregation Query
+    const summaryQuery = `
+      SELECT 
+        COUNT(b.id) AS total_bets,
+        COALESCE(SUM(b.stake), 0.00) AS total_stake,
+        COUNT(CASE WHEN b.status = 'won' THEN 1 END) AS won_bets,
+        COUNT(CASE WHEN b.status = 'lost' THEN 1 END) AS lost_bets,
+        COUNT(CASE WHEN b.settlement_status = 'pending' THEN 1 END) AS pending_bets,
+        COUNT(CASE WHEN b.status = 'no_result' THEN 1 END) AS no_result_bets,
+        COALESCE(SUM(CASE WHEN b.settlement_status = 'settled' THEN b.payout ELSE 0.00 END), 0.00) AS total_payout,
+        COALESCE(SUM(CASE WHEN b.settlement_status = 'settled' THEN (b.payout - b.stake) ELSE 0.00 END), 0.00) AS net_profit_loss
+      FROM bets b
+      WHERE b.user_id = ? ${dateFilterSql}
+    `;
+
+    // 2. Toss Selection Breakdown Query
+    const breakdownQuery = `
+      SELECT 
+        b.selection,
+        COUNT(b.id) AS total_bets,
+        COUNT(CASE WHEN b.status = 'won' THEN 1 END) AS won_bets,
+        COUNT(CASE WHEN b.status = 'lost' THEN 1 END) AS lost_bets,
+        COUNT(CASE WHEN b.settlement_status = 'pending' THEN 1 END) AS pending_bets,
+        COUNT(CASE WHEN b.status = 'no_result' THEN 1 END) AS no_result_bets,
+        COALESCE(SUM(b.stake), 0.00) AS total_stake,
+        COALESCE(SUM(CASE WHEN b.settlement_status = 'settled' THEN b.payout ELSE 0.00 END), 0.00) AS total_payout,
+        COALESCE(SUM(CASE WHEN b.settlement_status = 'settled' THEN (b.payout - b.stake) ELSE 0.00 END), 0.00) AS net_profit_loss
+      FROM bets b
+      WHERE b.user_id = ? ${dateFilterSql}
+      GROUP BY b.selection
+      ORDER BY total_bets DESC, total_stake DESC
+    `;
+
+    // 3. Detailed Paginated Bet Records Query
+    const recordsQuery = `
+      SELECT 
+        b.id,
+        b.match_id,
+        b.market_name,
+        b.selection,
+        b.stake,
+        b.odds,
+        b.potential_return,
+        b.status,
+        b.settlement_status,
+        b.payout,
+        b.settled_at,
+        b.created_at,
+        m.match_title,
+        m.competition,
+        m.team_one,
+        m.team_two,
+        m.team_one_logo,
+        m.team_two_logo,
+        m.toss_winner,
+        m.settled AS match_settled
+      FROM bets b
+      LEFT JOIN matches m ON m.id = b.match_id
+      WHERE b.user_id = ? ${dateFilterSql}
+      ORDER BY b.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    // 4. Total Count Query for pagination
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM bets b
+      WHERE b.user_id = ? ${dateFilterSql}
+    `;
+
+    const recordsParams = [...baseParams, limit, offset];
+
+    const [
+      [[summaryRow]],
+      [breakdownRows],
+      [recordRows],
+      [[countRow]]
+    ] = await Promise.all([
+      pool.query(summaryQuery, baseParams),
+      pool.query(breakdownQuery, baseParams),
+      pool.query(recordsQuery, recordsParams),
+      pool.query(countQuery, baseParams)
+    ]);
+
+    const totalRecords = parseInt(countRow?.total || 0, 10);
+    const totalPages = Math.ceil(totalRecords / limit) || 1;
+
+    const summary = {
+      totalBets: parseInt(summaryRow?.total_bets || 0, 10),
+      totalStake: parseFloat(summaryRow?.total_stake || 0),
+      wonBets: parseInt(summaryRow?.won_bets || 0, 10),
+      lostBets: parseInt(summaryRow?.lost_bets || 0, 10),
+      pendingBets: parseInt(summaryRow?.pending_bets || 0, 10),
+      noResultBets: parseInt(summaryRow?.no_result_bets || 0, 10),
+      totalPayout: parseFloat(summaryRow?.total_payout || 0),
+      netProfitLoss: parseFloat(summaryRow?.net_profit_loss || 0)
+    };
+
+    const breakdown = breakdownRows.map(r => ({
+      selection: r.selection,
+      totalBets: parseInt(r.total_bets || 0, 10),
+      wonBets: parseInt(r.won_bets || 0, 10),
+      lostBets: parseInt(r.lost_bets || 0, 10),
+      pendingBets: parseInt(r.pending_bets || 0, 10),
+      noResultBets: parseInt(r.no_result_bets || 0, 10),
+      totalStake: parseFloat(r.total_stake || 0),
+      totalPayout: parseFloat(r.total_payout || 0),
+      netProfitLoss: parseFloat(r.net_profit_loss || 0)
+    }));
+
+    const records = recordRows.map(r => ({
+      id: r.id,
+      matchId: r.match_id,
+      matchTitle: r.match_title || 'Match Deleted/Unavailable',
+      competition: r.competition || null,
+      teamOne: r.team_one || null,
+      teamTwo: r.team_two || null,
+      teamOneLogo: r.team_one_logo || null,
+      teamTwoLogo: r.team_two_logo || null,
+      marketName: r.market_name || 'Toss Winner',
+      selection: r.selection,
+      stake: parseFloat(r.stake || 0),
+      odds: parseFloat(r.odds || 0),
+      potentialReturn: parseFloat(r.potential_return || 0),
+      payout: parseFloat(r.payout || 0),
+      status: r.status,
+      settlementStatus: r.settlement_status,
+      tossWinner: r.toss_winner || null,
+      matchSettled: Boolean(r.match_settled),
+      createdAt: r.created_at,
+      settledAt: r.settled_at
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: targetUser.id,
+          uuid: targetUser.uuid,
+          fullName: targetUser.full_name,
+          username: targetUser.username,
+          email: targetUser.email,
+          phone: targetUser.phone,
+          role: targetUser.role,
+          status: targetUser.status,
+          createdAt: targetUser.created_at,
+          wallet: {
+            availableBalance: parseFloat(targetUser.available_balance || 0),
+            exposureBalance: parseFloat(targetUser.exposure_balance || 0),
+            currency: targetUser.currency || 'INR'
+          }
+        },
+        period: canonicalPeriod,
+        summary,
+        breakdown,
+        records,
+        pagination: {
+          page,
+          limit,
+          total: totalRecords,
+          totalPages
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// =============================================================================
 // 4. UPDATE USER STATUS (SUSPEND, RESTORE, BAN)
 // =============================================================================
 router.put('/users/:id/status', async (req, res, next) => {
