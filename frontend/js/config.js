@@ -7,9 +7,9 @@ const APP_CONFIG = Object.freeze({
   version: '1.0.0-day2',
   apiBaseUrl: (typeof window !== 'undefined' && window.ITB_API_URL)
     ? window.ITB_API_URL
-    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:5000/api'
-        : '/api'),
+    : (['5500', '3000', '5173'].includes(window.location.port)
+        ? `${window.location.protocol}//${window.location.hostname}:5000/api`
+        : (window.location.port === '5000' ? '/api' : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000/api' : '/api'))),
   endpoints: {
     health: '/health',
     authRegister: '/auth/register',
