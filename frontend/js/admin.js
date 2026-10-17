@@ -167,7 +167,7 @@
   }
 
   /**
-   * Open & Close Modals
+   * Open & Close Modals with proper scroll restoration and positioning
    */
   function openModal(modalId) {
     const el = document.getElementById(modalId);
@@ -175,6 +175,12 @@
       el.classList.add('open');
       el.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
+
+      // Reset scroll position of inner modal body to top
+      const bodyEl = el.querySelector('.admin-modal-body');
+      if (bodyEl) {
+        bodyEl.scrollTop = 0;
+      }
     }
   }
 
@@ -183,7 +189,12 @@
     if (el) {
       el.classList.remove('open');
       el.setAttribute('aria-hidden', 'true');
-      document.body.style.overflow = '';
+
+      // Only restore body scrolling if no other modal remains open
+      const openRemaining = document.querySelectorAll('.admin-modal-overlay.open');
+      if (!openRemaining || openRemaining.length === 0) {
+        document.body.style.overflow = '';
+      }
     }
   }
 
@@ -1934,6 +1945,14 @@
     const errorText = document.getElementById('create-match-error-text');
     if (errorBox) errorBox.style.display = 'none';
 
+    function showCreateMatchError(msg) {
+      if (errorBox && errorText) {
+        errorText.textContent = msg;
+        errorBox.style.display = 'flex';
+        errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
     const competition = document.getElementById('match-input-competition')?.value.trim();
     const stage = document.getElementById('match-input-stage')?.value.trim() || 'Fixture';
     const teamOne = document.getElementById('match-input-team-one')?.value.trim();
@@ -1948,46 +1967,28 @@
     const status = document.getElementById('match-input-status')?.value || 'upcoming';
 
     if (!competition) {
-      if (errorBox && errorText) {
-        errorText.textContent = 'Competition / Tournament name is required.';
-        errorBox.style.display = 'flex';
-      }
+      showCreateMatchError('Competition / Tournament name is required.');
       return;
     }
     if (!teamOne) {
-      if (errorBox && errorText) {
-        errorText.textContent = 'Team One name is required.';
-        errorBox.style.display = 'flex';
-      }
+      showCreateMatchError('Team One name is required.');
       return;
     }
     if (!teamTwo) {
-      if (errorBox && errorText) {
-        errorText.textContent = 'Team Two name is required.';
-        errorBox.style.display = 'flex';
-      }
+      showCreateMatchError('Team Two name is required.');
       return;
     }
     if (!matchEndTime) {
-      if (errorBox && errorText) {
-        errorText.textContent = 'Match end time (auto-expiry) is required.';
-        errorBox.style.display = 'flex';
-      }
+      showCreateMatchError('Match end time (auto-expiry) is required.');
       return;
     }
     const endMs = new Date(matchEndTime).getTime();
     if (isNaN(endMs) || endMs <= Date.now()) {
-      if (errorBox && errorText) {
-        errorText.textContent = 'Match end time must be a valid future date and time.';
-        errorBox.style.display = 'flex';
-      }
+      showCreateMatchError('Match end time must be a valid future date and time.');
       return;
     }
     if (!scheduledTime) {
-      if (errorBox && errorText) {
-        errorText.textContent = 'Display scheduled time is required.';
-        errorBox.style.display = 'flex';
-      }
+      showCreateMatchError('Display scheduled time is required.');
       return;
     }
 
@@ -2034,10 +2035,7 @@
       resetCreateMatchForm();
       loadMatches();
     } catch (err) {
-      if (errorBox && errorText) {
-        errorText.textContent = err.message || 'Error occurred while creating match.';
-        errorBox.style.display = 'flex';
-      }
+      showCreateMatchError(err.message || 'Error occurred while creating match.');
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
@@ -3429,6 +3427,16 @@
       confirmDeleteUserBtn.addEventListener('click', handleConfirmDeleteUser);
     }
 
+    // Global Escape key listener to close active modals
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const openModals = document.querySelectorAll('.admin-modal-overlay.open');
+        if (openModals.length > 0) {
+          openModals.forEach((m) => closeModal(m.id));
+        }
+      }
+    });
+
     // 8. Match Monitoring & Creation event listeners
     const openCreateMatchBtn = document.getElementById('btn-open-create-match');
     if (openCreateMatchBtn) {
@@ -3437,7 +3445,7 @@
         openModal('modal-create-match');
         setTimeout(() => {
           const compInput = document.getElementById('match-input-competition');
-          if (compInput) compInput.focus();
+          if (compInput) compInput.focus({ preventScroll: true });
         }, 100);
       });
     }

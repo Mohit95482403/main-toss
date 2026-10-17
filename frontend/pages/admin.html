@@ -1564,7 +1564,7 @@
 
   <!-- 9. Create New Match Modal -->
   <div class="admin-modal-overlay" id="modal-create-match" aria-hidden="true" role="dialog" aria-modal="true">
-    <div class="admin-modal-card" style="max-width: 640px;">
+    <div class="admin-modal-card">
       <header class="admin-modal-header">
         <div>
           <h2 class="text-base font-bold" id="create-match-modal-title">+ Create New Match Fixture</h2>
@@ -1574,7 +1574,7 @@
       </header>
 
       <form id="form-create-match" novalidate>
-        <div class="admin-modal-body" style="gap: 14px;">
+        <div class="admin-modal-body">
           <!-- Error banner inside modal -->
           <div id="create-match-error-box" class="alert alert-danger" style="display: none;">
             <span class="alert-icon">⚠️</span>
@@ -1582,7 +1582,7 @@
           </div>
 
           <!-- Tournament & Stage Row -->
-          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px;">
+          <div class="create-match-grid-2">
             <div class="field-group">
               <label for="match-input-competition" class="field-label">Competition / Tournament *</label>
               <input type="text" id="match-input-competition" class="admin-search-input" placeholder="e.g. ICC MEN'S T20 WORLD CUP" required />
@@ -1599,7 +1599,7 @@
               <span>Team One (Host / Team A)</span>
               <span class="badge badge-primary" style="font-size: 10px; padding: 2px 6px;">HOST</span>
             </div>
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+            <div class="create-match-grid-3">
               <div class="field-group">
                 <label for="match-input-team-one" class="field-label">Team Name *</label>
                 <input type="text" id="match-input-team-one" class="admin-search-input" placeholder="e.g. India" required />
@@ -1621,7 +1621,7 @@
               <span>Team Two (Visitor / Team B)</span>
               <span class="badge badge-secondary" style="font-size: 10px; padding: 2px 6px;">VISITOR</span>
             </div>
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+            <div class="create-match-grid-3">
               <div class="field-group">
                 <label for="match-input-team-two" class="field-label">Team Name *</label>
                 <input type="text" id="match-input-team-two" class="admin-search-input" placeholder="e.g. Australia" required />
@@ -1705,7 +1705,7 @@
           </div>
 
           <!-- Schedule, End Time, Venue & Status Row -->
-          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px;">
+          <div class="create-match-grid-2">
             <div class="field-group">
               <label for="match-input-end-time" class="field-label">Match End Time (Auto-Expiry from Home) *</label>
               <input type="datetime-local" id="match-input-end-time" class="admin-search-input" required />
@@ -1729,7 +1729,7 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px;">
+          <div class="create-match-grid-2">
             <div class="field-group">
               <label for="match-input-venue" class="field-label">Venue</label>
               <input type="text" id="match-input-venue" class="admin-search-input" placeholder="e.g. Melbourne Cricket Ground" />
