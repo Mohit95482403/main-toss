@@ -194,6 +194,7 @@
   --ticker-height: 34px;
   --bottom-nav-height: 62px;
   --sidebar-width: 260px;
+  --admin-sidebar-width: 260px;
   --sidebar-collapsed-width: 76px;
   --layout-gap: 24px;
   --card-gap: 20px;
@@ -206,9 +207,10 @@
   --z-header: 100;
   --z-ticker: 90;
   --z-bottom-nav: 100;
-  --z-modal: 200;
-  --z-toast: 300;
+  --z-modal: 2000;
+  --z-toast: 3000;
   --z-index-sticky: 100;
+  --z-index-modal: 2000;
 
   /* Transitions */
   --transition-fast: 160ms cubic-bezier(0.4, 0, 0.2, 1);

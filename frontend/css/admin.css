@@ -190,12 +190,11 @@
 
 @media (min-width: 1024px) {
   .admin-layout {
-    display: grid;
-    grid-template-columns: var(--sidebar-width, 260px) minmax(0, 1fr);
-    max-width: var(--content-max-width, 1440px);
-    margin: 0 auto;
+    display: flex;
+    flex-direction: row;
     width: 100%;
     min-height: calc(100vh - 64px);
+    position: relative;
   }
 }
 
@@ -218,7 +217,8 @@
 
 /* Admin Sidebar Container */
 .admin-sidebar {
-  width: var(--sidebar-width, 260px);
+  width: var(--admin-sidebar-width, var(--sidebar-width, 260px));
+  flex: 0 0 var(--admin-sidebar-width, var(--sidebar-width, 260px));
   min-width: 0;
   background: var(--surface-primary, #FFFFFF);
   border-right: 1px solid var(--border-primary, #F2D3DF);
@@ -233,6 +233,7 @@
     height: calc(100vh - 64px);
     overflow-y: auto;
     z-index: 90;
+    flex-shrink: 0;
   }
 }
 
@@ -399,16 +400,18 @@
 
 /* Main Content Area */
 .admin-main {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: var(--content-max-width, 1440px);
-  width: 100%;
-  margin: 0 auto;
+  width: 0;
+  max-width: 100%;
+  margin: 0;
   padding: var(--space-6, 24px) var(--page-padding-desktop, 32px);
+  overflow-x: hidden;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .admin-main {
+    width: 100%;
     padding: var(--space-5, 20px) var(--page-padding-tablet, 24px);
   }
 }
@@ -421,10 +424,16 @@
 
 .admin-section {
   display: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .admin-section.active {
   display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* Administrative Page Headers */
@@ -970,12 +979,12 @@
 .admin-modal-overlay {
   position: fixed;
   inset: 0;
-  background: var(--color-overlay);
+  background: var(--color-overlay, rgba(0, 0, 0, 0.5));
   backdrop-filter: blur(4px);
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-index-modal);
+  z-index: var(--z-index-modal, 2000);
   padding: 16px;
 }
 
@@ -2381,8 +2390,66 @@ input[type="datetime-local"].admin-form-input::-webkit-calendar-picker-indicator
 }
 
 /* =============================================================================
-   PLAYER TOSS REPORT IN ADMIN USER INSPECTOR
+   PLAYER TOSS REPORT & INSPECT USER PAGE
    ============================================================================= */
+
+/* In-Page User Inspector View (Inside Admin Main Content Area) */
+.user-inspect-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.user-inspect-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #F2D3DF);
+  border-radius: var(--border-radius-md, 10px);
+  padding: 12px 18px;
+  box-shadow: 0 1px 4px rgba(180, 70, 115, 0.05);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.user-inspect-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.user-inspect-breadcrumb {
+  font-size: 13px;
+  color: var(--color-text-muted, #71717A);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-inspect-card {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #F2D3DF);
+  border-radius: var(--border-radius-lg, 12px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(231, 84, 128, 0.04);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
 
 .player-toss-report-section {
   background: var(--color-surface, #FFFFFF);
@@ -2393,6 +2460,10 @@ input[type="datetime-local"].admin-form-input::-webkit-calendar-picker-indicator
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 2px 8px rgba(231, 84, 128, 0.04);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .toss-report-header {
