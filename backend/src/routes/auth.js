@@ -348,41 +348,19 @@ router.put('/profile', authenticate, async (req, res, next) => {
       params.push(trimmedPhone);
     }
 
-    if (username !== undefined) {
-      const trimmedUsername = String(username).trim();
-      if (!/^[a-zA-Z0-9_]{3,30}$/.test(trimmedUsername)) {
+    // Security & Immutability: Username is permanently non-editable by users.
+    // The username field is never updated in the database.
+    if (updates.length === 0) {
+      if (username !== undefined && String(username).trim() !== (req.user.username || '')) {
         return res.status(400).json({
           success: false,
           error: {
-            code: 'VALIDATION_ERROR',
+            code: 'IMMUTABLE_FIELD',
             field: 'username',
-            message: 'Username must be 3-30 characters long and contain only letters, numbers, or underscores.'
+            message: 'Username cannot be changed.'
           }
         });
       }
-
-      // Check unique constraint excluding current user
-      const pool = getPool();
-      const [existing] = await pool.query(
-        'SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1',
-        [trimmedUsername, req.user.id]
-      );
-
-      if (existing.length > 0) {
-        return res.status(409).json({
-          success: false,
-          error: {
-            code: 'DUPLICATE_USERNAME',
-            message: 'This username is already taken by another account.'
-          }
-        });
-      }
-
-      updates.push('username = ?');
-      params.push(trimmedUsername);
-    }
-
-    if (updates.length === 0) {
       return res.status(400).json({
         success: false,
         error: {

@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Match Details Page Controller (Day 8)
+ * DADDY TOSS BOOK - Match Details Page Controller (Day 8)
  * Resolves match fixture by URL parameter, handles not-found states,
  * and renders detailed toss market and venue information.
  */
@@ -28,6 +28,20 @@
   /**
    * Render Status Badge
    */
+  function formatLogoUrl(url) {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    if (url.startsWith('/uploads')) {
+      if (typeof window !== 'undefined' && window.location.port !== '5000' && window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) {
+        try {
+          const origin = new URL(window.APP_CONFIG.apiBaseUrl).origin;
+          return `${origin}${url}`;
+        } catch (e) {}
+      }
+    }
+    return url;
+  }
+
   function renderStatusBadge(status) {
     switch (status) {
       case 'live':
@@ -82,7 +96,7 @@
     if (contentView) contentView.style.display = 'flex';
 
     // Update document title
-    document.title = `IRONMAN TOSS BOOK | ${match.matchTitle}`;
+    document.title = `DADDY TOSS BOOK | ${match.matchTitle}`;
 
     // Populate Hero Summary Card
     const tourneyEl = document.getElementById('hero-tournament');
@@ -99,10 +113,28 @@
 
     if (tourneyEl) tourneyEl.textContent = `${match.competition} • ${match.stage || 'Fixture'}`;
     if (statusEl) statusEl.innerHTML = renderStatusBadge(match.status);
-    if (teamOneCrest) teamOneCrest.textContent = match.teamOneAbbr;
+
+    if (teamOneCrest) {
+      const logo1 = match.teamOneLogo || match.team_one_logo;
+      const abbr1 = match.teamOneAbbr || (match.teamOne ? match.teamOne.substring(0, 3).toUpperCase() : 'TM1');
+      if (logo1) {
+        teamOneCrest.innerHTML = `<img src="${escapeHtml(formatLogoUrl(logo1))}" alt="${escapeHtml(match.teamOne)}" style="width: 100%; height: 100%; object-fit: contain; padding: 4px; border-radius: 50%;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">${escapeHtml(abbr1)}</span>`;
+      } else {
+        teamOneCrest.textContent = abbr1;
+      }
+    }
     if (teamOneName) teamOneName.textContent = match.teamOne;
     if (teamOneCaptain) teamOneCaptain.textContent = `Capt: ${match.teamOneCaptain || 'N/A'}`;
-    if (teamTwoCrest) teamTwoCrest.textContent = match.teamTwoAbbr;
+
+    if (teamTwoCrest) {
+      const logo2 = match.teamTwoLogo || match.team_two_logo;
+      const abbr2 = match.teamTwoAbbr || (match.teamTwo ? match.teamTwo.substring(0, 3).toUpperCase() : 'TM2');
+      if (logo2) {
+        teamTwoCrest.innerHTML = `<img src="${escapeHtml(formatLogoUrl(logo2))}" alt="${escapeHtml(match.teamTwo)}" style="width: 100%; height: 100%; object-fit: contain; padding: 4px; border-radius: 50%;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">${escapeHtml(abbr2)}</span>`;
+      } else {
+        teamTwoCrest.textContent = abbr2;
+      }
+    }
     if (teamTwoName) teamTwoName.textContent = match.teamTwo;
     if (teamTwoCaptain) teamTwoCaptain.textContent = `Capt: ${match.teamTwoCaptain || 'N/A'}`;
     if (timeEl) timeEl.textContent = match.scheduledTime;

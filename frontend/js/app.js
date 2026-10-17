@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Frontend Application Entry (Day 1)
+ * DADDY TOSS BOOK - Frontend Application Entry (Day 1)
  */
 
 (function () {

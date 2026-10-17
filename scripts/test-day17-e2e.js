@@ -507,7 +507,7 @@ async function runDay17Tests() {
     assert.strictEqual(sysRes.status, 200);
     assert.strictEqual(sysRes.data.data.database.status, 'online');
     assert.ok(sysRes.data.data.database.latencyMs >= 0);
-    assert.strictEqual(sysRes.data.data.application.name, 'IRONMAN TOSS BOOK');
+    assert.strictEqual(sysRes.data.data.application.name, 'DADDY TOSS BOOK');
     assert.strictEqual(sysRes.data.data.application.version, '1.0.0-day17');
     logPass('GET /admin/system/status returns active database latency and operational stats');
   } catch (err) {

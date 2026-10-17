@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Home Dashboard & Match Feed Controller
+ * DADDY TOSS BOOK - Home Dashboard & Match Feed Controller
  * Integrates directly with MySQL Match Fixtures API (/api/matches).
  * Eliminates all static demo datasets, hardcoded balances, and sample fixtures.
  */
@@ -19,6 +19,7 @@
   let matchesState = [];
   let categoryCounts = { all: 0, live: 0, upcoming: 0, completed: 0 };
   let isLoading = false;
+  let checkActiveMatchEligibility = null;
 
   /**
    * Escape HTML utility
@@ -44,6 +45,30 @@
       default:
         return `<span class="match-status-badge">${escapeHtml(status)}</span>`;
     }
+  }
+
+  /**
+   * Format expiry date & time cleanly (e.g. 'Today, 09:30 PM', 'Tomorrow, 08:00 PM', '17 Oct, 09:30 PM')
+   */
+  function formatExpiryDisplay(dateInput, fallbackScheduled) {
+    if (!dateInput) return fallbackScheduled || 'TBA';
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return fallbackScheduled || 'TBA';
+
+    const now = new Date();
+    const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = d.getDate() === tomorrow.getDate() && d.getMonth() === tomorrow.getMonth() && d.getFullYear() === tomorrow.getFullYear();
+
+    const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    if (isToday) return `Today, ${timeStr}`;
+    if (isTomorrow) return `Tomorrow, ${timeStr}`;
+
+    const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    return `${dateStr}, ${timeStr}`;
   }
 
   /**
@@ -73,7 +98,7 @@
   /**
    * Calculate and format dynamic countdown pill
    */
-  function getCountdownDisplay(scheduledStr, status) {
+  function getCountdownDisplay(scheduledStr, status, endStr) {
     if (status === 'live') {
       return `<span class="match-live-pill"><span class="live-pulse-dot" aria-hidden="true"></span> LIVE TOSS</span>`;
     }
@@ -83,8 +108,9 @@
     if (status === 'abandoned') {
       return `<span class="match-status-pill status-closed">CLOSED</span>`;
     }
-    const targetDate = parseScheduledDateTime(scheduledStr);
-    if (!targetDate) {
+
+    const targetDate = (endStr ? new Date(endStr) : null) || parseScheduledDateTime(scheduledStr);
+    if (!targetDate || isNaN(targetDate.getTime())) {
       return `<span class="match-countdown-pill"><span class="countdown-clock-icon" aria-hidden="true">⏱️</span> <span>${escapeHtml(scheduledStr || 'SCHEDULED')}</span></span>`;
     }
     const diff = targetDate.getTime() - Date.now();
@@ -103,21 +129,58 @@
 
   /**
    * Render Match Card based on provided screenshot specification:
-   * Clean white card, countdown header, blue CRICKET badge, competition header,
-   * two light-gray team panels, centered circular VS divider, two info boxes (ENDTIME & TOSS RATE),
-   * and prominent blue BET ON TOSS button.
+   * Clean white card, countdown header, rose sport badge, competition header,
+   * two blush team panels, centered circular VS divider, two info boxes (ENDTIME & TOSS RATE),
+   * and prominent rose BET ON TOSS button.
    */
-  function renderMatchCard(match) {
-    const detailsUrl = `pages/match-details.html?id=${encodeURIComponent(match.id)}`;
-    const isClosed = match.status === 'completed' || match.status === 'abandoned';
-    const rateVal = parseFloat(match.teamOneRate || 1.90).toFixed(2);
+  function formatLogoUrl(url) {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    if (url.startsWith('/uploads')) {
+      if (typeof window !== 'undefined' && window.location.port !== '5000' && window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) {
+        try {
+          const origin = new URL(window.APP_CONFIG.apiBaseUrl).origin;
+          return `${origin}${url}`;
+        } catch (e) {}
+      }
+    }
+    return url;
+  }
+
+  function renderTeamLogo(logoUrl, teamName, teamAbbr, position = 'left') {
+    const safeName = escapeHtml(teamName || 'Team');
+    const safeAbbr = escapeHtml(teamAbbr || (teamName ? teamName.substring(0, 3).toUpperCase() : 'TM'));
+    const safeUrl = formatLogoUrl(logoUrl);
+
+    if (safeUrl) {
+      return `
+        <div class="match-team-logo-box ${position}" title="${safeName}">
+          <img src="${escapeHtml(safeUrl)}" alt="${safeName}" class="match-team-logo-img"
+               onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+          <div class="match-team-logo-fallback" style="display: none;">${safeAbbr}</div>
+        </div>
+      `;
+    }
 
     return `
-      <article class="match-card modern-match-card" data-match-id="${escapeHtml(match.id)}" aria-label="Match: ${escapeHtml(match.matchTitle || (match.teamOne + ' vs ' + match.teamTwo))}, ${escapeHtml(match.competition)}">
+      <div class="match-team-logo-box ${position}" title="${safeName}">
+        <div class="match-team-logo-fallback">${safeAbbr}</div>
+      </div>
+    `;
+  }
+
+  function renderMatchCard(match) {
+    const isClosed = match.status === 'completed' || match.status === 'abandoned';
+    const rateVal = parseFloat(match.teamOneRate || 1.90).toFixed(2);
+    const rawEndTime = match.matchEndTime || match.match_end_time;
+    const displayEndTime = formatExpiryDisplay(rawEndTime, match.scheduledTime);
+
+    return `
+      <article class="match-card modern-match-card" data-match-id="${escapeHtml(match.id)}" data-end-time="${escapeHtml(rawEndTime || '')}" aria-label="Match: ${escapeHtml(match.matchTitle || (match.teamOne + ' vs ' + match.teamTwo))}, ${escapeHtml(match.competition)}">
         <!-- Top: Countdown / Live Status & Sport Badge -->
         <header class="match-card-top-bar">
-          <div class="match-time-indicator" data-match-id="${escapeHtml(match.id)}" data-scheduled="${escapeHtml(match.scheduledTime || '')}" data-status="${escapeHtml(match.status)}">
-            ${getCountdownDisplay(match.scheduledTime, match.status)}
+          <div class="match-time-indicator" data-match-id="${escapeHtml(match.id)}" data-scheduled="${escapeHtml(match.scheduledTime || '')}" data-end-time="${escapeHtml(rawEndTime || '')}" data-status="${escapeHtml(match.status)}">
+            ${getCountdownDisplay(match.scheduledTime, match.status, rawEndTime)}
           </div>
           <span class="match-sport-badge">CRICKET</span>
         </header>
@@ -128,8 +191,9 @@
           ${match.stage ? `<span class="match-stage-title">&bull; ${escapeHtml(match.stage)}</span>` : ''}
         </div>
 
-        <!-- First Team Panel -->
+        <!-- First Team Panel: [Team 1 Logo] Team 1 Name -->
         <div class="match-team-panel">
+          ${renderTeamLogo(match.teamOneLogo || match.team_one_logo, match.teamOne, match.teamOneAbbr, 'left')}
           <span class="match-team-panel-name">${escapeHtml(match.teamOne)}</span>
         </div>
 
@@ -140,16 +204,17 @@
           <div class="match-vs-line"></div>
         </div>
 
-        <!-- Second Team Panel -->
+        <!-- Second Team Panel: Team 2 Name [Team 2 Logo] -->
         <div class="match-team-panel">
           <span class="match-team-panel-name">${escapeHtml(match.teamTwo)}</span>
+          ${renderTeamLogo(match.teamTwoLogo || match.team_two_logo, match.teamTwo, match.teamTwoAbbr, 'right')}
         </div>
 
         <!-- Two Equal-Width Info Boxes: ENDTIME & TOSS RATE -->
         <div class="match-info-boxes-grid">
           <div class="match-info-box">
             <span class="info-box-label">ENDTIME</span>
-            <span class="info-box-value" title="${escapeHtml(match.scheduledTime || 'TBA')}">${escapeHtml(match.scheduledTime || 'TBA')}</span>
+            <span class="info-box-value" title="${escapeHtml(displayEndTime)}">${escapeHtml(displayEndTime)}</span>
           </div>
           <div class="match-info-box">
             <span class="info-box-label">TOSS RATE</span>
@@ -157,7 +222,7 @@
           </div>
         </div>
 
-        <!-- Prominent Blue Button: BET ON TOSS -->
+        <!-- Prominent Button: BET ON TOSS -->
         <div class="match-action-row">
           ${isClosed ? `
             <button type="button" class="btn-bet-on-toss btn-disabled" disabled aria-disabled="true">
@@ -242,6 +307,8 @@
     const lockNotice = featuredCard.querySelector('.featured-lock-notice span');
     const venueEl = featuredCard.querySelector('.featured-footer > span:last-child');
 
+    const displayEndTime = formatExpiryDisplay(featured.matchEndTime || featured.match_end_time, featured.scheduledTime);
+
     if (tourneyEl) tourneyEl.textContent = `🏆 ${featured.competition}`;
     if (livePill) {
       livePill.innerHTML = featured.status === 'live'
@@ -250,15 +317,31 @@
       livePill.className = `featured-live-pill ${featured.status === 'live' ? '' : 'status-upcoming'}`;
     }
 
-    if (teamOneCrest) teamOneCrest.textContent = featured.teamOneAbbr || featured.teamOne.substring(0, 3).toUpperCase();
+    if (teamOneCrest) {
+      const logo1 = featured.teamOneLogo || featured.team_one_logo;
+      const abbr1 = featured.teamOneAbbr || featured.teamOne.substring(0, 3).toUpperCase();
+      if (logo1) {
+        teamOneCrest.innerHTML = `<img src="${escapeHtml(formatLogoUrl(logo1))}" alt="${escapeHtml(featured.teamOne)}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">${escapeHtml(abbr1)}</span>`;
+      } else {
+        teamOneCrest.textContent = abbr1;
+      }
+    }
     if (teamOneName) teamOneName.textContent = featured.teamOne;
     if (teamOneRate) teamOneRate.textContent = `Rate ${parseFloat(featured.teamOneRate || 1.90).toFixed(2)}`;
 
-    if (teamTwoCrest) teamTwoCrest.textContent = featured.teamTwoAbbr || featured.teamTwo.substring(0, 3).toUpperCase();
+    if (teamTwoCrest) {
+      const logo2 = featured.teamTwoLogo || featured.team_two_logo;
+      const abbr2 = featured.teamTwoAbbr || featured.teamTwo.substring(0, 3).toUpperCase();
+      if (logo2) {
+        teamTwoCrest.innerHTML = `<img src="${escapeHtml(formatLogoUrl(logo2))}" alt="${escapeHtml(featured.teamTwo)}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">${escapeHtml(abbr2)}</span>`;
+      } else {
+        teamTwoCrest.textContent = abbr2;
+      }
+    }
     if (teamTwoName) teamTwoName.textContent = featured.teamTwo;
     if (teamTwoRate) teamTwoRate.textContent = `Rate ${parseFloat(featured.teamTwoRate || 1.90).toFixed(2)}`;
 
-    if (lockNotice) lockNotice.textContent = `${featured.scheduledTime || 'Scheduled'} • ${featured.stage || 'Toss'}`;
+    if (lockNotice) lockNotice.textContent = `Ends: ${displayEndTime} • ${featured.stage || 'Toss'}`;
     if (venueEl) venueEl.textContent = featured.venue || 'Cricket Stadium';
   }
 
@@ -288,6 +371,112 @@
 
     if (!feedContainer) return;
 
+    // Track active client-side expiry timeouts to remove cards the second they expire
+    const expiryTimersMap = new Map();
+
+    /**
+     * Remove an expired match from the user Home page in real-time
+     */
+    function removeMatchFromHome(matchId) {
+      if (!matchId) return;
+      const sId = String(matchId);
+
+      // Clear timer for this match
+      if (expiryTimersMap.has(sId)) {
+        clearTimeout(expiryTimersMap.get(sId));
+        expiryTimersMap.delete(sId);
+      }
+
+      // Drop from local state
+      const beforeLen = matchesState.length;
+      matchesState = matchesState.filter(m => String(m.id) !== sId);
+
+      // Animate card removal smoothly
+      const card = feedContainer.querySelector(`.match-card[data-match-id="${sId}"]`);
+      if (card) {
+        card.style.transition = 'opacity 0.25s ease, transform 0.25s ease, margin 0.25s ease';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.97)';
+        setTimeout(() => {
+          card.remove();
+          if (matchesState.length === 0) {
+            feedContainer.innerHTML = renderEmptyState(currentCategory);
+            const resetBtn = document.getElementById('reset-category-btn');
+            if (resetBtn) resetBtn.addEventListener('click', () => setCategory('all'));
+          }
+        }, 260);
+      } else if (matchesState.length === 0) {
+        feedContainer.innerHTML = renderEmptyState(currentCategory);
+      }
+
+      // Re-calculate category counts
+      if (beforeLen !== matchesState.length) {
+        categoryCounts[currentCategory] = matchesState.length;
+        if (categoryCounts.all > 0) categoryCounts.all--;
+        updateCounts();
+      }
+
+      // Reconcile featured match
+      updateFeaturedMatch(matchesState);
+
+      // If betting modal is open for this match, close it and alert user
+      if (typeof checkActiveMatchEligibility === 'function') {
+        checkActiveMatchEligibility(matchesState);
+      }
+    }
+
+    /**
+     * Schedule exact-second browser timers for each visible match's expiry
+     */
+    function scheduleMatchExpiryTimers(matches) {
+      // Clear previously registered timeouts
+      expiryTimersMap.forEach(timerId => clearTimeout(timerId));
+      expiryTimersMap.clear();
+
+      const now = Date.now();
+      (matches || []).forEach(m => {
+        const rawEnd = m.matchEndTime || m.match_end_time;
+        if (!rawEnd) return;
+        const expiryMs = new Date(rawEnd).getTime();
+        if (isNaN(expiryMs)) return;
+
+        const msRemaining = expiryMs - now;
+        if (msRemaining <= 0) {
+          // Already passed expiry threshold - remove immediately
+          removeMatchFromHome(m.id);
+        } else {
+          // Schedule removal exactly when expiry is reached
+          const timerId = setTimeout(() => {
+            removeMatchFromHome(m.id);
+          }, msRemaining);
+          expiryTimersMap.set(String(m.id), timerId);
+        }
+      });
+    }
+
+    /**
+     * Check all current matches against actual clock (for background tabs and wakeups)
+     */
+    function checkAndPurgeExpiredMatches() {
+      const now = Date.now();
+      const expiredIds = [];
+      matchesState.forEach(m => {
+        const rawEnd = m.matchEndTime || m.match_end_time;
+        if (!rawEnd) {
+          expiredIds.push(m.id);
+          return;
+        }
+        const expMs = new Date(rawEnd).getTime();
+        if (isNaN(expMs) || expMs <= now) {
+          expiredIds.push(m.id);
+        }
+      });
+
+      if (expiredIds.length > 0) {
+        expiredIds.forEach(id => removeMatchFromHome(id));
+      }
+    }
+
     // Load authentic matches from MySQL API
     async function loadMatchesData(silent = false) {
       if (isLoading) return;
@@ -303,12 +492,31 @@
 
       try {
         const result = await window.TossBookMatches.getAll(currentCategory);
-        matchesState = result.matches || [];
+        const nowMs = Date.now();
+
+        // Exclude completed, settled, or expired matches
+        const eligibleMatches = (result.matches || []).filter(m => {
+          if (m.status === 'completed' || m.status === 'abandoned' || m.settled) return false;
+          const rawEnd = m.matchEndTime || m.match_end_time;
+          if (!rawEnd) return false; // missing end time is not treated as future
+          const expiryMs = new Date(rawEnd).getTime();
+          if (isNaN(expiryMs) || expiryMs <= nowMs) return false;
+          return true;
+        });
+
+        matchesState = eligibleMatches;
         categoryCounts = result.counts || { all: 0, live: 0, upcoming: 0, completed: 0 };
+        categoryCounts.all = eligibleMatches.length;
+        categoryCounts.completed = 0;
 
         updateCounts();
-        updateFeaturedMatch(window.TossBookMatches.getCached());
+        updateFeaturedMatch(eligibleMatches);
         renderFeed();
+        scheduleMatchExpiryTimers(eligibleMatches);
+
+        if (typeof checkActiveMatchEligibility === 'function') {
+          checkActiveMatchEligibility(eligibleMatches);
+        }
       } catch (err) {
         console.error('[HOME MATCHES ERROR]', err);
         if (!silent || matchesState.length === 0) {
@@ -343,6 +551,16 @@
         return;
       }
 
+      // Reconcile DOM cards: remove any completed / expired / ineligible match cards
+      const activeIds = new Set(matchesState.map(m => String(m.id)));
+      const existingCards = feedContainer.querySelectorAll('.match-card[data-match-id]');
+      existingCards.forEach(card => {
+        const id = card.getAttribute('data-match-id');
+        if (!activeIds.has(String(id))) {
+          card.remove();
+        }
+      });
+
       feedContainer.innerHTML = matchesState.map(renderMatchCard).join('');
     }
 
@@ -369,28 +587,61 @@
 
     // Real-time countdown timer ticker every 1 second
     setInterval(() => {
+      const now = Date.now();
       document.querySelectorAll('.match-time-indicator').forEach(el => {
         const scheduled = el.dataset.scheduled;
         const status = el.dataset.status;
+        const endTime = el.dataset.endTime;
+
+        if (endTime) {
+          const expMs = new Date(endTime).getTime();
+          if (!isNaN(expMs) && expMs <= now) {
+            const mId = el.dataset.matchId;
+            removeMatchFromHome(mId);
+            return;
+          }
+        }
+
         if (status === 'upcoming') {
-          el.innerHTML = getCountdownDisplay(scheduled, status);
+          el.innerHTML = getCountdownDisplay(scheduled, status, endTime);
         }
       });
     }, 1000);
 
-    // Periodic match background refresh (every 20s) and window focus revalidation
+    // Periodic match background refresh (every 5s) and window focus revalidation
     setInterval(() => {
       if (!document.hidden) {
+        checkAndPurgeExpiredMatches();
         loadMatchesData(true);
       }
-    }, 20000);
+    }, 5000);
 
     window.addEventListener('focus', () => {
+      checkAndPurgeExpiredMatches();
       loadMatchesData(true);
     });
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        checkAndPurgeExpiredMatches();
+        loadMatchesData(true);
+      }
+    });
+
+    // Real-time synchronization via BroadcastChannel & LocalStorage
+    if (typeof window.BroadcastChannel === 'function') {
+      try {
+        const matchesChannel = new BroadcastChannel('itb_matches');
+        matchesChannel.onmessage = (event) => {
+          if (event && event.data && (event.data.type === 'MATCH_SETTLED' || event.data.type === 'MATCHES_UPDATED' || event.data.type === 'MATCH_CREATED' || event.data.type === 'MATCH_DELETED')) {
+            loadMatchesData(true);
+          }
+        };
+      } catch (e) {}
+    }
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'itb_matches_updated_at') {
         loadMatchesData(true);
       }
     });
@@ -641,6 +892,12 @@
         return;
       }
 
+      if (match.settled || match.status === 'completed' || match.status === 'abandoned') {
+        alert('Betting is closed for this match as it has already concluded.');
+        loadMatchesData(true);
+        return;
+      }
+
       activeMatch = match;
       clearAlerts();
       isSubmitting = false;
@@ -744,24 +1001,31 @@
       });
     }
 
-    // Quick Presets
+    // Quick Presets (Min ₹50, Max ₹100,000)
     presetBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const preset = parseFloat(btn.dataset.preset) || 0;
         const current = parseFloat(stakeInput.value) || 0;
-        stakeInput.value = (current + preset).toFixed(0);
+        let nextVal = current === 0 ? preset : current + preset;
+        if (nextVal > 100000) nextVal = 100000;
+        stakeInput.value = nextVal.toFixed(0);
         clearAlerts();
         recalculateSummary();
       });
     });
 
-    // MAX Button
+    // MAX Button (Capped at ₹100,000)
     if (maxBtn) {
       maxBtn.addEventListener('click', () => {
         const avail = getAuthoritativeAvailableBalance();
-        const maxAllowed = Math.min(avail, 500000);
-        stakeInput.value = maxAllowed > 0 ? Math.floor(maxAllowed).toString() : '0';
-        clearAlerts();
+        const maxAllowed = Math.min(avail, 100000);
+        if (maxAllowed < 50) {
+          showError('Your available balance is below the minimum stake of ₹50.');
+          stakeInput.value = '';
+        } else {
+          stakeInput.value = Math.floor(maxAllowed).toString();
+          clearAlerts();
+        }
         recalculateSummary();
       });
     }
@@ -795,22 +1059,44 @@
         return;
       }
 
-      // 4. Stake Check
-      const stake = parseFloat(stakeInput.value);
-      if (isNaN(stake) || stake <= 0) {
-        showError('Please enter a valid stake amount greater than 0.');
+      // 4. Strict Stake Checks (Min ₹50, Max ₹100,000)
+      const rawVal = stakeInput ? stakeInput.value.trim() : '';
+      if (!rawVal) {
+        showError('Please enter a valid stake amount.');
         if (stakeInput) stakeInput.focus();
         return;
       }
 
-      if (stake < 1) {
-        showError('Minimum stake amount is ₹1.00.');
+      // Disallow non-numeric strings
+      if (!/^-?\d+(\.\d+)?$/.test(rawVal)) {
+        showError('Please enter a valid stake amount.');
         if (stakeInput) stakeInput.focus();
         return;
       }
 
-      if (stake > 500000) {
-        showError('Maximum stake amount is ₹500,000.00.');
+      const stake = Number(rawVal);
+      if (isNaN(stake) || !Number.isFinite(stake) || stake <= 0) {
+        showError('Please enter a valid stake amount.');
+        if (stakeInput) stakeInput.focus();
+        return;
+      }
+
+      // Check decimal precision (at most 2 decimals)
+      const decParts = rawVal.split('.');
+      if (decParts.length === 2 && decParts[1].length > 2) {
+        showError('Stake amount cannot have more than 2 decimal places.');
+        if (stakeInput) stakeInput.focus();
+        return;
+      }
+
+      if (stake < 50) {
+        showError('Minimum stake amount is ₹50.');
+        if (stakeInput) stakeInput.focus();
+        return;
+      }
+
+      if (stake > 100000) {
+        showError('Maximum stake amount is ₹100,000.');
         if (stakeInput) stakeInput.focus();
         return;
       }
@@ -880,14 +1166,38 @@
 
       } catch (err) {
         console.error('[BET PLACEMENT ERROR]', err);
-        const errMsg = err.message || (err.error && err.error.message) || 'Unable to place bet. Please try again.';
-        showError(escapeHtml(errMsg));
+        const errObj = err.error || err;
+        const errCode = errObj.code || err.code || '';
+        const errMsg = err.message || errObj.message || 'Unable to place bet. Please try again.';
+
+        if (errCode === 'BETTING_CLOSED' || errMsg.toLowerCase().includes('closed') || errMsg.toLowerCase().includes('settled')) {
+          showError('⚠️ Betting is closed. This match has concluded and settled.');
+          if (confirmBtn) confirmBtn.disabled = true;
+          loadMatchesData(true);
+          setTimeout(() => {
+            closeBetModal();
+          }, 3000);
+        } else {
+          showError(escapeHtml(errMsg));
+          confirmBtn.disabled = false;
+        }
         isSubmitting = false;
-        confirmBtn.disabled = false;
         if (confirmText) confirmText.style.display = 'inline-block';
         if (confirmSpinner) confirmSpinner.style.display = 'none';
       }
     });
+
+    // Check active match eligibility while popup is open
+    checkActiveMatchEligibility = function (activeMatchesList) {
+      if (!activeMatch || modal.style.display !== 'flex') return;
+      const matchId = String(activeMatch.id);
+      const isStillEligible = (activeMatchesList || []).some(m => String(m.id) === matchId);
+      if (!isStillEligible) {
+        showError('⚠️ Betting is closed. This match has been concluded/settled by the administrator.');
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (stakeInput) stakeInput.disabled = true;
+      }
+    };
 
     // Delegate "BET ON TOSS" click on match cards
     const feedContainer = document.getElementById('match-feed-container');

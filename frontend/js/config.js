@@ -1,9 +1,9 @@
 /**
- * IRONMAN TOSS BOOK - Frontend Configuration
+ * DADDY TOSS BOOK - Frontend Configuration
  */
 
 const APP_CONFIG = Object.freeze({
-  appName: 'IRONMAN TOSS BOOK',
+  appName: 'DADDY TOSS BOOK',
   version: '1.0.0-day2',
   apiBaseUrl: (typeof window !== 'undefined' && window.ITB_API_URL)
     ? window.ITB_API_URL
@@ -36,7 +36,7 @@ const APP_CONFIG = Object.freeze({
 
   // Centralized Announcement Ticker Messages (Supports English & Hindi)
   announcements: [
-    'WELCOME TO IRONMAN TOSS BOOK',
+    'WELCOME TO DADDY TOSS BOOK',
     '100% SECURE & LIGHTNING FAST SETTLEMENT',
     'टॉस के बेताज बादशाह - हर मैच का लाइव टॉस उपलब्ध',
     'ALL INTERNATIONAL & T20 LEAGUE MATCHES ACTIVE',
@@ -46,7 +46,7 @@ const APP_CONFIG = Object.freeze({
   // Brand Logo configuration
   logo: {
     src: 'assets/images/logo.png',
-    alt: 'IRONMAN TOSS BOOK Logo'
+    alt: 'DADDY TOSS BOOK Logo'
   }
 });
 

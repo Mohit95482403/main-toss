@@ -11,6 +11,12 @@ package-lock.json.bak
 *.cert
 *.crt
 
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+!backend/uploads/team-logos/
+!backend/uploads/team-logos/.gitkeep
+
 # Logs
 logs/
 *.log

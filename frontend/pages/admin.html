@@ -4,8 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>IRONMAN TOSS BOOK | Admin Governance Portal</title>
-  <meta name="description" content="Administrative control center, user management, and operational monitoring for IRONMAN TOSS BOOK.">
+  <title>DADDY TOSS BOOK | Admin Governance Portal</title>
+  <meta name="description" content="Administrative control center, user management, and operational monitoring for DADDY TOSS BOOK.">
+
+  <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
   <!-- Core Design System CSS -->
   <link rel="stylesheet" href="../css/variables.css">
@@ -16,7 +21,7 @@
   <link rel="stylesheet" href="../css/responsive.css">
 
   <!-- Admin Page Specific CSS -->
-  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/admin.css?v=1.4">
 </head>
 <body data-page="admin" data-in-pages="true">
   <div class="admin-view-wrapper">
@@ -25,13 +30,22 @@
     <header class="admin-header" role="banner">
       <div class="admin-header-inner">
         <div class="admin-header-left">
-          <a href="../index.html" class="admin-logo-badge" title="IRONMAN TOSS BOOK Home">
+          <!-- Mobile Sidebar Drawer Toggle -->
+          <button type="button" class="admin-sidebar-toggle" id="admin-sidebar-toggle" aria-label="Toggle navigation sidebar" aria-expanded="false" aria-controls="admin-sidebar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <a href="../index.html" class="admin-logo-badge" title="DADDY TOSS BOOK Home">
             <div class="admin-logo-icon">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"></path>
               </svg>
             </div>
-            <span class="admin-brand-title">IRONMAN TOSS BOOK</span>
+            <span class="admin-brand-title">DADDY TOSS BOOK</span>
             <span class="admin-portal-tag">Admin</span>
           </a>
         </div>
@@ -55,77 +69,96 @@
       </div>
     </header>
 
-    <!-- Administrative Navigation Tabs -->
-    <nav class="admin-nav-bar" aria-label="Administrative Tabs">
-      <div class="admin-nav-inner">
-        <button type="button" class="admin-tab-btn active" data-tab="overview">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-          </svg>
-          Overview
-        </button>
+    <!-- Admin Responsive Layout Container -->
+    <div class="admin-layout" id="admin-layout">
+      <!-- Backdrop overlay for mobile/tablet drawer -->
+      <div class="admin-sidebar-backdrop" id="admin-sidebar-backdrop" aria-hidden="true"></div>
 
-        <button type="button" class="admin-tab-btn" data-tab="matches">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
-            <path d="M2 12h20"></path>
-          </svg>
-          Matches &amp; Bets
-        </button>
+      <!-- Admin Sidebar Navigation -->
+      <aside class="admin-sidebar" id="admin-sidebar" aria-label="Administrative Navigation Sidebar">
+        <div class="admin-sidebar-header">
+          <div class="admin-sidebar-brand-title">Navigation</div>
+          <button type="button" class="admin-sidebar-close" id="admin-sidebar-close" aria-label="Close navigation sidebar">✕</button>
+        </div>
 
-        <button type="button" class="admin-tab-btn" data-tab="settlement">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12"></polyline>
-            <path d="M12 22a10 10 0 1 0-10-10"></path>
-          </svg>
-          Bet Settlement
-        </button>
+        <nav class="admin-sidebar-nav admin-nav-bar" aria-label="Administrative Tabs">
+          <div class="admin-nav-inner">
+            <button type="button" class="admin-tab-btn active" data-tab="overview">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              <span>Overview</span>
+            </button>
 
-        <button type="button" class="admin-tab-btn" data-tab="coins">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="9"></circle>
-            <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1-1.8-1"></path>
-            <path d="M12 6v2m0 8v2"></path>
-          </svg>
-          Player Coin Management
-        </button>
+            <button type="button" class="admin-tab-btn" data-tab="matches">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+                <path d="M2 12h20"></path>
+              </svg>
+              <span>Matches &amp; Bets</span>
+            </button>
 
-        <button type="button" class="admin-tab-btn" data-tab="users">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          User Management
-        </button>
+            <button type="button" class="admin-tab-btn" data-tab="settlement">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"></polyline>
+                <path d="M12 22a10 10 0 1 0-10-10"></path>
+              </svg>
+              <span>Bet Settlement</span>
+            </button>
 
-        <button type="button" class="admin-tab-btn" data-tab="audits">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-          </svg>
-          Audit History
-        </button>
+            <button type="button" class="admin-tab-btn" data-tab="coins">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1-1.8-1"></path>
+                <path d="M12 6v2m0 8v2"></path>
+              </svg>
+              <span>Player Coin Management</span>
+            </button>
 
-        <button type="button" class="admin-tab-btn" data-tab="system">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-          </svg>
-          System Health
-        </button>
-      </div>
-    </nav>
+            <button type="button" class="admin-tab-btn" data-tab="users">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <span>User Management</span>
+            </button>
 
-    <!-- Main Content Container -->
-    <main class="admin-main" id="admin-main-container">
+            <button type="button" class="admin-tab-btn" data-tab="audits">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <span>Audit History</span>
+            </button>
+
+            <button type="button" class="admin-tab-btn" data-tab="system">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              <span>System Health</span>
+            </button>
+          </div>
+        </nav>
+
+        <div class="admin-sidebar-footer">
+          <div class="admin-sidebar-status">
+            <span class="status-beacon-live" aria-hidden="true"></span>
+            <span>Governance Active</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content Container -->
+      <main class="admin-main" id="admin-main-container">
 
       <!-- =================================================================== -->
       <!-- TAB 1: OVERVIEW -->
@@ -509,7 +542,7 @@
                 <div class="text-sm font-bold text-secondary">APPLICATION SERVICE</div>
                 <div class="system-metric-row">
                   <span class="text-muted">Service Name:</span>
-                  <span class="font-bold" id="sys-app-name">IRONMAN TOSS BOOK</span>
+                  <span class="font-bold" id="sys-app-name">DADDY TOSS BOOK</span>
                 </div>
                 <div class="system-metric-row">
                   <span class="text-muted">Environment:</span>
@@ -683,7 +716,7 @@
           <div class="admin-toolbar">
             <div class="toolbar-group-left">
               <div class="admin-search-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <svg class="admin-search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 <input type="text" id="matches-search-input" class="admin-search-input" placeholder="Search match, teams, or competition...">
               </div>
               <select id="matches-status-select" class="admin-select" aria-label="Filter by Match Status">
@@ -714,17 +747,18 @@
                   <th scope="col" style="width: 50px;">ID</th>
                   <th scope="col">Match / Event</th>
                   <th scope="col">Competition</th>
+                  <th scope="col">Configured End Time</th>
                   <th scope="col">Status</th>
                   <th scope="col" class="text-right">Bets</th>
                   <th scope="col" class="text-right">Players</th>
                   <th scope="col" class="text-right">Total Stake</th>
                   <th scope="col">Settlement</th>
-                  <th scope="col" class="text-center" style="width: 160px;">Actions</th>
+                  <th scope="col" class="text-center" style="min-width: 250px;">Actions</th>
                 </tr>
               </thead>
               <tbody id="matches-table-body">
                 <tr>
-                  <td colspan="9" class="text-center text-muted" style="padding: 30px;">Loading matches from MySQL database...</td>
+                  <td colspan="10" class="text-center text-muted" style="padding: 30px;">Loading matches from MySQL database...</td>
                 </tr>
               </tbody>
             </table>
@@ -1054,6 +1088,7 @@
       </section>
 
     </main>
+    </div><!-- /admin-layout -->
 
   </div>
 
@@ -1176,7 +1211,7 @@
         <div class="admin-toolbar" style="margin-bottom: 0;">
           <div class="toolbar-group-left" style="flex: 1;">
             <div class="admin-search-box" style="flex: 1;">
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <svg class="admin-search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               <input type="text" id="match-bets-search-input" class="admin-search-input" placeholder="Search player name or bet ID...">
             </div>
             <select id="match-bets-status-select" class="admin-select" aria-label="Filter by Bet Status">
@@ -1382,7 +1417,7 @@
           <!-- 2. Username -->
           <div class="field-group">
             <label for="input-create-username" class="field-label">Username: <span class="text-danger">*</span></label>
-            <input type="text" class="admin-search-input" id="input-create-username" name="username" placeholder="e.g. player_ironman" required autocomplete="off" />
+            <input type="text" class="admin-search-input" id="input-create-username" name="username" placeholder="e.g. player_daddy" required autocomplete="off" />
             <div class="text-xs text-muted" style="margin-top: 4px;">3–30 characters, alphanumeric and underscores only.</div>
             <div class="text-xs text-danger" id="error-create-username" style="display: none; margin-top: 4px;"></div>
           </div>
@@ -1582,7 +1617,7 @@
 
           <!-- Team 2 Inputs -->
           <div class="create-match-team-card">
-            <div class="create-match-team-title" style="color: #475569;">
+            <div class="create-match-team-title" style="color: var(--text-secondary);">
               <span>Team Two (Visitor / Team B)</span>
               <span class="badge badge-secondary" style="font-size: 10px; padding: 2px 6px;">VISITOR</span>
             </div>
@@ -1602,12 +1637,99 @@
             </div>
           </div>
 
-          <!-- Schedule, Venue & Status Row -->
-          <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 1fr; gap: 10px;">
-            <div class="field-group">
-              <label for="match-input-schedule" class="field-label">Scheduled Time *</label>
-              <input type="text" id="match-input-schedule" class="admin-search-input" placeholder="e.g. Today, 07:30 PM" required />
+          <!-- Team Logos Upload Row (Side-by-side on desktop, stacked on mobile) -->
+          <div class="field-group">
+            <div class="create-match-team-title" style="margin-bottom: 8px;">
+              <span>Official Team Logos</span>
+              <span class="text-2xs text-muted">PNG, JPG, JPEG, WEBP (Max 2MB per logo)</span>
             </div>
+            <div class="team-logos-upload-grid">
+              <!-- Team 1 Logo Card -->
+              <div class="logo-upload-card" id="team-one-logo-card">
+                <label class="field-label" for="match-input-team-one-logo">Team 1 Logo</label>
+                <div class="logo-upload-dropzone" id="team-one-logo-dropzone" tabindex="0" role="button" aria-label="Upload Team 1 Logo">
+                  <input type="file" id="match-input-team-one-logo" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="logo-file-input" style="display: none;" />
+                  <!-- Placeholder state -->
+                  <div class="logo-placeholder" id="team-one-logo-placeholder">
+                    <div class="logo-icon-circle">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                    </div>
+                    <span class="logo-upload-text">Select Team 1 Logo</span>
+                    <span class="logo-upload-subtext">Click or drag image here</span>
+                  </div>
+                  <!-- Preview state -->
+                  <div class="logo-preview-wrap" id="team-one-logo-preview-wrap" style="display: none;">
+                    <img id="team-one-logo-preview" src="" alt="Team 1 Logo Preview" class="logo-preview-img" />
+                    <div class="logo-preview-actions">
+                      <button type="button" class="btn btn-secondary btn-xs btn-change-logo" id="btn-change-team-one-logo">Change Image</button>
+                      <button type="button" class="btn btn-outline-danger btn-xs btn-remove-logo" id="btn-remove-team-one-logo">Remove Image</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="logo-validation-msg" id="team-one-logo-validation" style="display: none;"></div>
+              </div>
+
+              <!-- Team 2 Logo Card -->
+              <div class="logo-upload-card" id="team-two-logo-card">
+                <label class="field-label" for="match-input-team-two-logo">Team 2 Logo</label>
+                <div class="logo-upload-dropzone" id="team-two-logo-dropzone" tabindex="0" role="button" aria-label="Upload Team 2 Logo">
+                  <input type="file" id="match-input-team-two-logo" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="logo-file-input" style="display: none;" />
+                  <!-- Placeholder state -->
+                  <div class="logo-placeholder" id="team-two-logo-placeholder">
+                    <div class="logo-icon-circle">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                    </div>
+                    <span class="logo-upload-text">Select Team 2 Logo</span>
+                    <span class="logo-upload-subtext">Click or drag image here</span>
+                  </div>
+                  <!-- Preview state -->
+                  <div class="logo-preview-wrap" id="team-two-logo-preview-wrap" style="display: none;">
+                    <img id="team-two-logo-preview" src="" alt="Team 2 Logo Preview" class="logo-preview-img" />
+                    <div class="logo-preview-actions">
+                      <button type="button" class="btn btn-secondary btn-xs btn-change-logo" id="btn-change-team-two-logo">Change Image</button>
+                      <button type="button" class="btn btn-outline-danger btn-xs btn-remove-logo" id="btn-remove-team-two-logo">Remove Image</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="logo-validation-msg" id="team-two-logo-validation" style="display: none;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schedule, End Time, Venue & Status Row -->
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px;">
+            <div class="field-group">
+              <label for="match-input-end-time" class="field-label">Match End Time (Auto-Expiry from Home) *</label>
+              <input type="datetime-local" id="match-input-end-time" class="admin-search-input" required />
+              <div class="quick-preset-chips" style="margin-top: 6px;">
+                <button type="button" class="preset-chip preset-end-chip" data-mins="15">+15m</button>
+                <button type="button" class="preset-chip preset-end-chip" data-mins="30">+30m</button>
+                <button type="button" class="preset-chip preset-end-chip" data-mins="60">+1h</button>
+                <button type="button" class="preset-chip preset-end-chip" data-mins="120">+2h</button>
+                <button type="button" class="preset-chip preset-end-chip" data-mins="1440">+1d</button>
+              </div>
+              <div class="text-2xs text-muted" style="margin-top: 4px;">
+                Match will automatically disappear from the user's Home page at this exact moment.
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="match-input-schedule" class="field-label">Display Schedule / Time *</label>
+              <input type="text" id="match-input-schedule" class="admin-search-input" placeholder="e.g. Today, 07:30 PM" required />
+              <div class="text-2xs text-muted" style="margin-top: 4px;">
+                Human-friendly label displayed on cards (auto-filled when selecting end time).
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px;">
             <div class="field-group">
               <label for="match-input-venue" class="field-label">Venue</label>
               <input type="text" id="match-input-venue" class="admin-search-input" placeholder="e.g. Melbourne Cricket Ground" />
@@ -1635,6 +1757,123 @@
     </div>
   </div>
 
+  <!-- 10. Edit Match Schedule & End Time Modal -->
+  <div class="admin-modal-overlay" id="modal-edit-match-schedule" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="admin-modal-card" style="max-width: 540px;">
+      <header class="admin-modal-header">
+        <div>
+          <h2 class="text-base font-bold" id="edit-schedule-modal-title">⏱ Edit Match End Time &amp; Schedule</h2>
+          <div class="text-xs text-muted" id="edit-schedule-modal-subtitle">Configure auto-expiry for this match fixture</div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close aria-label="Close dialog">✕</button>
+      </header>
+
+      <form id="form-edit-match-schedule" novalidate>
+        <input type="hidden" id="edit-match-id" />
+        <div class="admin-modal-body" style="gap: 14px;">
+          <!-- Error banner inside modal -->
+          <div id="edit-schedule-error-box" class="alert alert-danger" style="display: none;">
+            <span class="alert-icon">⚠️</span>
+            <span class="alert-text" id="edit-schedule-error-text"></span>
+          </div>
+
+          <div class="field-group">
+            <label for="edit-match-input-end-time" class="field-label">Configured End Time (Auto-Expiry from Home) *</label>
+            <input type="datetime-local" id="edit-match-input-end-time" class="admin-search-input" required />
+            <div class="quick-preset-chips" style="margin-top: 6px;">
+              <button type="button" class="preset-chip preset-edit-end-chip" data-mins="15">+15m</button>
+              <button type="button" class="preset-chip preset-edit-end-chip" data-mins="30">+30m</button>
+              <button type="button" class="preset-chip preset-edit-end-chip" data-mins="60">+1h</button>
+              <button type="button" class="preset-chip preset-edit-end-chip" data-mins="120">+2h</button>
+              <button type="button" class="preset-chip preset-edit-end-chip" data-mins="1440">+1d</button>
+            </div>
+            <div class="text-2xs text-muted" style="margin-top: 4px;">
+              Setting a past time will instantly hide this match from the user Home page. Setting a future time will keep or restore its visibility.
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="edit-match-input-schedule" class="field-label">Display Schedule / Time Label *</label>
+            <input type="text" id="edit-match-input-schedule" class="admin-search-input" placeholder="e.g. Today, 07:30 PM" required />
+          </div>
+
+          <!-- Team Logos Edit Row -->
+          <div class="field-group">
+            <div class="create-match-team-title" style="margin-bottom: 8px;">
+              <span>Update Match Team Logos</span>
+              <span class="text-2xs text-muted">View, replace, or remove</span>
+            </div>
+            <div class="team-logos-upload-grid">
+              <!-- Edit Team 1 Logo Card -->
+              <div class="logo-upload-card" id="edit-team-one-logo-card">
+                <label class="field-label" id="edit-label-team-one-logo">Team 1 Logo</label>
+                <div class="logo-upload-dropzone" id="edit-team-one-logo-dropzone" tabindex="0" role="button" aria-label="Upload Team 1 Replacement Logo">
+                  <input type="file" id="edit-input-team-one-logo" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="logo-file-input" style="display: none;" />
+                  <div class="logo-placeholder" id="edit-team-one-placeholder">
+                    <div class="logo-icon-circle">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                    </div>
+                    <span class="logo-upload-text">Upload Team 1 Logo</span>
+                    <span class="logo-upload-subtext">No logo set</span>
+                  </div>
+                  <div class="logo-preview-wrap" id="edit-team-one-preview-wrap" style="display: none;">
+                    <img id="edit-team-one-preview" src="" alt="Team 1 Logo" class="logo-preview-img" />
+                    <div class="logo-preview-actions">
+                      <button type="button" class="btn btn-secondary btn-xs btn-change-logo" id="btn-edit-change-team-one">Replace</button>
+                      <button type="button" class="btn btn-outline-danger btn-xs btn-remove-logo" id="btn-edit-remove-team-one">Remove</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="logo-validation-msg" id="edit-team-one-validation" style="display: none;"></div>
+              </div>
+
+              <!-- Edit Team 2 Logo Card -->
+              <div class="logo-upload-card" id="edit-team-two-logo-card">
+                <label class="field-label" id="edit-label-team-two-logo">Team 2 Logo</label>
+                <div class="logo-upload-dropzone" id="edit-team-two-logo-dropzone" tabindex="0" role="button" aria-label="Upload Team 2 Replacement Logo">
+                  <input type="file" id="edit-input-team-two-logo" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="logo-file-input" style="display: none;" />
+                  <div class="logo-placeholder" id="edit-team-two-placeholder">
+                    <div class="logo-icon-circle">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                    </div>
+                    <span class="logo-upload-text">Upload Team 2 Logo</span>
+                    <span class="logo-upload-subtext">No logo set</span>
+                  </div>
+                  <div class="logo-preview-wrap" id="edit-team-two-preview-wrap" style="display: none;">
+                    <img id="edit-team-two-preview" src="" alt="Team 2 Logo" class="logo-preview-img" />
+                    <div class="logo-preview-actions">
+                      <button type="button" class="btn btn-secondary btn-xs btn-change-logo" id="btn-edit-change-team-two">Replace</button>
+                      <button type="button" class="btn btn-outline-danger btn-xs btn-remove-logo" id="btn-edit-remove-team-two">Remove</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="logo-validation-msg" id="edit-team-two-validation" style="display: none;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="admin-modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btn-submit-edit-schedule" style="display: inline-flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Save &amp; Apply Schedule</span>
+          </button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
   <!-- Shared Toast Mount Container -->
   <div class="app-toast-container" id="app-toast-container" aria-live="polite"></div>
 
@@ -1642,6 +1881,6 @@
   <script src="../js/config.js"></script>
   <script src="../js/api-client.js"></script>
   <script src="../js/shared-layout.js"></script>
-  <script src="../js/admin.js"></script>
+  <script src="../js/admin.js?v=1.4"></script>
 </body>
 </html>

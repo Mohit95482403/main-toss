@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Bets History & Filter Controller (Day 9 Enhanced)
+ * DADDY TOSS BOOK - Bets History & Filter Controller (Day 9 Enhanced)
  * Handles client-side demonstration betting data, date grouping, status filtering,
  * real-time search, dynamic summary metrics, and accessible bet details modal.
  */
@@ -48,6 +48,20 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function formatLogoUrl(url) {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    if (url.startsWith('/uploads')) {
+      if (typeof window !== 'undefined' && window.location.port !== '5000' && window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) {
+        try {
+          const origin = new URL(window.APP_CONFIG.apiBaseUrl).origin;
+          return `${origin}${url}`;
+        } catch (e) {}
+      }
+    }
+    return url;
   }
 
   /**
@@ -172,7 +186,10 @@
           
           <div class="selection-row">
             <span>Market: <strong>${escapeHtml(bet.marketName)}</strong></span>
-            <span>Selection: <strong class="selection-choice">${escapeHtml(bet.selectedTeam)}</strong></span>
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              ${bet.selectedTeamLogo ? `<img src="${escapeHtml(formatLogoUrl(bet.selectedTeamLogo))}" alt="${escapeHtml(bet.selectedTeam)}" style="width: 18px; height: 18px; object-fit: contain; border-radius: 4px; background: #fff; border: 1px solid #F3D5E0; vertical-align: middle;" onerror="this.style.display='none';" />` : ''}
+              <span>Selection: <strong class="selection-choice">${escapeHtml(bet.selectedTeam)}</strong></span>
+            </span>
           </div>
 
           <!-- Financial Metrics -->

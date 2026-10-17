@@ -4,8 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>IRONMAN TOSS BOOK | My Profile</title>
-  <meta name="description" content="Manage your IRONMAN TOSS BOOK user profile, account settings, notifications, and security preferences.">
+  <title>DADDY TOSS BOOK | My Profile</title>
+  <meta name="description" content="Manage your DADDY TOSS BOOK user profile, account settings, notifications, and security preferences.">
+
+  <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
   <!-- Core Design System CSS -->
   <link rel="stylesheet" href="../css/variables.css">
@@ -153,23 +158,32 @@
               </div>
             </button>
 
-            <!-- 3. Dark Mode Theme Switcher -->
+            <!-- 3. Theme & Appearance -->
             <div class="settings-item" id="dark-mode-item" role="listitem">
               <div class="settings-item-left">
-                <div class="settings-icon-box icon-box-purple" aria-hidden="true">
+                <div class="settings-icon-box icon-box-primary" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                   </svg>
                 </div>
                 <div class="settings-text-group">
-                  <span class="settings-title">Dark Mode</span>
-                  <span class="settings-desc">Switch between light and dark visual themes</span>
+                  <span class="settings-title">Theme &amp; Appearance</span>
+                  <span class="settings-desc">Signature Ultra-Premium Light Pink edition</span>
                 </div>
               </div>
-              <label class="switch-control" for="dark-mode-switch-input">
-                <input type="checkbox" id="dark-mode-switch-input" aria-label="Toggle dark mode theme">
+              <label class="switch-control" for="dark-mode-switch-input" aria-label="Toggle Theme" style="display: none;">
+                <input type="checkbox" id="dark-mode-switch-input" disabled />
                 <span class="switch-slider"></span>
               </label>
+              <span class="badge badge-primary badge-pill">Signature Pink</span>
             </div>
 
             <!-- 4. Notification Preferences -->
@@ -329,8 +343,24 @@
           </div>
 
           <div class="form-group">
-            <label for="edit-username-input" class="form-label">Username *</label>
-            <input type="text" id="edit-username-input" class="form-control" placeholder="Enter username (e.g., ironman_99)" required>
+            <label for="edit-username-input" class="form-label">Username <span class="text-xs text-muted font-normal">(Read-only)</span></label>
+            <div class="input-readonly-wrap">
+              <input type="text" id="edit-username-input" class="form-control" readonly aria-readonly="true" tabindex="0">
+              <span class="input-lock-badge" aria-hidden="true" title="Username cannot be changed">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </span>
+            </div>
+            <span class="text-xs text-muted" style="margin-top: 4px; display: inline-flex; align-items: center; gap: 4px;">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              Username cannot be changed.
+            </span>
             <span class="field-error-msg" id="edit-username-error"></span>
           </div>
 
@@ -530,7 +560,7 @@
         <div>
           <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">Data Confidentiality</h4>
           <p class="text-xs text-secondary">
-            IRONMAN TOSS BOOK respects your privacy. In our production release (scheduled for Day 20), all personal details, contact identifiers, and transactional records are encrypted at rest and in transit via TLS 1.3.
+            DADDY TOSS BOOK respects your privacy. In our production release (scheduled for Day 20), all personal details, contact identifiers, and transactional records are encrypted at rest and in transit via TLS 1.3.
           </p>
         </div>
         <div>
@@ -569,8 +599,8 @@
         <div>
           <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--color-text); margin-bottom: 4px;">Official Channels</h4>
           <ul class="flex flex-col gap-xs text-xs" style="padding-left: var(--space-md); color: var(--color-text-secondary);">
-            <li><strong>Support Desk Email:</strong> support@ironmantossbook.com</li>
-            <li><strong>Telegram Channel:</strong> @IronmanTossOfficial</li>
+            <li><strong>Support Desk Email:</strong> support@daddytossbook.com</li>
+            <li><strong>Telegram Channel:</strong> @DaddyTossOfficial</li>
             <li><strong>WhatsApp Helpline:</strong> +91 98765 00000</li>
           </ul>
         </div>
@@ -604,7 +634,7 @@
       </header>
       <div class="profile-modal-body">
         <p>
-          Are you sure you want to log out of your <strong>IRONMAN TOSS BOOK</strong> account session?
+          Are you sure you want to log out of your <strong>DADDY TOSS BOOK</strong> account session?
         </p>
         <p class="text-xs text-muted">
           You will need to sign in again with your credentials to access your wallet and bet history.

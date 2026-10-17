@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - CSS Reset & Normalization
+ * DADDY TOSS BOOK - CSS Reset & Normalization
  * Standardizes styling across modern browsers.
  */
 
@@ -12,6 +12,8 @@
 }
 
 html {
+  width: 100%;
+  min-height: 100%;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -20,12 +22,13 @@ html {
 }
 
 body {
+  width: 100%;
   min-height: 100vh;
+  margin: 0;
   line-height: var(--line-height-normal, 1.5);
   font-family: var(--font-family-base, sans-serif);
-  background-color: var(--color-background, #F6F8FA);
-  color: var(--color-text, #15171A);
-  overflow-x: hidden;
+  background-color: var(--pink-bg, #FFF7FA);
+  color: var(--text-primary, #352631);
 }
 
 img,

@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Reset Password Controller (Day 3)
+ * DADDY TOSS BOOK - Reset Password Controller (Day 3)
  * Handles reset token detection, new password validation, strength feedback, and submission.
  */
 

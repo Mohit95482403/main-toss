@@ -95,10 +95,13 @@ CREATE TABLE IF NOT EXISTS matches (
   team_one VARCHAR(100) NOT NULL,
   team_one_abbr VARCHAR(10) DEFAULT NULL,
   team_one_rate DECIMAL(5, 2) NOT NULL DEFAULT 1.90,
+  team_one_logo VARCHAR(255) DEFAULT NULL,
   team_two VARCHAR(100) NOT NULL,
   team_two_abbr VARCHAR(10) DEFAULT NULL,
   team_two_rate DECIMAL(5, 2) NOT NULL DEFAULT 1.90,
+  team_two_logo VARCHAR(255) DEFAULT NULL,
   scheduled_time VARCHAR(100) DEFAULT NULL,
+  match_end_time DATETIME NULL DEFAULT NULL,
   venue VARCHAR(200) DEFAULT NULL,
   status ENUM('upcoming', 'live', 'completed', 'abandoned') NOT NULL DEFAULT 'upcoming',
   toss_winner VARCHAR(100) DEFAULT NULL,
@@ -110,6 +113,7 @@ CREATE TABLE IF NOT EXISTS matches (
   FOREIGN KEY (settled_by) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_matches_status (status),
   INDEX idx_matches_settled (settled),
+  INDEX idx_matches_end_time (match_end_time),
   INDEX idx_matches_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

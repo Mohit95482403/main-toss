@@ -18,30 +18,41 @@ router.get('/', async (req, res, next) => {
     const category = (req.query.category || 'all').trim().toLowerCase();
     const search = (req.query.search || '').trim();
 
-    // 1. Concurrently calculate real-time category counts from MySQL
+    // 1. Calculate real-time counts for active/eligible matches from MySQL (excluding expired matches)
     const [[countsRow]] = await pool.query(`
       SELECT
-        COUNT(*) AS totalAll,
-        SUM(CASE WHEN status = 'live' THEN 1 ELSE 0 END) AS totalLive,
-        SUM(CASE WHEN status = 'upcoming' THEN 1 ELSE 0 END) AS totalUpcoming,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS totalCompleted
+        COUNT(CASE WHEN status IN ('live', 'upcoming') AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NOT NULL AND match_end_time > NOW()) THEN 1 END) AS totalAll,
+        SUM(CASE WHEN status = 'live' AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NOT NULL AND match_end_time > NOW()) THEN 1 ELSE 0 END) AS totalLive,
+        SUM(CASE WHEN status = 'upcoming' AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NOT NULL AND match_end_time > NOW()) THEN 1 ELSE 0 END) AS totalUpcoming
       FROM matches
+      WHERE status IN ('live', 'upcoming') AND (settled = 0 OR settled IS FALSE)
+        AND (match_end_time IS NOT NULL AND match_end_time > NOW())
     `);
 
     const counts = {
-      all: parseInt(countsRow.totalAll || 0, 10),
-      live: parseInt(countsRow.totalLive || 0, 10),
-      upcoming: parseInt(countsRow.totalUpcoming || 0, 10),
-      completed: parseInt(countsRow.totalCompleted || 0, 10)
+      all: parseInt(countsRow?.totalAll || 0, 10),
+      live: parseInt(countsRow?.totalLive || 0, 10),
+      upcoming: parseInt(countsRow?.totalUpcoming || 0, 10),
+      completed: 0
     };
 
     // 2. Build parameterized query for fixtures
-    const whereClauses = [];
+    // Mandatory filter: ONLY active, unsettled, UNEXPIRED matches are eligible for the user's Home page
+    const whereClauses = [
+      "(match_end_time IS NOT NULL AND match_end_time > NOW())"
+    ];
     const queryParams = [];
 
-    if (category !== 'all' && ['live', 'upcoming', 'completed'].includes(category)) {
-      whereClauses.push('status = ?');
-      queryParams.push(category);
+    if (category === 'live') {
+      whereClauses.push("status = 'live'", "(settled = 0 OR settled IS FALSE)");
+    } else if (category === 'upcoming') {
+      whereClauses.push("status = 'upcoming'", "(settled = 0 OR settled IS FALSE)");
+    } else if (category === 'completed') {
+      // Completed matches are archived and excluded from the user Home page
+      whereClauses.push("1 = 0");
+    } else {
+      // Default: 'all' eligible active matches (upcoming or live, unsettled)
+      whereClauses.push("status IN ('live', 'upcoming')", "(settled = 0 OR settled IS FALSE)");
     }
 
     if (search.length > 0) {
@@ -61,10 +72,13 @@ router.get('/', async (req, res, next) => {
         team_one,
         team_one_abbr,
         team_one_rate,
+        team_one_logo,
         team_two,
         team_two_abbr,
         team_two_rate,
+        team_two_logo,
         scheduled_time,
+        match_end_time,
         venue,
         status,
         toss_winner,
@@ -75,6 +89,7 @@ router.get('/', async (req, res, next) => {
        ${whereSql}
        ORDER BY
          CASE WHEN status = 'live' THEN 1 WHEN status = 'upcoming' THEN 2 ELSE 3 END,
+         match_end_time ASC,
          created_at DESC`,
       queryParams
     );
@@ -87,10 +102,17 @@ router.get('/', async (req, res, next) => {
       teamOne: m.team_one,
       teamOneAbbr: m.team_one_abbr || m.team_one.substring(0, 3).toUpperCase(),
       teamOneRate: parseFloat(m.team_one_rate || 1.90),
+      teamOneLogo: m.team_one_logo || null,
+      team_one_logo: m.team_one_logo || null,
       teamTwo: m.team_two,
       teamTwoAbbr: m.team_two_abbr || m.team_two.substring(0, 3).toUpperCase(),
       teamTwoRate: parseFloat(m.team_two_rate || 1.90),
+      teamTwoLogo: m.team_two_logo || null,
+      team_two_logo: m.team_two_logo || null,
       scheduledTime: m.scheduled_time || 'Schedule TBA',
+      matchEndTime: m.match_end_time,
+      match_end_time: m.match_end_time,
+      isExpired: Boolean(m.match_end_time && new Date(m.match_end_time).getTime() <= Date.now()),
       venue: m.venue || 'Venue TBA',
       status: m.status,
       tossWinner: m.toss_winner,
@@ -128,8 +150,8 @@ router.get('/:id', async (req, res, next) => {
     const pool = getPool();
     const [rows] = await pool.query(
       `SELECT
-        id, competition, stage, match_title, team_one, team_one_abbr, team_one_rate,
-        team_two, team_two_abbr, team_two_rate, scheduled_time, venue, status,
+        id, competition, stage, match_title, team_one, team_one_abbr, team_one_rate, team_one_logo,
+        team_two, team_two_abbr, team_two_rate, team_two_logo, scheduled_time, match_end_time, venue, status,
         toss_winner, settled, settled_at, created_at
        FROM matches
        WHERE id = ?
@@ -155,10 +177,17 @@ router.get('/:id', async (req, res, next) => {
         teamOne: m.team_one,
         teamOneAbbr: m.team_one_abbr || m.team_one.substring(0, 3).toUpperCase(),
         teamOneRate: parseFloat(m.team_one_rate || 1.90),
+        teamOneLogo: m.team_one_logo || null,
+        team_one_logo: m.team_one_logo || null,
         teamTwo: m.team_two,
         teamTwoAbbr: m.team_two_abbr || m.team_two.substring(0, 3).toUpperCase(),
         teamTwoRate: parseFloat(m.team_two_rate || 1.90),
+        teamTwoLogo: m.team_two_logo || null,
+        team_two_logo: m.team_two_logo || null,
         scheduledTime: m.scheduled_time || 'Schedule TBA',
+        matchEndTime: m.match_end_time,
+        match_end_time: m.match_end_time,
+        isExpired: Boolean(m.match_end_time && new Date(m.match_end_time).getTime() <= Date.now()),
         venue: m.venue || 'Venue TBA',
         status: m.status,
         tossWinner: m.toss_winner,

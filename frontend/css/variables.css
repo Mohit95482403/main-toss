@@ -1,63 +1,138 @@
 /**
- * IRONMAN TOSS BOOK - Design System Variables & Tokens
- * Clean, modern, mobile-first design system custom properties.
+ * DADDY TOSS BOOK - Ultra-Premium Light Pink Design System
+ * Palette: Blush-pink canvases, pristine white surfaces, rose-pink brand accents,
+ * soft pastel semantic feedback, and elegant micro-elevations.
  */
 
 :root {
   /* ==========================================================================
-     Color Palette (Light Theme Default)
+     1. Exact Specified Light Pink Palette & Brand Tokens
      ========================================================================== */
-  --color-primary: #0860BE;
-  --color-primary-hover: #064F9D;
-  --color-primary-active: #053F7D;
-  --color-primary-subtle: #E8F2FC;
-  --color-primary-focus: rgba(8, 96, 190, 0.25);
+  --bg-primary: #FFF7FA;
+  --bg-secondary: #FFF0F5;
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #FFFAFC;
 
-  --color-background: #F6F8FA;
-  --color-surface: #FFFFFF;
-  --color-surface-elevated: #FFFFFF;
-  --color-surface-subtle: #F1F4F8;
-  --color-surface-hover: #F8FAFC;
+  --pink-bg: #FFF7FA;               /* Main page canvas */
+  --pink-bg-secondary: #FFF0F5;     /* Secondary / section canvas */
+  --pink-surface: #FFFFFF;          /* Pure white card surface */
+  --pink-surface-elevated: #FFFFFF; /* Elevated white card surface */
 
-  --color-text: #15171A;
-  --color-text-secondary: #4B5563;
-  --color-text-muted: #737B87;
-  --color-text-inverse: #FFFFFF;
+  --pink-primary: #E75480;          /* Primary action button & active highlights */
+  --pink-hover: #D94370;            /* Button hover alias */
+  --pink-primary-hover: #D94370;    /* Button hover state */
+  --pink-primary-dark: #C93768;     /* Button active/pressed state */
+  --pink-soft: #FCE4EC;             /* Soft pink highlight / chip background */
+  --pink-soft-hover: #F8D4E1;       /* Soft pink hover */
+  --pink-soft-subtle: #FFF3F7;      /* Very subtle pink wash */
+  --pink-light: #FFF0F5;            /* Primary light pink alias */
+  --pink-rose: #E879A5;             /* Primary rose pink */
 
-  --color-border: #E5E7EB;
-  --color-border-subtle: #EEF0F2;
-  --color-border-focus: #0860BE;
+  --border-primary: #F2D3DF;        /* Standard primary border */
+  --border-secondary: #F7E6ED;      /* Secondary subtle border */
+  --pink-border: #F2D3DF;           /* Subtle pink border */
+  --pink-border-strong: #EABCCF;    /* Stronger pink border for focus/hover */
 
-  /* Semantic Feedback */
-  --color-success: #16A34A;
-  --color-success-bg: #DCFCE7;
-  --color-success-text: #14532D;
+  --text-primary: #352631;          /* Primary high-contrast text */
+  --text-secondary: #786875;        /* Secondary supporting text */
+  --text-muted: #9A8994;            /* Muted timestamps & captions */
+  --text-inverse: #FFFFFF;          /* Text on dark/rose backgrounds */
 
-  --color-danger: #D62828;
-  --color-danger-bg: #FEE2E2;
-  --color-danger-text: #7F1D1D;
+  /* Semantic Feedback (Soft & Restrained) */
+  --success: #16865C;
+  --success-bg: #E8F7EF;
+  --success-text: #0D573B;
+  --success-border: #B7E4CF;
 
-  --color-warning: #F59E0B;
-  --color-warning-bg: #FEF3C7;
-  --color-warning-text: #78350F;
+  --warning: #A96F16;
+  --warning-bg: #FFF4D8;
+  --warning-text: #6E4609;
+  --warning-border: #F9E0A2;
 
-  --color-info: #0284C7;
-  --color-info-bg: #E0F2FE;
-  --color-info-text: #075985;
+  --danger: #D64550;
+  --danger-bg: #FDEBEC;
+  --danger-text: #9B2832;
+  --danger-border: #F7C0C5;
 
-  /* Overlays & Shadows */
-  --color-overlay: rgba(15, 23, 42, 0.55);
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.09), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-bottom-nav: 0 -2px 10px rgba(0, 0, 0, 0.06);
+  --info: #357ABD;
+  --info-bg: #EBF3FC;
+  --info-text: #1E4F80;
+  --info-border: #BFDAF7;
 
   /* ==========================================================================
-     Typography
+     2. Standard Platform Semantic Color Mappings
      ========================================================================== */
-  --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-primary: var(--pink-primary);
+  --color-primary-hover: var(--pink-primary-hover);
+  --color-primary-active: var(--pink-primary-dark);
+  --color-primary-subtle: var(--pink-soft);
+  --color-primary-focus: rgba(231, 84, 128, 0.22);
+
+  --color-background: var(--pink-bg);
+  --color-surface: var(--pink-surface);
+  --color-surface-elevated: var(--pink-surface-elevated);
+  --color-surface-subtle: var(--pink-bg-secondary);
+  --color-surface-hover: var(--pink-soft);
+
+  --color-text: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+
+  --color-border: var(--pink-border);
+  --color-border-subtle: var(--pink-border);
+  --color-border-focus: var(--pink-primary);
+  --color-border-hover: var(--pink-border-strong);
+
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-text: var(--success-text);
+
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-text: var(--danger-text);
+
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-text: var(--warning-text);
+
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-text: var(--info-text);
+
+  /* Layered Shadows with subtle rose tint */
+  --shadow-xs: 0 1px 3px rgba(180, 70, 115, 0.05);
+  --shadow-sm: 0 2px 8px rgba(180, 70, 115, 0.06);
+  --shadow-card: 0 4px 18px rgba(130, 63, 91, 0.06);
+  --shadow-hover: 0 10px 28px rgba(130, 63, 91, 0.11);
+  --shadow-md: 0 8px 24px rgba(180, 70, 115, 0.08);
+  --shadow-lg: 0 16px 36px rgba(180, 70, 115, 0.12);
+  --shadow-xl: 0 24px 48px rgba(180, 70, 115, 0.16);
+  --shadow-glow: 0 4px 16px rgba(231, 84, 128, 0.28);
+  --shadow-bottom-nav: 0 -3px 16px rgba(180, 70, 115, 0.08);
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  --border-radius-xs: var(--radius-xs);
+  --border-radius-sm: var(--radius-sm);
+  --border-radius-md: var(--radius-md);
+  --border-radius-lg: var(--radius-lg);
+  --border-radius-xl: var(--radius-xl);
+  --border-radius-full: var(--radius-full);
+
+  /* ==========================================================================
+     3. Modern Typography Tokens
+     ========================================================================== */
+  --font-family-base: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-display: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   --font-size-2xs: 0.6875rem; /* 11px */
   --font-size-xs: 0.75rem;     /* 12px */
@@ -65,100 +140,92 @@
   --font-size-base: 0.875rem;  /* 14px */
   --font-size-md: 1rem;        /* 16px */
   --font-size-lg: 1.125rem;    /* 18px */
-  --font-size-xl: 1.5rem;      /* 24px */
-  --font-size-2xl: 1.875rem;   /* 30px */
+  --font-size-xl: 1.375rem;    /* 22px */
+  --font-size-2xl: 1.75rem;    /* 28px */
+  --font-size-3xl: 2.25rem;    /* 36px */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
 
-  --line-height-tight: 1.25;
+  --line-height-tight: 1.2;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.625;
 
   /* ==========================================================================
-     Spacing (8pt harmonic system)
+     4. Standardized Global Spacing System Scale
      ========================================================================== */
-  --space-2xs: 0.125rem; /* 2px */
-  --space-xs: 0.25rem;   /* 4px */
-  --space-sm: 0.5rem;    /* 8px */
-  --space-md: 0.75rem;   /* 12px */
-  --space-lg: 1rem;      /* 16px */
-  --space-xl: 1.5rem;    /* 24px */
-  --space-2xl: 2rem;     /* 32px */
-  --space-3xl: 3rem;     /* 48px */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
 
-  /* ==========================================================================
-     Border Radius
-     ========================================================================== */
-  --radius-xs: 0.25rem;   /* 4px */
-  --radius-sm: 0.375rem;  /* 6px */
-  --radius-md: 0.5rem;    /* 8px */
-  --radius-lg: 0.75rem;   /* 12px */
-  --radius-xl: 1rem;      /* 16px */
-  --radius-full: 9999px;
+  /* Mapped Spacing Aliases */
+  --space-2xs: 2px;
+  --space-xs: var(--space-1);   /* 4px */
+  --space-sm: var(--space-2);   /* 8px */
+  --space-md: var(--space-3);   /* 12px */
+  --space-lg: var(--space-4);   /* 16px */
+  --space-xl: var(--space-6);   /* 24px */
+  --space-2xl: var(--space-8);  /* 32px */
+  --space-3xl: var(--space-12); /* 48px */
 
-  /* ==========================================================================
-     Layout Dimensions
-     ========================================================================== */
+  /* Page-Level Layout Paddings */
+  --page-padding-desktop: 32px;
+  --page-padding-tablet: 24px;
+  --page-padding-mobile: 16px;
+
+  /* Global Content Maximum Boundaries */
+  --content-max-width: 1440px;
   --container-max-width: 480px;
   --container-tablet-max: 768px;
-  --container-desktop-max: 1040px;
-  --header-height: 56px;
-  --ticker-height: 32px;
-  --bottom-nav-height: 60px;
+  --container-desktop-max: 1080px;
+  --admin-max-width: var(--content-max-width);
+
+  /* Component Heights & Layout Offsets */
+  --header-height: 60px;
+  --ticker-height: 34px;
+  --bottom-nav-height: 62px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 76px;
+  --layout-gap: 24px;
+  --card-gap: 20px;
+  --btn-height-sm: 32px;
+  --btn-height-md: 40px;
+  --btn-height-lg: 48px;
+  --input-height: 44px;
+
+  /* Z-Indices */
   --z-header: 100;
   --z-ticker: 90;
   --z-bottom-nav: 100;
   --z-modal: 200;
   --z-toast: 300;
+  --z-index-sticky: 100;
 
   /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-}
+  --transition-fast: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 380ms cubic-bezier(0.4, 0, 0.2, 1);
 
-/* ==========================================================================
-   Dark Theme Variant (Persisted via data-theme attribute)
-   ========================================================================== */
-[data-theme="dark"] {
-  --color-primary: #3B82F6;
-  --color-primary-hover: #2563EB;
-  --color-primary-active: #1D4ED8;
-  --color-primary-subtle: #1E293B;
-  --color-primary-focus: rgba(59, 130, 246, 0.35);
+  /* Glassmorphism & Elevated Aesthetics */
+  --glass-bg: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(242, 211, 223, 0.7);
+  --glass-blur: blur(14px);
+  --glass-shadow: 0 8px 32px rgba(180, 70, 115, 0.08);
 
-  --color-background: #0B0F17;
-  --color-surface: #151D2A;
-  --color-surface-elevated: #1E293B;
-  --color-surface-subtle: #121824;
-  --color-surface-hover: #1E293B;
-
-  --color-text: #F8FAFC;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #64748B;
-  --color-text-inverse: #0B0F17;
-
-  --color-border: #243042;
-  --color-border-subtle: #192333;
-  --color-border-focus: #3B82F6;
-
-  --color-success-bg: #064E3B;
-  --color-success-text: #6EE7B7;
-
-  --color-danger-bg: #450A0A;
-  --color-danger-text: #FCA5A5;
-
-  --color-warning-bg: #451A03;
-  --color-warning-text: #FCD34D;
-
-  --color-info-bg: #082F49;
-  --color-info-text: #7DD3FC;
-
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
-  --shadow-bottom-nav: 0 -2px 10px rgba(0, 0, 0, 0.5);
+  /* Curated Premium Gradients */
+  --gradient-primary: linear-gradient(135deg, #E75480 0%, #D94370 100%);
+  --gradient-primary-hover: linear-gradient(135deg, #ED6590 0%, #D94370 100%);
+  --gradient-primary-soft: linear-gradient(135deg, #FFF0F5 0%, #FCE4EC 100%);
+  --gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #FFF7FA 100%);
+  --gradient-hero: linear-gradient(135deg, #C93768 0%, #E75480 60%, #E879A5 100%);
+  --gradient-badge-live: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
 }

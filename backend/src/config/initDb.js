@@ -86,10 +86,13 @@ const TABLES_DDL = [
     team_one VARCHAR(100) NOT NULL,
     team_one_abbr VARCHAR(10) DEFAULT NULL,
     team_one_rate DECIMAL(5, 2) NOT NULL DEFAULT 1.90,
+    team_one_logo VARCHAR(255) DEFAULT NULL,
     team_two VARCHAR(100) NOT NULL,
     team_two_abbr VARCHAR(10) DEFAULT NULL,
     team_two_rate DECIMAL(5, 2) NOT NULL DEFAULT 1.90,
+    team_two_logo VARCHAR(255) DEFAULT NULL,
     scheduled_time VARCHAR(100) DEFAULT NULL,
+    match_end_time DATETIME NULL DEFAULT NULL,
     venue VARCHAR(200) DEFAULT NULL,
     status ENUM('upcoming', 'live', 'completed', 'abandoned') NOT NULL DEFAULT 'upcoming',
     toss_winner VARCHAR(100) DEFAULT NULL,
@@ -101,6 +104,7 @@ const TABLES_DDL = [
     FOREIGN KEY (settled_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_matches_status (status),
     INDEX idx_matches_settled (settled),
+    INDEX idx_matches_end_time (match_end_time),
     INDEX idx_matches_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 
@@ -225,6 +229,44 @@ async function initializeDatabase() {
       }
     } catch (colErr) {
       console.warn('[DB INIT] users.email nullability check notice:', colErr.message);
+    }
+
+    // Ensure match_end_time column exists in matches table
+    try {
+      const [colRows] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME = 'match_end_time'"
+      );
+      if (colRows.length === 0) {
+        await pool.query('ALTER TABLE matches ADD COLUMN match_end_time DATETIME NULL DEFAULT NULL AFTER scheduled_time');
+        await pool.query('ALTER TABLE matches ADD INDEX idx_matches_end_time (match_end_time)');
+        console.log('[DB INIT] Successfully added match_end_time column and index to matches table.');
+      }
+      // Historical backfill
+      await pool.query(`
+        UPDATE matches 
+        SET match_end_time = COALESCE(settled_at, created_at)
+        WHERE match_end_time IS NULL AND (settled = 1 OR status IN ('completed', 'abandoned'))
+      `);
+    } catch (mErr) {
+      console.warn('[DB INIT] match_end_time column verification notice:', mErr.message);
+    }
+
+    // Ensure team_one_logo and team_two_logo columns exist in matches table
+    try {
+      const [colRows] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME IN ('team_one_logo', 'team_two_logo')"
+      );
+      const existingCols = colRows.map(r => r.COLUMN_NAME);
+      if (!existingCols.includes('team_one_logo')) {
+        await pool.query('ALTER TABLE matches ADD COLUMN team_one_logo VARCHAR(255) NULL DEFAULT NULL AFTER team_one_rate');
+        console.log('[DB INIT] Successfully added team_one_logo column to matches table.');
+      }
+      if (!existingCols.includes('team_two_logo')) {
+        await pool.query('ALTER TABLE matches ADD COLUMN team_two_logo VARCHAR(255) NULL DEFAULT NULL AFTER team_two_rate');
+        console.log('[DB INIT] Successfully added team_two_logo column to matches table.');
+      }
+    } catch (logoErr) {
+      console.warn('[DB INIT] team logo columns verification notice:', logoErr.message);
     }
 
     // Schema verification complete (automatic demo data seeding disabled)

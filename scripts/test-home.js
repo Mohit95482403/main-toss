@@ -51,8 +51,8 @@ assert(htmlContent.includes('data-category="completed"'), 'Category filter "Comp
 assert(htmlContent.includes('id="match-feed-container"'), 'Match feed container present');
 
 // Diagnostics & Modal
-assert(htmlContent.includes('id="diagnostics-toggle-btn"'), 'Diagnostics toggle button present');
-assert(htmlContent.includes('id="diagnostics-content"'), 'Diagnostics collapsible content present');
+assert(!htmlContent.includes('id="diagnostics-toggle-btn"'), 'Diagnostics toggle button cleanly removed from home page');
+assert(!htmlContent.includes('id="diagnostics-content"'), 'Diagnostics collapsible content cleanly removed from home page');
 assert(htmlContent.includes('id="match-detail-modal"'), 'Match detail modal present');
 assert(htmlContent.includes('role="dialog"') && htmlContent.includes('aria-modal="true"'), 'Modal dialog ARIA attributes present');
 

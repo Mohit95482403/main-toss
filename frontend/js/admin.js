@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Administrative Portal Client Controller (Day 14)
+ * DADDY TOSS BOOK - Administrative Portal Client Controller (Day 14)
  * Handles authentication checks, live statistics, server-side user directory,
  * moderation actions (suspend/restore/ban), role assignment, audit history, and diagnostics.
  */
@@ -83,12 +83,16 @@
    */
   async function apiFetch(endpoint, options = {}) {
     const token = getAuthToken();
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
     const headers = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       'Accept': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     };
+    if (isFormData) {
+      delete headers['Content-Type'];
+    }
 
     if (window.ApiClient && typeof window.ApiClient.request === 'function') {
       return window.ApiClient.request(endpoint, {
@@ -222,6 +226,69 @@
       });
     }
   }
+
+  /**
+   * Set up responsive Admin Sidebar drawer & controls (Section 4)
+   */
+  function setupAdminSidebar() {
+    const toggleBtn = document.getElementById('admin-sidebar-toggle');
+    const closeBtn = document.getElementById('admin-sidebar-close');
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('admin-sidebar-backdrop');
+    if (!sidebar) return;
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      if (backdrop) backdrop.classList.add('open');
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('open');
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    }
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (sidebar.classList.contains('open')) {
+          closeSidebar();
+        } else {
+          openSidebar();
+        }
+      });
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+    // Escape key closes mobile drawer
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+        closeSidebar();
+      }
+    });
+
+    // Close drawer when tab button clicked on smaller screens
+    document.querySelectorAll('.admin-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (window.innerWidth < 1024) {
+          closeSidebar();
+        }
+      });
+    });
+
+    // Automatically close on viewport resize to desktop
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 1024 && sidebar.classList.contains('open')) {
+        closeSidebar();
+      }
+    });
+  }
+
 
   // ===========================================================================
   // 1. AUTHENTICATION & ACCESS VERIFICATION
@@ -1238,7 +1305,7 @@
       const elUptime = document.getElementById('sys-uptime');
       const elClock = document.getElementById('sys-clock');
 
-      if (elAppName) elAppName.textContent = app.name || 'IRONMAN TOSS BOOK';
+      if (elAppName) elAppName.textContent = app.name || 'DADDY TOSS BOOK';
       if (elEnv) elEnv.textContent = app.environment || 'development';
       if (elUptime) elUptime.textContent = app.uptimeHuman || '--';
       if (elClock) elClock.textContent = app.serverTime || '--';
@@ -1290,6 +1357,20 @@
     }
   }
 
+  // Global cross-tab match mutation broadcaster
+  function broadcastMatchesChanged(type, matchId) {
+    if (typeof window.BroadcastChannel === 'function') {
+      try {
+        const bc = new BroadcastChannel('itb_matches');
+        bc.postMessage({ type: type || 'MATCH_SETTLED', matchId: String(matchId || '') });
+        setTimeout(() => bc.close(), 100);
+      } catch (e) {}
+    }
+    try {
+      localStorage.setItem('itb_matches_updated_at', String(Date.now()));
+    } catch (e) {}
+  }
+
   // ===========================================================================
   // 6. MATCH MONITORING & BET INSPECTION CONTROLLER
   // ===========================================================================
@@ -1314,10 +1395,12 @@
       });
 
       const res = await apiFetch(`/admin/matches?${queryParams.toString()}`);
-      const { summary, matches } = res.data;
+      const payload = (res && res.data) || {};
+      const summary = payload.summary || {};
+      const matches = Array.isArray(payload.matches) ? payload.matches : [];
 
-      matchesState.matches = matches || [];
-      matchesState.stats = summary || {};
+      matchesState.matches = matches;
+      matchesState.stats = summary;
 
       // Update KPI metrics
       const kpiMatchesWithBets = document.getElementById('kpi-matches-with-bets');
@@ -1326,11 +1409,11 @@
       const kpiSettledBets = document.getElementById('kpi-settled-bets');
       const kpiTotalStakes = document.getElementById('kpi-total-stakes');
 
-      if (kpiMatchesWithBets) kpiMatchesWithBets.textContent = summary.matches_with_bets || 0;
-      if (kpiTotalBets) kpiTotalBets.textContent = summary.total_bets || 0;
-      if (kpiPendingBets) kpiPendingBets.textContent = summary.pending_bets || 0;
-      if (kpiSettledBets) kpiSettledBets.textContent = summary.settled_bets || 0;
-      if (kpiTotalStakes) kpiTotalStakes.textContent = formatMoney(summary.total_stakes_placed || 0);
+      if (kpiMatchesWithBets) kpiMatchesWithBets.textContent = (summary.matches_with_bets ?? summary.totalMatchesWithBets) || 0;
+      if (kpiTotalBets) kpiTotalBets.textContent = (summary.total_bets ?? summary.totalBets) || 0;
+      if (kpiPendingBets) kpiPendingBets.textContent = (summary.pending_bets ?? summary.pendingBets) || 0;
+      if (kpiSettledBets) kpiSettledBets.textContent = (summary.settled_bets ?? summary.settledBets) || 0;
+      if (kpiTotalStakes) kpiTotalStakes.textContent = formatMoney((summary.total_stakes_placed ?? summary.totalStakes) || 0);
 
       renderMatchesTable(matchesState.matches);
     } catch (err) {
@@ -1344,6 +1427,33 @@
       `;
       notify(`Failed to load matches: ${err.message}`, 'error');
     }
+  }
+
+  function formatLogoUrl(url) {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    if (url.startsWith('/uploads')) {
+      if (typeof window !== 'undefined' && window.location.port !== '5000' && window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) {
+        try {
+          const origin = new URL(window.APP_CONFIG.apiBaseUrl).origin;
+          return `${origin}${url}`;
+        } catch (e) {}
+      }
+    }
+    return url;
+  }
+
+  function renderAdminTeamBadge(logoUrl, teamName, teamAbbr) {
+    const abbr = escapeHtml(teamAbbr || (teamName ? teamName.substring(0, 3).toUpperCase() : 'TM'));
+    if (!logoUrl) {
+      return `<span class="admin-match-team-fallback" title="${escapeHtml(teamName)}">${abbr}</span>`;
+    }
+    const safeUrl = escapeHtml(formatLogoUrl(logoUrl));
+    return `
+      <img src="${safeUrl}" alt="${escapeHtml(teamName)}" class="admin-match-team-logo"
+           onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='inline-flex';" />
+      <span class="admin-match-team-fallback" style="display: none;" title="${escapeHtml(teamName)}">${abbr}</span>
+    `;
   }
 
   function renderMatchesTable(matches) {
@@ -1370,25 +1480,46 @@
             ? `<span class="badge-status pending">⏳ Pending (${m.pending_bets})</span>`
             : `<span class="text-xs text-muted">No Pending</span>`);
 
+      const rawEnd = m.match_end_time || m.matchEndTime;
+      const isExpired = Boolean(m.isExpired || (rawEnd && new Date(rawEnd).getTime() <= Date.now()));
+      const formattedEndTime = rawEnd ? new Date(rawEnd).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : (m.scheduled_time || 'TBA');
+
+      const expiryBadge = isExpired
+        ? `<div style="margin-top: 3px;"><span class="badge-status lost" style="font-size: 10px; padding: 2px 6px;">⏱ Expired</span></div>`
+        : `<div style="margin-top: 3px;"><span class="badge-status won" style="font-size: 10px; padding: 2px 6px;">Active</span></div>`;
+
       return `
         <tr>
           <td class="font-bold">#${m.id}</td>
           <td>
-            <div class="font-bold text-sm">${escapeHtml(m.match_title)}</div>
-            <div class="text-xs text-muted">${escapeHtml(m.team_one)} vs ${escapeHtml(m.team_two)}</div>
+            <div class="font-bold text-sm" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              ${renderAdminTeamBadge(m.team_one_logo || m.teamOneLogo, m.team_one, m.team_one_abbr)}
+              <span>${escapeHtml(m.team_one)}</span>
+              <span style="color: var(--pink-primary, #E75480); font-size: 11px; font-weight: 800;">VS</span>
+              <span>${escapeHtml(m.team_two)}</span>
+              ${renderAdminTeamBadge(m.team_two_logo || m.teamTwoLogo, m.team_two, m.team_two_abbr)}
+            </div>
+            <div class="text-xs text-muted" style="margin-top: 3px;">${escapeHtml(m.match_title)}</div>
           </td>
           <td>
             <span class="text-xs font-semibold">${escapeHtml(m.competition || 'Cricket')}</span>
+          </td>
+          <td>
+            <div class="text-xs font-bold">${escapeHtml(formattedEndTime)}</div>
+            ${expiryBadge}
           </td>
           <td>${statusBadge}</td>
           <td class="text-right font-bold">${m.total_bets}</td>
           <td class="text-right text-muted">${m.total_players}</td>
           <td class="text-right font-bold text-primary">${formatMoney(m.total_stake)}</td>
           <td>${settlementBadge}</td>
-          <td class="text-center">
-            <div style="display: flex; gap: 6px; justify-content: center;">
+          <td class="text-center" style="white-space: nowrap;">
+            <div style="display: flex; gap: 6px; justify-content: center; align-items: center; white-space: nowrap;">
               <button type="button" class="btn btn-secondary btn-xs btn-inspect-match-bets" data-match-id="${m.id}" title="Inspect all player bets">
                 Inspect Bets (${m.total_bets})
+              </button>
+              <button type="button" class="btn btn-secondary btn-xs btn-edit-match-schedule" data-match-id="${m.id}" title="Edit match expiry & schedule">
+                Edit Expiry
               </button>
               ${!isSettled && m.pending_bets > 0 ? `
                 <button type="button" class="btn btn-primary btn-xs btn-settle-match-direct" data-match-id="${m.id}" title="Settle this match">
@@ -1414,6 +1545,13 @@
       });
     });
 
+    tableBody.querySelectorAll('.btn-edit-match-schedule').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const matchId = btn.dataset.matchId;
+        openEditScheduleModal(matchId);
+      });
+    });
+
     tableBody.querySelectorAll('.btn-settle-match-direct').forEach((btn) => {
       btn.addEventListener('click', () => {
         const matchId = btn.dataset.matchId;
@@ -1431,12 +1569,318 @@
         try {
           await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}`, { method: 'DELETE' });
           notify('Match fixture deleted successfully.', 'success');
+          broadcastMatchesChanged('MATCH_DELETED', matchId);
           loadMatches();
         } catch (err) {
           notify(`Failed to delete match: ${err.message}`, 'error');
         }
       });
     });
+  }
+
+  function toLocalDatetimeInputString(date) {
+    const d = date || new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // State for team logo files in Create and Edit modals
+  const createMatchLogoState = {
+    teamOneFile: null,
+    teamTwoFile: null
+  };
+
+  const editMatchLogoState = {
+    matchId: null,
+    teamOneFile: null,
+    teamTwoFile: null,
+    removeTeamOne: false,
+    removeTeamTwo: false,
+    currentTeamOneLogo: null,
+    currentTeamTwoLogo: null
+  };
+
+  function validateLogoFile(file) {
+    if (!file) return { valid: false, error: 'No file selected.' };
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    const extMatch = (file.name || '').match(/\.(png|jpe?g|webp)$/i);
+    if (!allowedTypes.includes(file.type) && !extMatch) {
+      return {
+        valid: false,
+        error: 'Unsupported file format. Please upload PNG, JPG, JPEG, or WEBP.'
+      };
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      return {
+        valid: false,
+        error: 'File size exceeds 2 MB limit. Please select a smaller logo.'
+      };
+    }
+    return { valid: true };
+  }
+
+  function setupLogoUploadControls() {
+    // 1. Create Modal Team 1
+    const drop1 = document.getElementById('team-one-logo-dropzone');
+    const input1 = document.getElementById('match-input-team-one-logo');
+    const wrap1 = document.getElementById('team-one-logo-preview-wrap');
+    const placeholder1 = document.getElementById('team-one-logo-placeholder');
+    const img1 = document.getElementById('team-one-logo-preview');
+    const changeBtn1 = document.getElementById('btn-change-team-one-logo');
+    const removeBtn1 = document.getElementById('btn-remove-team-one-logo');
+    const valMsg1 = document.getElementById('team-one-logo-validation');
+
+    // 2. Create Modal Team 2
+    const drop2 = document.getElementById('team-two-logo-dropzone');
+    const input2 = document.getElementById('match-input-team-two-logo');
+    const wrap2 = document.getElementById('team-two-logo-preview-wrap');
+    const placeholder2 = document.getElementById('team-two-logo-placeholder');
+    const img2 = document.getElementById('team-two-logo-preview');
+    const changeBtn2 = document.getElementById('btn-change-team-two-logo');
+    const removeBtn2 = document.getElementById('btn-remove-team-two-logo');
+    const valMsg2 = document.getElementById('team-two-logo-validation');
+
+    function handleLogoChange(file, team) {
+      const valMsg = team === 1 ? valMsg1 : valMsg2;
+      const wrap = team === 1 ? wrap1 : wrap2;
+      const placeholder = team === 1 ? placeholder1 : placeholder2;
+      const img = team === 1 ? img1 : img2;
+
+      if (!file) return;
+      const check = validateLogoFile(file);
+      if (!check.valid) {
+        if (valMsg) {
+          valMsg.textContent = check.error;
+          valMsg.style.display = 'flex';
+        }
+        return;
+      }
+
+      if (valMsg) {
+        valMsg.textContent = '';
+        valMsg.style.display = 'none';
+      }
+
+      if (team === 1) {
+        createMatchLogoState.teamOneFile = file;
+      } else {
+        createMatchLogoState.teamTwoFile = file;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (img) img.src = e.target.result;
+        if (placeholder) placeholder.style.display = 'none';
+        if (wrap) wrap.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearCreateLogo(team) {
+      const valMsg = team === 1 ? valMsg1 : valMsg2;
+      const wrap = team === 1 ? wrap1 : wrap2;
+      const placeholder = team === 1 ? placeholder1 : placeholder2;
+      const img = team === 1 ? img1 : img2;
+      const input = team === 1 ? input1 : input2;
+
+      if (team === 1) {
+        createMatchLogoState.teamOneFile = null;
+      } else {
+        createMatchLogoState.teamTwoFile = null;
+      }
+
+      if (input) input.value = '';
+      if (img) img.src = '';
+      if (wrap) wrap.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'flex';
+      if (valMsg) {
+        valMsg.textContent = '';
+        valMsg.style.display = 'none';
+      }
+    }
+
+    if (drop1 && input1) {
+      drop1.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        input1.click();
+      });
+      input1.addEventListener('change', () => {
+        if (input1.files && input1.files[0]) handleLogoChange(input1.files[0], 1);
+      });
+      drop1.addEventListener('dragover', (e) => { e.preventDefault(); drop1.classList.add('dragover'); });
+      drop1.addEventListener('dragleave', () => drop1.classList.remove('dragover'));
+      drop1.addEventListener('drop', (e) => {
+        e.preventDefault();
+        drop1.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) handleLogoChange(e.dataTransfer.files[0], 1);
+      });
+    }
+    if (changeBtn1 && input1) {
+      changeBtn1.addEventListener('click', (e) => {
+        e.stopPropagation();
+        input1.click();
+      });
+    }
+    if (removeBtn1) {
+      removeBtn1.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearCreateLogo(1);
+      });
+    }
+
+    if (drop2 && input2) {
+      drop2.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        input2.click();
+      });
+      input2.addEventListener('change', () => {
+        if (input2.files && input2.files[0]) handleLogoChange(input2.files[0], 2);
+      });
+      drop2.addEventListener('dragover', (e) => { e.preventDefault(); drop2.classList.add('dragover'); });
+      drop2.addEventListener('dragleave', () => drop2.classList.remove('dragover'));
+      drop2.addEventListener('drop', (e) => {
+        e.preventDefault();
+        drop2.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) handleLogoChange(e.dataTransfer.files[0], 2);
+      });
+    }
+    if (changeBtn2 && input2) {
+      changeBtn2.addEventListener('click', (e) => {
+        e.stopPropagation();
+        input2.click();
+      });
+    }
+    if (removeBtn2) {
+      removeBtn2.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearCreateLogo(2);
+      });
+    }
+
+    // 3. Edit Modal Controls
+    setupEditModalLogoControls();
+  }
+
+  function setupEditModalLogoControls() {
+    const editDrop1 = document.getElementById('edit-team-one-logo-dropzone');
+    const editInput1 = document.getElementById('edit-input-team-one-logo');
+    const editWrap1 = document.getElementById('edit-team-one-preview-wrap');
+    const editPlaceholder1 = document.getElementById('edit-team-one-placeholder');
+    const editImg1 = document.getElementById('edit-team-one-preview');
+    const editChangeBtn1 = document.getElementById('btn-edit-change-team-one');
+    const editRemoveBtn1 = document.getElementById('btn-edit-remove-team-one');
+    const editValMsg1 = document.getElementById('edit-team-one-validation');
+
+    const editDrop2 = document.getElementById('edit-team-two-logo-dropzone');
+    const editInput2 = document.getElementById('edit-input-team-two-logo');
+    const editWrap2 = document.getElementById('edit-team-two-preview-wrap');
+    const editPlaceholder2 = document.getElementById('edit-team-two-placeholder');
+    const editImg2 = document.getElementById('edit-team-two-preview');
+    const editChangeBtn2 = document.getElementById('btn-edit-change-team-two');
+    const editRemoveBtn2 = document.getElementById('btn-edit-remove-team-two');
+    const editValMsg2 = document.getElementById('edit-team-two-validation');
+
+    function handleEditLogoChange(file, team) {
+      const valMsg = team === 1 ? editValMsg1 : editValMsg2;
+      const wrap = team === 1 ? editWrap1 : editWrap2;
+      const placeholder = team === 1 ? editPlaceholder1 : editPlaceholder2;
+      const img = team === 1 ? editImg1 : editImg2;
+
+      if (!file) return;
+      const check = validateLogoFile(file);
+      if (!check.valid) {
+        if (valMsg) {
+          valMsg.textContent = check.error;
+          valMsg.style.display = 'flex';
+        }
+        return;
+      }
+
+      if (valMsg) {
+        valMsg.textContent = '';
+        valMsg.style.display = 'none';
+      }
+
+      if (team === 1) {
+        editMatchLogoState.teamOneFile = file;
+        editMatchLogoState.removeTeamOne = false;
+      } else {
+        editMatchLogoState.teamTwoFile = file;
+        editMatchLogoState.removeTeamTwo = false;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (img) img.src = e.target.result;
+        if (placeholder) placeholder.style.display = 'none';
+        if (wrap) wrap.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeEditLogo(team) {
+      const wrap = team === 1 ? editWrap1 : editWrap2;
+      const placeholder = team === 1 ? editPlaceholder1 : editPlaceholder2;
+      const img = team === 1 ? editImg1 : editImg2;
+      const input = team === 1 ? editInput1 : editInput2;
+
+      if (team === 1) {
+        editMatchLogoState.teamOneFile = null;
+        editMatchLogoState.removeTeamOne = true;
+      } else {
+        editMatchLogoState.teamTwoFile = null;
+        editMatchLogoState.removeTeamTwo = true;
+      }
+
+      if (input) input.value = '';
+      if (img) img.src = '';
+      if (wrap) wrap.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'flex';
+    }
+
+    if (editDrop1 && editInput1) {
+      editDrop1.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        editInput1.click();
+      });
+      editInput1.addEventListener('change', () => {
+        if (editInput1.files && editInput1.files[0]) handleEditLogoChange(editInput1.files[0], 1);
+      });
+    }
+    if (editChangeBtn1 && editInput1) {
+      editChangeBtn1.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editInput1.click();
+      });
+    }
+    if (editRemoveBtn1) {
+      editRemoveBtn1.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeEditLogo(1);
+      });
+    }
+
+    if (editDrop2 && editInput2) {
+      editDrop2.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        editInput2.click();
+      });
+      editInput2.addEventListener('change', () => {
+        if (editInput2.files && editInput2.files[0]) handleEditLogoChange(editInput2.files[0], 2);
+      });
+    }
+    if (editChangeBtn2 && editInput2) {
+      editChangeBtn2.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editInput2.click();
+      });
+    }
+    if (editRemoveBtn2) {
+      editRemoveBtn2.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeEditLogo(2);
+      });
+    }
   }
 
   function resetCreateMatchForm() {
@@ -1450,6 +1894,38 @@
     if (rate2) rate2.value = '1.90';
     const statusSelect = document.getElementById('match-input-status');
     if (statusSelect) statusSelect.value = 'upcoming';
+
+    // Reset logo state & previews
+    createMatchLogoState.teamOneFile = null;
+    createMatchLogoState.teamTwoFile = null;
+    const input1 = document.getElementById('match-input-team-one-logo');
+    const input2 = document.getElementById('match-input-team-two-logo');
+    if (input1) input1.value = '';
+    if (input2) input2.value = '';
+    const wrap1 = document.getElementById('team-one-logo-preview-wrap');
+    const wrap2 = document.getElementById('team-two-logo-preview-wrap');
+    const placeholder1 = document.getElementById('team-one-logo-placeholder');
+    const placeholder2 = document.getElementById('team-two-logo-placeholder');
+    if (wrap1) wrap1.style.display = 'none';
+    if (wrap2) wrap2.style.display = 'none';
+    if (placeholder1) placeholder1.style.display = 'flex';
+    if (placeholder2) placeholder2.style.display = 'flex';
+    const valMsg1 = document.getElementById('team-one-logo-validation');
+    const valMsg2 = document.getElementById('team-two-logo-validation');
+    if (valMsg1) { valMsg1.style.display = 'none'; valMsg1.textContent = ''; }
+    if (valMsg2) { valMsg2.style.display = 'none'; valMsg2.textContent = ''; }
+
+    // Auto-populate default end time (now + 2 hours)
+    const endInput = document.getElementById('match-input-end-time');
+    const defaultEndTime = new Date(Date.now() + 7200000);
+    if (endInput) {
+      endInput.value = toLocalDatetimeInputString(defaultEndTime);
+    }
+    const schedInput = document.getElementById('match-input-schedule');
+    if (schedInput && !schedInput.value) {
+      const timeStr = defaultEndTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      schedInput.value = `Today, ${timeStr}`;
+    }
   }
 
   async function handleCreateMatchSubmit(e) {
@@ -1466,6 +1942,7 @@
     const teamTwo = document.getElementById('match-input-team-two')?.value.trim();
     const teamTwoAbbr = document.getElementById('match-input-team-two-abbr')?.value.trim() || (teamTwo ? teamTwo.substring(0, 4).toUpperCase() : '');
     const teamTwoRate = parseFloat(document.getElementById('match-input-team-two-rate')?.value || '1.90');
+    const matchEndTime = document.getElementById('match-input-end-time')?.value;
     const scheduledTime = document.getElementById('match-input-schedule')?.value.trim();
     const venue = document.getElementById('match-input-venue')?.value.trim() || 'Cricket Stadium';
     const status = document.getElementById('match-input-status')?.value || 'upcoming';
@@ -1491,9 +1968,24 @@
       }
       return;
     }
+    if (!matchEndTime) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Match end time (auto-expiry) is required.';
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
+    const endMs = new Date(matchEndTime).getTime();
+    if (isNaN(endMs) || endMs <= Date.now()) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Match end time must be a valid future date and time.';
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
     if (!scheduledTime) {
       if (errorBox && errorText) {
-        errorText.textContent = 'Scheduled time is required.';
+        errorText.textContent = 'Display scheduled time is required.';
         errorBox.style.display = 'flex';
       }
       return;
@@ -1506,23 +1998,30 @@
     }
 
     try {
-      const payload = {
-        competition,
-        stage,
-        team_one: teamOne,
-        team_one_abbr: teamOneAbbr,
-        team_one_rate: teamOneRate,
-        team_two: teamTwo,
-        team_two_abbr: teamTwoAbbr,
-        team_two_rate: teamTwoRate,
-        scheduled_time: scheduledTime,
-        venue,
-        status
-      };
+      const formData = new FormData();
+      formData.append('competition', competition);
+      formData.append('stage', stage);
+      formData.append('team_one', teamOne);
+      formData.append('team_one_abbr', teamOneAbbr);
+      formData.append('team_one_rate', teamOneRate);
+      formData.append('team_two', teamTwo);
+      formData.append('team_two_abbr', teamTwoAbbr);
+      formData.append('team_two_rate', teamTwoRate);
+      formData.append('match_end_time', matchEndTime);
+      formData.append('scheduled_time', scheduledTime);
+      formData.append('venue', venue);
+      formData.append('status', status);
+
+      if (createMatchLogoState.teamOneFile) {
+        formData.append('teamOneLogo', createMatchLogoState.teamOneFile);
+      }
+      if (createMatchLogoState.teamTwoFile) {
+        formData.append('teamTwoLogo', createMatchLogoState.teamTwoFile);
+      }
 
       const res = await apiFetch('/admin/matches', {
         method: 'POST',
-        body: payload
+        body: formData
       });
 
       if (!res.success) {
@@ -1530,6 +2029,7 @@
       }
 
       notify(`Match "${teamOne} vs ${teamTwo}" created and published successfully!`, 'success');
+      broadcastMatchesChanged('MATCH_CREATED', res.data?.match?.id);
       closeModal('modal-create-match');
       resetCreateMatchForm();
       loadMatches();
@@ -1551,6 +2051,167 @@
     }
   }
 
+  function openEditScheduleModal(matchId) {
+    const match = (matchesState.matches || []).find(m => String(m.id) === String(matchId));
+    if (!match) return;
+
+    const idInput = document.getElementById('edit-match-id');
+    const endInput = document.getElementById('edit-match-input-end-time');
+    const schedInput = document.getElementById('edit-match-input-schedule');
+    const subtitle = document.getElementById('edit-schedule-modal-subtitle');
+    const errorBox = document.getElementById('edit-schedule-error-box');
+
+    if (errorBox) errorBox.style.display = 'none';
+    if (idInput) idInput.value = match.id;
+    if (subtitle) subtitle.textContent = `${match.match_title || (match.team_one + ' vs ' + match.team_two)} (ID #${match.id})`;
+
+    const rawEnd = match.match_end_time || match.matchEndTime;
+    if (endInput) {
+      if (rawEnd) {
+        endInput.value = toLocalDatetimeInputString(new Date(rawEnd));
+      } else {
+        endInput.value = toLocalDatetimeInputString(new Date(Date.now() + 7200000));
+      }
+    }
+    if (schedInput) {
+      schedInput.value = match.scheduled_time || match.scheduledTime || 'Schedule TBA';
+    }
+
+    // Populate team logos in edit modal
+    editMatchLogoState.matchId = match.id;
+    editMatchLogoState.teamOneFile = null;
+    editMatchLogoState.teamTwoFile = null;
+    editMatchLogoState.removeTeamOne = false;
+    editMatchLogoState.removeTeamTwo = false;
+    editMatchLogoState.currentTeamOneLogo = match.team_one_logo || match.teamOneLogo || null;
+    editMatchLogoState.currentTeamTwoLogo = match.team_two_logo || match.teamTwoLogo || null;
+
+    const lbl1 = document.getElementById('edit-label-team-one-logo');
+    const lbl2 = document.getElementById('edit-label-team-two-logo');
+    if (lbl1) lbl1.textContent = `${match.team_one || 'Team 1'} Logo`;
+    if (lbl2) lbl2.textContent = `${match.team_two || 'Team 2'} Logo`;
+
+    // Render initial edit preview for Team 1
+    const editImg1 = document.getElementById('edit-team-one-preview');
+    const editWrap1 = document.getElementById('edit-team-one-preview-wrap');
+    const editPlaceholder1 = document.getElementById('edit-team-one-placeholder');
+    if (editMatchLogoState.currentTeamOneLogo) {
+      if (editImg1) editImg1.src = formatLogoUrl(editMatchLogoState.currentTeamOneLogo);
+      if (editWrap1) editWrap1.style.display = 'flex';
+      if (editPlaceholder1) editPlaceholder1.style.display = 'none';
+    } else {
+      if (editImg1) editImg1.src = '';
+      if (editWrap1) editWrap1.style.display = 'none';
+      if (editPlaceholder1) editPlaceholder1.style.display = 'flex';
+    }
+
+    // Render initial edit preview for Team 2
+    const editImg2 = document.getElementById('edit-team-two-preview');
+    const editWrap2 = document.getElementById('edit-team-two-preview-wrap');
+    const editPlaceholder2 = document.getElementById('edit-team-two-placeholder');
+    if (editMatchLogoState.currentTeamTwoLogo) {
+      if (editImg2) editImg2.src = formatLogoUrl(editMatchLogoState.currentTeamTwoLogo);
+      if (editWrap2) editWrap2.style.display = 'flex';
+      if (editPlaceholder2) editPlaceholder2.style.display = 'none';
+    } else {
+      if (editImg2) editImg2.src = '';
+      if (editWrap2) editWrap2.style.display = 'none';
+      if (editPlaceholder2) editPlaceholder2.style.display = 'flex';
+    }
+
+    const val1 = document.getElementById('edit-team-one-validation');
+    const val2 = document.getElementById('edit-team-two-validation');
+    if (val1) { val1.style.display = 'none'; val1.textContent = ''; }
+    if (val2) { val2.style.display = 'none'; val2.textContent = ''; }
+
+    openModal('modal-edit-match-schedule');
+  }
+
+  async function handleEditScheduleSubmit(e) {
+    e.preventDefault();
+    const matchId = document.getElementById('edit-match-id')?.value;
+    const endTime = document.getElementById('edit-match-input-end-time')?.value;
+    const schedule = document.getElementById('edit-match-input-schedule')?.value?.trim();
+    const errorBox = document.getElementById('edit-schedule-error-box');
+    const errorText = document.getElementById('edit-schedule-error-text');
+
+    if (errorBox) errorBox.style.display = 'none';
+    if (!matchId) return;
+
+    if (!endTime) {
+      if (errorBox && errorText) {
+        errorText.textContent = 'Please choose a valid end time.';
+        errorBox.style.display = 'flex';
+      }
+      return;
+    }
+
+    const submitBtn = document.getElementById('btn-submit-edit-schedule');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving Changes...';
+    }
+
+    try {
+      // 1. Update schedule and end time
+      const res = await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/schedule`, {
+        method: 'PUT',
+        body: {
+          match_end_time: endTime,
+          scheduled_time: schedule
+        }
+      });
+
+      if (!res.success) {
+        throw new Error(res.error?.message || 'Failed to update match schedule.');
+      }
+
+      // 2. If logo modifications occurred, update logos
+      const hasLogoChanges = editMatchLogoState.teamOneFile || editMatchLogoState.teamTwoFile ||
+                             editMatchLogoState.removeTeamOne || editMatchLogoState.removeTeamTwo;
+
+      if (hasLogoChanges) {
+        const logoFormData = new FormData();
+        if (editMatchLogoState.teamOneFile) {
+          logoFormData.append('teamOneLogo', editMatchLogoState.teamOneFile);
+        } else if (editMatchLogoState.removeTeamOne) {
+          logoFormData.append('remove_team_one_logo', 'true');
+        }
+
+        if (editMatchLogoState.teamTwoFile) {
+          logoFormData.append('teamTwoLogo', editMatchLogoState.teamTwoFile);
+        } else if (editMatchLogoState.removeTeamTwo) {
+          logoFormData.append('remove_team_two_logo', 'true');
+        }
+
+        await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/logos`, {
+          method: 'PUT',
+          body: logoFormData
+        });
+      }
+
+      notify('Match details & logos updated successfully.', 'success');
+      broadcastMatchesChanged('MATCHES_UPDATED', matchId);
+      closeModal('modal-edit-match-schedule');
+      loadMatches();
+    } catch (err) {
+      if (errorBox && errorText) {
+        errorText.textContent = err.message || 'Error occurred while updating match.';
+        errorBox.style.display = 'flex';
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Save &amp; Apply Changes</span>
+        `;
+      }
+    }
+  }
+
   async function openMatchBetsModal(matchId) {
     const modalStrip = document.getElementById('match-bets-modal-strip');
     const tableBody = document.getElementById('match-bets-table-body');
@@ -1564,12 +2225,24 @@
 
     try {
       const res = await apiFetch(`/admin/matches/${matchId}/bets`);
-      const { match, bets, summary } = res.data;
+      const payload = (res && res.data) || {};
+      const match = payload.match || {};
+      const bets = Array.isArray(payload.bets) ? payload.bets : [];
+      const summary = payload.summary || {
+        total_stake: 0,
+        total_bets: 0,
+        pending_bets: 0,
+        settled_bets: 0
+      };
 
       matchesState.activeMatchForBets = match;
-      matchesState.modalBets = bets || [];
+      matchesState.modalBets = bets;
 
-      if (titleEl) titleEl.textContent = `${match.match_title} (ID #${match.id})`;
+      if (titleEl) titleEl.textContent = `${match.match_title || match.matchTitle || ('Match #' + matchId)} (ID #${match.id || matchId})`;
+
+      const rawEnd = match.match_end_time || match.matchEndTime;
+      const isExpired = Boolean(match.isExpired || (rawEnd && new Date(rawEnd).getTime() <= Date.now()));
+      const formattedEndTime = rawEnd ? new Date(rawEnd).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : (match.scheduled_time || 'TBA');
 
       if (modalStrip) {
         modalStrip.innerHTML = `
@@ -1579,19 +2252,29 @@
           </div>
           <div class="meta-strip-item">
             <span class="meta-strip-label">Teams</span>
-            <span class="meta-strip-value">${escapeHtml(match.team_one)} vs ${escapeHtml(match.team_two)}</span>
+            <span class="meta-strip-value" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              ${renderAdminTeamBadge(match.team_one_logo || match.teamOneLogo, match.team_one || match.teamOne, match.team_one_abbr || match.teamOneAbbr)}
+              <span>${escapeHtml(match.team_one || match.teamOne || 'Team 1')}</span>
+              <span style="color: var(--pink-primary, #E75480); font-weight: 800; font-size: 11px;">VS</span>
+              <span>${escapeHtml(match.team_two || match.teamTwo || 'Team 2')}</span>
+              ${renderAdminTeamBadge(match.team_two_logo || match.teamTwoLogo, match.team_two || match.teamTwo, match.team_two_abbr || match.teamTwoAbbr)}
+            </span>
+          </div>
+          <div class="meta-strip-item">
+            <span class="meta-strip-label">Configured End Time</span>
+            <span class="meta-strip-value">${escapeHtml(formattedEndTime)} ${isExpired ? '<span class="badge-status lost" style="font-size:10px;padding:1px 5px;margin-left:4px;">Expired</span>' : '<span class="badge-status won" style="font-size:10px;padding:1px 5px;margin-left:4px;">Active</span>'}</span>
           </div>
           <div class="meta-strip-item">
             <span class="meta-strip-label">Status</span>
-            <span class="meta-strip-value">${escapeHtml(match.status)} ${match.settled ? '(Settled)' : '(Unsettled)'}</span>
+            <span class="meta-strip-value">${escapeHtml(match.status || 'upcoming')} ${match.settled ? '(Settled)' : '(Unsettled)'}</span>
           </div>
           <div class="meta-strip-item">
             <span class="meta-strip-label">Rates</span>
-            <span class="meta-strip-value">${escapeHtml(match.team_one)}: ${match.rate_team_one || '1.95'} | ${escapeHtml(match.team_two)}: ${match.rate_team_two || '1.95'}</span>
+            <span class="meta-strip-value">${escapeHtml(match.team_one || match.teamOne || 'T1')}: ${match.rate_team_one || match.team_one_rate || match.teamOneRate || '1.95'} | ${escapeHtml(match.team_two || match.teamTwo || 'T2')}: ${match.rate_team_two || match.team_two_rate || match.teamTwoRate || '1.95'}</span>
           </div>
           <div class="meta-strip-item">
             <span class="meta-strip-label">Total Stakes</span>
-            <span class="meta-strip-value text-primary">${formatMoney(summary.total_stake || 0)}</span>
+            <span class="meta-strip-value text-primary">${formatMoney(summary.total_stake ?? summary.totalStake ?? 0)}</span>
           </div>
         `;
       }
@@ -1972,6 +2655,7 @@
       });
 
       notify(`Match settled successfully! ${res.data.bets_settled} bets processed.`, 'success');
+      broadcastMatchesChanged('MATCH_SETTLED', matchId);
 
       // Close modal
       closeModal('modal-settlement-preview');
@@ -2763,6 +3447,48 @@
       createMatchForm.addEventListener('submit', handleCreateMatchSubmit);
     }
 
+    // Initialize Team Logo Upload controls
+    setupLogoUploadControls();
+
+    const editScheduleForm = document.getElementById('form-edit-match-schedule');
+    if (editScheduleForm) {
+      editScheduleForm.addEventListener('submit', handleEditScheduleSubmit);
+    }
+
+    // Quick-preset chips for create match modal
+    document.querySelectorAll('.preset-end-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mins = parseInt(btn.dataset.mins, 10) || 60;
+        const targetDate = new Date(Date.now() + mins * 60000);
+        const input = document.getElementById('match-input-end-time');
+        if (input) input.value = toLocalDatetimeInputString(targetDate);
+        const sched = document.getElementById('match-input-schedule');
+        if (sched) {
+          const timeStr = targetDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+          const now = new Date();
+          const isToday = targetDate.getDate() === now.getDate() && targetDate.getMonth() === now.getMonth();
+          sched.value = isToday ? `Today, ${timeStr}` : `${targetDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}, ${timeStr}`;
+        }
+      });
+    });
+
+    // Quick-preset chips for edit schedule modal
+    document.querySelectorAll('.preset-edit-end-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mins = parseInt(btn.dataset.mins, 10) || 60;
+        const targetDate = new Date(Date.now() + mins * 60000);
+        const input = document.getElementById('edit-match-input-end-time');
+        if (input) input.value = toLocalDatetimeInputString(targetDate);
+        const sched = document.getElementById('edit-match-input-schedule');
+        if (sched) {
+          const timeStr = targetDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+          const now = new Date();
+          const isToday = targetDate.getDate() === now.getDate() && targetDate.getMonth() === now.getMonth();
+          sched.value = isToday ? `Today, ${timeStr}` : `${targetDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}, ${timeStr}`;
+        }
+      });
+    });
+
     const refreshMatchesBtn = document.getElementById('btn-refresh-matches');
     if (refreshMatchesBtn) {
       refreshMatchesBtn.addEventListener('click', () => {
@@ -3020,6 +3746,7 @@
   // ===========================================================================
   async function init() {
     setupTabs();
+    setupAdminSidebar();
     setupEventListeners();
 
     const isAuthed = await verifyAdminAuth();

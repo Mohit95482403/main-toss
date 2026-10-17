@@ -158,7 +158,7 @@ async function runLiveIntegrationTests() {
     // 1. Root & Health Check
     const rootRes = await makeRequest('GET', '/');
     assert(rootRes.status === 200, 'GET / returns 200 OK');
-    assert(rootRes.body.service === 'IRONMAN TOSS BOOK API', 'GET / returns service name');
+    assert(rootRes.body.service === 'DADDY TOSS BOOK API', 'GET / returns service name');
     assert(rootRes.body.endpoints && rootRes.body.endpoints.health, 'GET / provides endpoint inventory');
 
     const healthRes = await makeRequest('GET', '/api/health');

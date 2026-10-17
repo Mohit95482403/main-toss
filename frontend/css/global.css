@@ -1,60 +1,101 @@
 /**
- * IRONMAN TOSS BOOK - Global Typography & Utility Styles
+ * DADDY TOSS BOOK - Global Typography & Design Foundations
+ * Professional font stack, accessible focus indicators, and subtle pink scrollbars.
  */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
+html {
+  font-family: var(--font-family-base);
+  font-size: 16px;
+  background-color: var(--pink-bg, #FFF7FA);
+  color: var(--text-primary, #352631);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--pink-bg, #FFF7FA);
+  color: var(--text-primary, #352631);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  min-height: 100vh;
+}
 
 /* ==========================================================================
    Typography Base Styles
    ========================================================================== */
 
 h1, .h1 {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-extrabold);
   line-height: var(--line-height-tight);
-  color: var(--color-text);
-  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  letter-spacing: -0.025em;
+  margin: 0;
 }
 
 h2, .h2 {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
-  color: var(--color-text);
-  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  letter-spacing: -0.015em;
+  margin: 0;
 }
 
 h3, .h3 {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
-  color: var(--color-text);
+  color: var(--text-primary);
+  margin: 0;
 }
 
 h4, .h4 {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-normal);
-  color: var(--color-text);
+  color: var(--text-primary);
+  margin: 0;
 }
 
 p {
   font-size: var(--font-size-base);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   line-height: var(--line-height-normal);
+  margin: 0;
 }
 
 small, .text-sm {
   font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+  color: var(--text-muted);
+}
+
+.text-xs {
+  font-size: var(--font-size-2xs);
 }
 
 strong, b {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
 }
 
 code, kbd, samp, pre {
   font-family: var(--font-family-mono);
-  font-size: 0.85em;
+  font-size: 0.875em;
 }
 
 /* ==========================================================================
@@ -62,16 +103,17 @@ code, kbd, samp, pre {
    ========================================================================== */
 
 a {
-  color: var(--color-primary);
+  color: var(--pink-primary);
+  text-decoration: none;
   transition: color var(--transition-fast);
 }
 
 a:hover {
-  color: var(--color-primary-hover);
+  color: var(--pink-primary-hover);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--pink-primary);
   outline-offset: 2px;
 }
 
@@ -79,8 +121,30 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--pink-primary);
   outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Custom Subtle Pink Scrollbar
+   ========================================================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pink-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pink-border-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pink-rose);
 }
 
 /* ==========================================================================
@@ -99,11 +163,12 @@ textarea:focus-visible {
   border: 0;
 }
 
-/* Text helpers */
-.text-muted { color: var(--color-text-muted); }
-.text-secondary { color: var(--color-text-secondary); }
-.text-primary { color: var(--color-primary); }
-.text-success { color: var(--color-success); }
-.text-danger { color: var(--color-danger); }
-.text-center { text-align: center; }
-.text-right { text-align: right; }
+/* Animation control for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

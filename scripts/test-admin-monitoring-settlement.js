@@ -191,8 +191,16 @@ async function runTests() {
     // ------------------------------------------------------------------------
     console.log('\n--- Section D: Bet Settlement Workflow & Read-Only Preview ---');
 
-    // Ensure MATCH-2026-001 has pending bets for test reproducibility
-    await pool.query("UPDATE matches SET status = 'live', settled = 0, toss_winner = NULL, settled_at = NULL, settled_by = NULL WHERE id = 'MATCH-2026-001'");
+    // Ensure MATCH-2026-001 exists and has pending bets for test reproducibility
+    const [existingMatch] = await pool.query("SELECT id FROM matches WHERE id = 'MATCH-2026-001'");
+    if (existingMatch.length === 0) {
+      await pool.query(
+        "INSERT INTO matches (id, competition, stage, team_one, team_one_abbr, team_one_rate, team_two, team_two_abbr, team_two_rate, scheduled_time, match_end_time, venue, status, settled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ['MATCH-2026-001', "ICC Men's T20 World Cup", 'Group 1', 'India', 'IND', 1.95, 'Australia', 'AUS', 1.90, 'Today, 03:00 PM', new Date(Date.now() + 86400000).toISOString().slice(0, 19).replace('T', ' '), 'Melbourne Cricket Ground', 'live', 0]
+      );
+    } else {
+      await pool.query("UPDATE matches SET status = 'live', settled = 0, toss_winner = NULL, settled_at = NULL, settled_by = NULL WHERE id = 'MATCH-2026-001'");
+    }
     const [existingBets] = await pool.query("SELECT id FROM bets WHERE match_id = 'MATCH-2026-001'");
     if (existingBets.length === 0) {
       await pool.query(

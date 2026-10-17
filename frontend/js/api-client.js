@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Standardized Frontend API Client (Day 15)
+ * DADDY TOSS BOOK - Standardized Frontend API Client (Day 15)
  * Centralized, resilient HTTP client for frontend-backend communication,
  * token lifecycle management, error normalization, and real-time balance sync.
  */

@@ -1,6 +1,6 @@
 /**
- * IRONMAN TOSS BOOK - Shared Website Header Styles
- * Mobile-first, responsive, accessible header matching reference screenshots.
+ * DADDY TOSS BOOK - Shared Website Header Styles
+ * Refined white surface, delicate pink border, rose brand crest, and clear balance pills.
  */
 
 .app-header {
@@ -9,34 +9,48 @@
   left: 0;
   right: 0;
   z-index: var(--z-header, 100);
-  background-color: var(--color-surface, #FFFFFF);
-  border-bottom: 1px solid var(--color-border, #E5E7EB);
-  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
-  height: var(--header-height, 56px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.92));
+  border-bottom: 1px solid var(--pink-border, #F2D3DF);
+  box-shadow: 0 4px 20px rgba(180, 70, 115, 0.05);
+  height: var(--header-height, 60px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-md, 12px);
+  padding: 0 var(--space-md, 14px);
   user-select: none;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+@media (min-width: 768px) {
+  .app-header {
+    border-top-left-radius: var(--radius-xl, 20px);
+    border-top-right-radius: var(--radius-xl, 20px);
+  }
 }
 
 /* ==========================================================================
-   Logo Area
+   Logo & Brand Identity
    ========================================================================== */
 
 .header-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-xs, 6px);
+  gap: var(--space-sm, 8px);
   text-decoration: none;
   color: inherit;
   flex-shrink: 0;
   min-width: 0;
+  transition: transform var(--transition-fast);
+}
+
+.header-brand:hover {
+  transform: translateY(-1px);
 }
 
 .brand-logo-img {
-  height: 36px;
+  height: 38px;
   width: auto;
   max-width: 140px;
   object-fit: contain;
@@ -46,46 +60,52 @@
 .brand-logo-fallback {
   display: flex;
   align-items: center;
-  gap: var(--space-xs, 6px);
+  gap: var(--space-sm, 8px);
 }
 
 .brand-icon-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md, 8px);
-  background: linear-gradient(135deg, var(--color-primary, #0860BE) 0%, #1E40AF 100%);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm, 10px);
+  background: linear-gradient(135deg, var(--pink-rose, #E879A5) 0%, var(--pink-primary, #E75480) 60%, var(--pink-primary-dark, #C93768) 100%);
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(8, 96, 190, 0.25);
+  box-shadow: 0 3px 10px rgba(231, 84, 128, 0.28);
   flex-shrink: 0;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.header-brand:hover .brand-icon-badge {
+  box-shadow: 0 4px 14px rgba(231, 84, 128, 0.38);
 }
 
 .brand-icon-badge svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   fill: currentColor;
 }
 
 .brand-text-group {
   display: flex;
   flex-direction: column;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .brand-title {
-  font-size: 0.875rem; /* 14px */
+  font-family: var(--font-family-display);
+  font-size: 0.9375rem; /* 15px */
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--color-text, #15171A);
+  color: var(--text-primary, #352631);
   text-transform: uppercase;
 }
 
 .brand-subtitle {
   font-size: 0.625rem; /* 10px */
   font-weight: 700;
-  color: var(--color-primary, #0860BE);
+  color: var(--pink-primary, #E75480);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -109,12 +129,28 @@
   line-height: 1.15;
 }
 
+.balance-card-pill {
+  background-color: var(--pink-bg-secondary, #FFF0F5);
+  border: 1px solid var(--pink-border, #F2D3DF);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm, 10px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  transition: all var(--transition-fast);
+}
+
+.balance-card-pill:hover {
+  border-color: var(--pink-border-strong, #EABCCF);
+  background-color: var(--pink-soft, #FCE4EC);
+}
+
 .balance-label {
   font-size: 0.625rem; /* 10px */
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted, #737B87);
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #9A8994);
   display: flex;
   align-items: center;
   gap: 3px;
@@ -128,29 +164,14 @@
   white-space: nowrap;
 }
 
-/* Blue Available Balance Pill / Text */
+/* Available Balance Pill */
 .balance-available .balance-amount {
-  color: var(--color-primary, #0860BE);
+  color: var(--pink-primary, #E75480);
 }
 
-/* Red Exposure Indicator Pill / Text */
+/* Red Exposure Indicator Pill */
 .balance-exposure .balance-amount {
-  color: var(--color-danger, #D62828);
-}
-
-.balance-card-pill {
-  background-color: var(--color-surface-subtle, #F1F4F8);
-  border: 1px solid var(--color-border-subtle, #EEF0F2);
-  padding: 3px 8px;
-  border-radius: var(--radius-sm, 6px);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-[data-theme="dark"] .balance-card-pill {
-  background-color: var(--color-surface-subtle, #121824);
-  border-color: var(--color-border, #243042);
+  color: var(--danger, #D64550);
 }
 
 /* Balance loading & error states */
@@ -165,18 +186,29 @@
 }
 
 .balance-error {
-  color: var(--color-danger, #EF4444) !important;
+  color: var(--danger, #D64550) !important;
   text-decoration: underline dotted;
 }
 
 /* Small mobile responsiveness */
-@media (max-width: 360px) {
+@media (max-width: 380px) {
   .app-header {
     padding: 0 var(--space-xs, 8px);
+    height: 56px;
+  }
+
+  .brand-icon-badge {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand-icon-badge svg {
+    width: 17px;
+    height: 17px;
   }
 
   .brand-title {
-    font-size: 0.75rem; /* 12px */
+    font-size: 0.8125rem; /* 13px */
   }
 
   .brand-subtitle {
@@ -184,7 +216,7 @@
   }
 
   .balance-card-pill {
-    padding: 2px 6px;
+    padding: 3px 8px;
   }
 
   .balance-amount {

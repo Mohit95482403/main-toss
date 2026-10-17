@@ -88,7 +88,9 @@ router.get('/my-bets', async (req, res, next) => {
         COALESCE(m.match_title, 'Match Fixture') AS match_title,
         COALESCE(m.competition, 'Cricket Tournament') AS competition,
         COALESCE(m.team_one, 'Team One') AS team_one,
+        m.team_one_logo,
         COALESCE(m.team_two, 'Team Two') AS team_two,
+        m.team_two_logo,
         m.status AS match_status,
         m.toss_winner
        FROM bets b
@@ -108,13 +110,22 @@ router.get('/my-bets', async (req, res, next) => {
         resultText = 'Match abandoned / no result. Stake refunded.';
       }
 
+      let selectedTeamLogo = null;
+      if (r.selection === r.team_one) selectedTeamLogo = r.team_one_logo;
+      else if (r.selection === r.team_two) selectedTeamLogo = r.team_two_logo;
+
       return {
         id: r.id,
         matchId: r.match_id,
         competition: r.competition,
         matchTitle: r.match_title,
         teamOne: r.team_one,
+        teamOneLogo: r.team_one_logo || null,
+        team_one_logo: r.team_one_logo || null,
         teamTwo: r.team_two,
+        teamTwoLogo: r.team_two_logo || null,
+        team_two_logo: r.team_two_logo || null,
+        selectedTeamLogo: selectedTeamLogo || null,
         marketName: r.market_name || 'Toss Winner',
         selectedTeam: r.selection,
         rate: parseFloat(r.odds),
@@ -154,56 +165,110 @@ async function handlePlaceBet(req, res, next) {
     const userId = req.user.id;
     const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
     const rawSelection = req.body.selection || req.body.selectedTeam || req.body.team;
-    const rawStake = req.body.stake !== undefined ? req.body.stake : (req.body.amount !== undefined ? req.body.amount : 0);
+    const rawStake = req.body.stake !== undefined ? req.body.stake : req.body.amount;
 
     const matchId = (rawMatchId || '').trim();
     const selection = typeof rawSelection === 'string' ? rawSelection.trim() : '';
-    const stake = parseFloat(rawStake);
 
-    // 1. Basic Input Validation
+    // 1. Basic Input & Match Validation
     if (!matchId) {
       return res.status(400).json({
         success: false,
-        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' },
+        message: 'Match identifier is required.'
       });
     }
 
     if (!selection) {
       return res.status(400).json({
         success: false,
-        error: { code: 'INVALID_SELECTION', message: 'Please select a team to win the toss.' }
+        error: { code: 'INVALID_SELECTION', message: 'Please select a team to win the toss.' },
+        message: 'Please select a team to win the toss.'
       });
     }
 
-    if (isNaN(stake) || stake <= 0) {
+    // 2. Strict Stake Input Validation (Min ₹50, Max ₹100,000)
+    if (rawStake === undefined || rawStake === null || typeof rawStake === 'boolean') {
       return res.status(400).json({
         success: false,
-        error: { code: 'INVALID_STAKE', message: 'Stake amount must be a positive number greater than 0.' }
+        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
+        message: 'Please enter a valid stake amount.'
       });
     }
 
-    // Min & Max bounds (e.g. min 1 coin, max 500,000 coins)
-    if (stake < 1) {
+    const stakeStr = String(rawStake).trim();
+    if (stakeStr === '' || stakeStr === 'null' || stakeStr === 'undefined') {
       return res.status(400).json({
         success: false,
-        error: { code: 'MIN_STAKE_ERROR', message: 'Minimum stake is ₹1.00.' }
+        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
+        message: 'Please enter a valid stake amount.'
       });
     }
 
-    if (stake > 500000) {
+    // Disallow non-numeric strings such as "100abc", "Infinity", "NaN"
+    if (!/^-?\d+(\.\d+)?$/.test(stakeStr)) {
       return res.status(400).json({
         success: false,
-        error: { code: 'MAX_STAKE_ERROR', message: 'Maximum stake is ₹500,000.00.' }
+        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
+        message: 'Please enter a valid stake amount.'
       });
     }
+
+    const stakeNum = Number(stakeStr);
+    if (isNaN(stakeNum) || !Number.isFinite(stakeNum)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
+        message: 'Please enter a valid stake amount.'
+      });
+    }
+
+    // Zero & Negative amounts rejected
+    if (stakeNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_STAKE', message: 'Stake amount must be a positive number greater than 0.' },
+        message: 'Stake amount must be a positive number greater than 0.'
+      });
+    }
+
+    // Currency Decimal Precision Check (at most 2 decimal places)
+    const decimalParts = stakeStr.split('.');
+    if (decimalParts.length === 2 && decimalParts[1].length > 2) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_STAKE_PRECISION', message: 'Stake amount cannot have more than 2 decimal places.' },
+        message: 'Stake amount cannot have more than 2 decimal places.'
+      });
+    }
+
+    // Fixed Minimum Stake Boundary: ₹50
+    if (stakeNum < 50) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MIN_STAKE_ERROR', message: 'Minimum stake amount is ₹50.' },
+        message: 'Minimum stake amount is ₹50.'
+      });
+    }
+
+    // Fixed Maximum Stake Boundary: ₹100,000
+    if (stakeNum > 100000) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MAX_STAKE_ERROR', message: 'Maximum stake amount is ₹100,000.' },
+        message: 'Maximum stake amount is ₹100,000.'
+      });
+    }
+
+    const stake = parseFloat(stakeNum.toFixed(2));
 
     // 2. Transactional validation & atomic placement
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    // 2a. Row-lock match to verify current status
+    // 2a. Row-lock match to verify current status and authoritative expiry
     const [matchRows] = await connection.query(
-      'SELECT id, match_title, competition, team_one, team_one_rate, team_two, team_two_rate, status, settled FROM matches WHERE id = ? FOR UPDATE',
+      'SELECT id, match_title, competition, team_one, team_one_rate, team_two, team_two_rate, status, settled, match_end_time FROM matches WHERE id = ? FOR UPDATE',
       [matchId]
     );
 
@@ -223,6 +288,30 @@ async function handlePlaceBet(req, res, next) {
       return res.status(400).json({
         success: false,
         error: { code: 'BETTING_CLOSED', message: 'Betting on this match is closed.' }
+      });
+    }
+
+    // Check if match has expired based on real database match_end_time
+    if (!match.match_end_time) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'MATCH_EXPIRED',
+          message: 'This match has expired and betting is closed.'
+        }
+      });
+    }
+
+    const matchEndTimeMs = new Date(match.match_end_time).getTime();
+    if (isNaN(matchEndTimeMs) || matchEndTimeMs <= Date.now()) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'MATCH_EXPIRED',
+          message: 'This match has expired and betting is closed.'
+        }
       });
     }
 

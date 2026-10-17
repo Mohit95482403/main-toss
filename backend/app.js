@@ -3,6 +3,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 // Load environment variables from root or backend directory
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
@@ -72,6 +73,7 @@ const SERVE_STATIC_FRONTEND = process.env.SERVE_STATIC_FRONTEND !== 'false';
 const frontendDir = path.resolve(__dirname, '../frontend');
 if (SERVE_STATIC_FRONTEND) {
   app.use(express.static(frontendDir, {
+    index: false,
     maxAge: '1d',
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.html')) {
@@ -80,6 +82,19 @@ if (SERVE_STATIC_FRONTEND) {
     }
   }));
 }
+
+// 6.5 Persistent Static Uploads Serving (Team Logos & Media)
+const uploadsDir = path.resolve(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(path.join(uploadsDir, 'team-logos'), { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir, {
+  maxAge: '7d',
+  setHeaders: (res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
 
 // 7. API Routes Mounting
 app.use('/api/health', healthRoutes);
@@ -92,11 +107,11 @@ app.use('/api/wallet', walletRoutes);
 
 // Root informational endpoint
 app.get('/', (req, res) => {
-  if (SERVE_STATIC_FRONTEND && req.accepts('html')) {
+  if (SERVE_STATIC_FRONTEND && req.accepts('html') && req.get('accept') && req.get('accept').includes('text/html')) {
     return res.sendFile(path.join(frontendDir, 'index.html'));
   }
   res.status(200).json({
-    service: 'IRONMAN TOSS BOOK API',
+    service: 'DADDY TOSS BOOK API',
     status: 'active',
     version: '1.0.0-day19',
     environment: NODE_ENV,

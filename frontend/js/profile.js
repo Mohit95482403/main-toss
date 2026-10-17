@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Profile & Account Settings Controller (Day 6)
+ * DADDY TOSS BOOK - Profile & Account Settings Controller (Day 6)
  * Handles client-side user profile information, edit profile validation,
  * change password dialog, notification toggles, dark mode switch, and modals.
  */
@@ -356,10 +356,10 @@
         clearErrors();
 
         const newName = nameInput ? nameInput.value.trim() : '';
-        const newUsername = usernameInput ? usernameInput.value.trim() : '';
+        const currentUsername = (currentProfile.username || (usernameInput ? usernameInput.value.trim() : '')).trim();
         const newPhone = phoneInput ? phoneInput.value.trim() : '';
 
-        const validation = validateProfileFields(newName, newUsername, newPhone);
+        const validation = validateProfileFields(newName, currentUsername, newPhone);
 
         if (!validation.isValid) {
           if (validation.errors.name && nameError) {
@@ -386,14 +386,14 @@
 
         const isLive = window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && window.ApiClient.isAuthenticated();
         const savePromise = isLive
-          ? window.ApiClient.put('/auth/profile', { fullName: newName, username: newUsername, phone: newPhone })
+          ? window.ApiClient.put('/auth/profile', { fullName: newName, username: currentUsername, phone: newPhone })
           : new Promise(resolve => setTimeout(() => resolve({ success: true }), 200));
 
         savePromise
           .then((res) => {
             const updated = res.user || (res.data && res.data.user);
             currentProfile.fullName = (updated && (updated.full_name || updated.fullName)) || newName;
-            currentProfile.username = (updated && updated.username) || newUsername;
+            currentProfile.username = (updated && updated.username) || currentProfile.username;
             currentProfile.phone = (updated && updated.phone) || newPhone;
 
             if (updated && window.ApiClient && typeof window.ApiClient.setUser === 'function') {

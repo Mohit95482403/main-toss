@@ -116,6 +116,7 @@ async function runTests() {
       team_two_abbr: 'BK',
       team_two_rate: 95,
       scheduled_time: '2026-10-16 20:00:00',
+      match_end_time: new Date(Date.now() + 3600000).toISOString(),
       venue: 'Wankhede Stadium',
       status: 'upcoming'
     };

@@ -9,6 +9,7 @@ const { getPool } = require('../config/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/crypto');
 const { createUserAccount } = require('../services/userService');
+const { uploadTeamLogos, deleteUploadedFile } = require('../middleware/uploadLogo');
 
 const router = express.Router();
 
@@ -990,7 +991,7 @@ router.get('/system/status', async (req, res, next) => {
       success: true,
       data: {
         application: {
-          name: 'IRONMAN TOSS BOOK',
+          name: 'DADDY TOSS BOOK',
           version: '1.0.0-day17',
           environment: process.env.NODE_ENV || 'development',
           serverTime: new Date().toISOString(),
@@ -1044,9 +1045,9 @@ router.get('/matches', async (req, res, next) => {
     const queryParams = [];
 
     if (search.length > 0) {
-      whereClauses.push('(m.match_title LIKE ? OR m.competition LIKE ? OR m.team_one LIKE ? OR m.team_two LIKE ?)');
+      whereClauses.push('(m.id LIKE ? OR m.match_title LIKE ? OR m.competition LIKE ? OR m.team_one LIKE ? OR m.team_two LIKE ?)');
       const pattern = `%${search}%`;
-      queryParams.push(pattern, pattern, pattern, pattern);
+      queryParams.push(pattern, pattern, pattern, pattern, pattern);
     }
 
     if (statusFilter !== 'all' && ['live', 'upcoming', 'completed', 'abandoned'].includes(statusFilter)) {
@@ -1079,10 +1080,13 @@ router.get('/matches', async (req, res, next) => {
         m.team_one,
         m.team_one_abbr,
         m.team_one_rate,
+        m.team_one_logo,
         m.team_two,
         m.team_two_abbr,
         m.team_two_rate,
+        m.team_two_logo,
         m.scheduled_time,
+        m.match_end_time,
         m.venue,
         m.status,
         m.toss_winner,
@@ -1132,11 +1136,18 @@ router.get('/matches', async (req, res, next) => {
       team_one: row.team_one,
       teamOneAbbr: row.team_one_abbr,
       teamOneRate: parseFloat(row.team_one_rate || 0),
+      teamOneLogo: row.team_one_logo || null,
+      team_one_logo: row.team_one_logo || null,
       teamTwo: row.team_two,
       team_two: row.team_two,
       teamTwoAbbr: row.team_two_abbr,
       teamTwoRate: parseFloat(row.team_two_rate || 0),
+      teamTwoLogo: row.team_two_logo || null,
+      team_two_logo: row.team_two_logo || null,
       scheduledTime: row.scheduled_time,
+      matchEndTime: row.match_end_time,
+      match_end_time: row.match_end_time,
+      isExpired: Boolean(row.match_end_time && new Date(row.match_end_time).getTime() <= Date.now()),
       venue: row.venue,
       status: row.status,
       tossWinner: row.toss_winner,
@@ -1199,7 +1210,10 @@ router.get('/matches/:id/bets', async (req, res, next) => {
 
     // Verify match exists
     const [matchRows] = await pool.query(
-      'SELECT id, competition, stage, match_title, team_one, team_two, scheduled_time, venue, status, toss_winner, settled, settled_at FROM matches WHERE id = ?',
+      `SELECT id, competition, stage, match_title, team_one, team_one_abbr, team_one_rate, team_one_logo,
+              team_two, team_two_abbr, team_two_rate, team_two_logo, scheduled_time, match_end_time, venue, status,
+              toss_winner, settled, settled_at, created_at
+       FROM matches WHERE id = ?`,
       [matchId]
     );
 
@@ -1214,10 +1228,10 @@ router.get('/matches/:id/bets', async (req, res, next) => {
 
     // Pagination
     let page = parseInt(req.query.page || '1', 10);
-    let limit = parseInt(req.query.limit || '15', 10);
+    let limit = parseInt(req.query.limit || '100', 10);
     if (isNaN(page) || page < 1) page = 1;
-    if (isNaN(limit) || limit < 1) limit = 15;
-    if (limit > 100) limit = 100;
+    if (isNaN(limit) || limit < 1) limit = 100;
+    if (limit > 500) limit = 500;
     const offset = (page - 1) * limit;
 
     // Filters
@@ -1277,12 +1291,31 @@ router.get('/matches/:id/bets', async (req, res, next) => {
       LIMIT ? OFFSET ?
     `;
 
-    const [ [[countResult]], [betsRows] ] = await Promise.all([
+    // Aggregate summary query for this match's bets
+    const summaryQuery = `
+      SELECT
+        COUNT(*) AS total_bets,
+        COUNT(DISTINCT b.user_id) AS total_players,
+        COALESCE(SUM(b.stake), 0.00) AS total_stake,
+        COUNT(CASE WHEN b.settlement_status = 'pending' THEN 1 END) AS pending_bets,
+        COALESCE(SUM(CASE WHEN b.settlement_status = 'pending' THEN b.stake ELSE 0.00 END), 0.00) AS pending_stake,
+        COUNT(CASE WHEN b.settlement_status = 'settled' THEN 1 END) AS settled_bets,
+        COALESCE(SUM(CASE WHEN b.settlement_status = 'settled' THEN b.stake ELSE 0.00 END), 0.00) AS settled_stake,
+        COUNT(CASE WHEN b.status = 'won' THEN 1 END) AS won_bets,
+        COUNT(CASE WHEN b.status = 'lost' THEN 1 END) AS lost_bets,
+        COUNT(CASE WHEN b.status = 'no_result' THEN 1 END) AS refund_bets,
+        COALESCE(SUM(b.payout), 0.00) AS total_payout
+      FROM bets b
+      WHERE b.match_id = ?
+    `;
+
+    const [ [[countResult]], [betsRows], [[summaryResult]] ] = await Promise.all([
       pool.query(countQuery, queryParams),
-      pool.query(dataQuery, [...queryParams, limit, offset])
+      pool.query(dataQuery, [...queryParams, limit, offset]),
+      pool.query(summaryQuery, [matchId])
     ]);
 
-    const total = parseInt(countResult.total || 0, 10);
+    const total = parseInt(countResult?.total || 0, 10);
     const totalPages = Math.ceil(total / limit) || 1;
 
     const formattedBets = betsRows.map(row => ({
@@ -1312,24 +1345,69 @@ router.get('/matches/:id/bets', async (req, res, next) => {
       settled_at: row.settled_at
     }));
 
+    const summary = {
+      totalBets: parseInt(summaryResult?.total_bets || 0, 10),
+      total_bets: parseInt(summaryResult?.total_bets || 0, 10),
+      totalPlayers: parseInt(summaryResult?.total_players || 0, 10),
+      total_players: parseInt(summaryResult?.total_players || 0, 10),
+      totalStake: parseFloat(summaryResult?.total_stake || 0),
+      total_stake: parseFloat(summaryResult?.total_stake || 0),
+      pendingBets: parseInt(summaryResult?.pending_bets || 0, 10),
+      pending_bets: parseInt(summaryResult?.pending_bets || 0, 10),
+      pendingStake: parseFloat(summaryResult?.pending_stake || 0),
+      pending_stake: parseFloat(summaryResult?.pending_stake || 0),
+      settledBets: parseInt(summaryResult?.settled_bets || 0, 10),
+      settled_bets: parseInt(summaryResult?.settled_bets || 0, 10),
+      settledStake: parseFloat(summaryResult?.settled_stake || 0),
+      settled_stake: parseFloat(summaryResult?.settled_stake || 0),
+      wonBets: parseInt(summaryResult?.won_bets || 0, 10),
+      won_bets: parseInt(summaryResult?.won_bets || 0, 10),
+      lostBets: parseInt(summaryResult?.lost_bets || 0, 10),
+      lost_bets: parseInt(summaryResult?.lost_bets || 0, 10),
+      refundBets: parseInt(summaryResult?.refund_bets || 0, 10),
+      refund_bets: parseInt(summaryResult?.refund_bets || 0, 10),
+      totalPayout: parseFloat(summaryResult?.total_payout || 0),
+      total_payout: parseFloat(summaryResult?.total_payout || 0)
+    };
+
     return res.status(200).json({
       success: true,
       data: {
         match: {
           id: matchInfo.id,
           matchTitle: matchInfo.match_title,
+          match_title: matchInfo.match_title,
           competition: matchInfo.competition,
           stage: matchInfo.stage,
           teamOne: matchInfo.team_one,
+          team_one: matchInfo.team_one,
+          teamOneAbbr: matchInfo.team_one_abbr,
+          team_one_abbr: matchInfo.team_one_abbr,
+          teamOneRate: parseFloat(matchInfo.team_one_rate || 1.90),
+          team_one_rate: parseFloat(matchInfo.team_one_rate || 1.90),
+          rate_team_one: parseFloat(matchInfo.team_one_rate || 1.90),
           teamTwo: matchInfo.team_two,
+          team_two: matchInfo.team_two,
+          teamTwoAbbr: matchInfo.team_two_abbr,
+          team_two_abbr: matchInfo.team_two_abbr,
+          teamTwoRate: parseFloat(matchInfo.team_two_rate || 1.90),
+          team_two_rate: parseFloat(matchInfo.team_two_rate || 1.90),
+          rate_team_two: parseFloat(matchInfo.team_two_rate || 1.90),
           scheduledTime: matchInfo.scheduled_time,
+          scheduled_time: matchInfo.scheduled_time,
+          matchEndTime: matchInfo.match_end_time,
+          match_end_time: matchInfo.match_end_time,
+          isExpired: Boolean(matchInfo.match_end_time && new Date(matchInfo.match_end_time).getTime() <= Date.now()),
           venue: matchInfo.venue,
           status: matchInfo.status,
           tossWinner: matchInfo.toss_winner,
+          toss_winner: matchInfo.toss_winner,
           settled: Boolean(matchInfo.settled),
-          settledAt: matchInfo.settled_at
+          settledAt: matchInfo.settled_at,
+          settled_at: matchInfo.settled_at
         },
         bets: formattedBets,
+        summary,
         pagination: {
           page,
           limit,
@@ -1343,8 +1421,26 @@ router.get('/matches/:id/bets', async (req, res, next) => {
   }
 });
 
+function parseExpiryDateTime(input) {
+  if (!input) return null;
+  if (typeof input === 'number') return new Date(input);
+  const str = String(input).trim();
+  if (!str) return null;
+  if (/^\d+$/.test(str)) {
+    const n = parseInt(str, 10);
+    return new Date(n < 1e11 ? n * 1000 : n);
+  }
+  // If datetime-local without timezone (e.g. "2026-10-16T21:30" or "2026-10-16 21:30:00")
+  // Interpret as Indian Standard Time (IST, UTC+5:30)
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/.test(str)) {
+    return new Date(str.replace(' ', 'T') + '+05:30');
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // =============================================================================
-// 9. MATCH MANAGEMENT: CREATE & DELETE MATCH
+// 9. MATCH MANAGEMENT: CREATE, SCHEDULE & DELETE MATCH
 // =============================================================================
 async function handleAdminCreateMatch(req, res, next) {
   try {
@@ -1362,8 +1458,33 @@ async function handleAdminCreateMatch(req, res, next) {
     const teamTwoRate = parseFloat(req.body.team_two_rate || req.body.teamTwoRate || 1.90);
 
     const scheduledTime = (req.body.scheduled_time || req.body.scheduledTime || '').trim() || 'Schedule TBA';
+    const rawEndTime = req.body.match_end_time || req.body.matchEndTime || req.body.end_time || req.body.endTime;
+    const matchEndTime = parseExpiryDateTime(rawEndTime);
+
     const venue = (req.body.venue || '').trim() || 'Cricket Stadium';
     const status = (req.body.status || 'upcoming').trim().toLowerCase();
+
+    // Extract team logos from uploaded files or body
+    let teamOneLogo = null;
+    let teamTwoLogo = null;
+
+    if (req.files) {
+      const file1 = (req.files.teamOneLogo || req.files.team_one_logo)?.[0];
+      if (file1) {
+        teamOneLogo = `/uploads/team-logos/${file1.filename}`;
+      }
+      const file2 = (req.files.teamTwoLogo || req.files.team_two_logo)?.[0];
+      if (file2) {
+        teamTwoLogo = `/uploads/team-logos/${file2.filename}`;
+      }
+    }
+
+    if (!teamOneLogo && (req.body.team_one_logo || req.body.teamOneLogo)) {
+      teamOneLogo = String(req.body.team_one_logo || req.body.teamOneLogo).trim() || null;
+    }
+    if (!teamTwoLogo && (req.body.team_two_logo || req.body.teamTwoLogo)) {
+      teamTwoLogo = String(req.body.team_two_logo || req.body.teamTwoLogo).trim() || null;
+    }
 
     // Validation
     const validationErrors = [];
@@ -1380,7 +1501,21 @@ async function handleAdminCreateMatch(req, res, next) {
       validationErrors.push({ field: 'status', message: "Status must be either 'upcoming' or 'live'." });
     }
 
+    if (!matchEndTime || isNaN(matchEndTime.getTime())) {
+      validationErrors.push({
+        field: 'match_end_time',
+        message: 'Valid match end / expiry date and time is required.'
+      });
+    } else if (matchEndTime.getTime() <= Date.now()) {
+      validationErrors.push({
+        field: 'match_end_time',
+        message: 'Match end time cannot be in the past. Please set a future expiry time.'
+      });
+    }
+
     if (validationErrors.length > 0) {
+      if (teamOneLogo && teamOneLogo.startsWith('/uploads/')) await deleteUploadedFile(teamOneLogo);
+      if (teamTwoLogo && teamTwoLogo.startsWith('/uploads/')) await deleteUploadedFile(teamTwoLogo);
       return res.status(400).json({
         success: false,
         error: {
@@ -1397,10 +1532,10 @@ async function handleAdminCreateMatch(req, res, next) {
     await pool.query(
       `INSERT INTO matches (
         id, competition, stage, match_title,
-        team_one, team_one_abbr, team_one_rate,
-        team_two, team_two_abbr, team_two_rate,
-        scheduled_time, venue, status, toss_winner, settled, settled_at, settled_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
+        team_one, team_one_abbr, team_one_rate, team_one_logo,
+        team_two, team_two_abbr, team_two_rate, team_two_logo,
+        scheduled_time, match_end_time, venue, status, toss_winner, settled, settled_at, settled_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
       [
         matchId,
         competition,
@@ -1409,10 +1544,13 @@ async function handleAdminCreateMatch(req, res, next) {
         teamOne,
         teamOneAbbr,
         teamOneRate,
+        teamOneLogo,
         teamTwo,
         teamTwoAbbr,
         teamTwoRate,
+        teamTwoLogo,
         scheduledTime,
+        matchEndTime,
         venue,
         status
       ]
@@ -1433,7 +1571,10 @@ async function handleAdminCreateMatch(req, res, next) {
         teamTwo,
         teamOneRate,
         teamTwoRate,
+        teamOneLogo,
+        teamTwoLogo,
         scheduledTime,
+        matchEndTime,
         venue,
         status
       },
@@ -1448,10 +1589,16 @@ async function handleAdminCreateMatch(req, res, next) {
       teamOne,
       teamOneAbbr,
       teamOneRate,
+      teamOneLogo,
+      team_one_logo: teamOneLogo,
       teamTwo,
       teamTwoAbbr,
       teamTwoRate,
+      teamTwoLogo,
+      team_two_logo: teamTwoLogo,
       scheduledTime,
+      matchEndTime,
+      match_end_time: matchEndTime,
       venue,
       status,
       settled: false
@@ -1465,12 +1612,168 @@ async function handleAdminCreateMatch(req, res, next) {
       }
     });
   } catch (err) {
+    if (req.files) {
+      const file1 = (req.files.teamOneLogo || req.files.team_one_logo)?.[0];
+      if (file1) await deleteUploadedFile(file1.filename);
+      const file2 = (req.files.teamTwoLogo || req.files.team_two_logo)?.[0];
+      if (file2) await deleteUploadedFile(file2.filename);
+    }
     next(err);
   }
 }
 
-router.post('/matches', handleAdminCreateMatch);
-router.post('/matches/create', handleAdminCreateMatch);
+async function handleAdminUpdateMatchLogos(req, res, next) {
+  try {
+    const pool = getPool();
+    const matchId = (req.params.id || '').trim();
+
+    const [rows] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Match fixture not found.' }
+      });
+    }
+
+    const currentMatch = rows[0];
+    let newTeamOneLogo = currentMatch.team_one_logo;
+    let newTeamTwoLogo = currentMatch.team_two_logo;
+
+    const removeTeamOne = req.body.remove_team_one_logo === 'true' || req.body.remove_team_one_logo === true || req.body.removeTeamOneLogo === true;
+    const removeTeamTwo = req.body.remove_team_two_logo === 'true' || req.body.remove_team_two_logo === true || req.body.removeTeamTwoLogo === true;
+
+    if (removeTeamOne) {
+      newTeamOneLogo = null;
+    } else if (req.files && (req.files.teamOneLogo || req.files.team_one_logo)) {
+      const f1 = (req.files.teamOneLogo || req.files.team_one_logo)[0];
+      newTeamOneLogo = `/uploads/team-logos/${f1.filename}`;
+    } else if (req.body.team_one_logo !== undefined && req.body.team_one_logo !== '') {
+      newTeamOneLogo = String(req.body.team_one_logo).trim();
+    }
+
+    if (removeTeamTwo) {
+      newTeamTwoLogo = null;
+    } else if (req.files && (req.files.teamTwoLogo || req.files.team_two_logo)) {
+      const f2 = (req.files.teamTwoLogo || req.files.team_two_logo)[0];
+      newTeamTwoLogo = `/uploads/team-logos/${f2.filename}`;
+    } else if (req.body.team_two_logo !== undefined && req.body.team_two_logo !== '') {
+      newTeamTwoLogo = String(req.body.team_two_logo).trim();
+    }
+
+    await pool.query(
+      'UPDATE matches SET team_one_logo = ?, team_two_logo = ? WHERE id = ?',
+      [newTeamOneLogo, newTeamTwoLogo, matchId]
+    );
+
+    await logAdminAction(
+      req.user,
+      'update_match_logos',
+      'match',
+      null,
+      matchId,
+      {
+        matchId,
+        previousTeamOneLogo: currentMatch.team_one_logo,
+        newTeamOneLogo,
+        previousTeamTwoLogo: currentMatch.team_two_logo,
+        newTeamTwoLogo
+      },
+      req.ip
+    );
+
+    const [updatedRows] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
+    const m = updatedRows[0];
+
+    return res.status(200).json({
+      success: true,
+      message: 'Match team logos updated successfully.',
+      data: {
+        match: {
+          id: m.id,
+          matchTitle: m.match_title,
+          teamOne: m.team_one,
+          teamOneLogo: m.team_one_logo,
+          team_one_logo: m.team_one_logo,
+          teamTwo: m.team_two,
+          teamTwoLogo: m.team_two_logo,
+          team_two_logo: m.team_two_logo
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/matches', uploadTeamLogos, handleAdminCreateMatch);
+router.post('/matches/create', uploadTeamLogos, handleAdminCreateMatch);
+router.put('/matches/:id/logos', uploadTeamLogos, handleAdminUpdateMatchLogos);
+
+router.put('/matches/:id/schedule', async (req, res, next) => {
+  try {
+    const matchId = (req.params.id || '').trim();
+    const pool = getPool();
+
+    const [matches] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
+    if (matches.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Match fixture not found.' }
+      });
+    }
+
+    const rawEndTime = req.body.match_end_time || req.body.matchEndTime || req.body.end_time;
+    const scheduledTime = req.body.scheduled_time || req.body.scheduledTime;
+
+    const parsedEndTime = parseExpiryDateTime(rawEndTime);
+    if (!parsedEndTime || isNaN(parsedEndTime.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_END_TIME', message: 'Valid match end / expiry date and time is required.' }
+      });
+    }
+
+    await pool.query(
+      'UPDATE matches SET match_end_time = ?, scheduled_time = COALESCE(?, scheduled_time) WHERE id = ?',
+      [parsedEndTime, scheduledTime ? String(scheduledTime).trim() : null, matchId]
+    );
+
+    await logAdminAction(
+      req.user,
+      'update_match_schedule',
+      'match',
+      null,
+      matchId,
+      {
+        matchId,
+        previousEndTime: matches[0].match_end_time,
+        newEndTime: parsedEndTime,
+        scheduledTime: scheduledTime || matches[0].scheduled_time
+      },
+      req.ip
+    );
+
+    const [updatedRows] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
+    const m = updatedRows[0];
+
+    return res.status(200).json({
+      success: true,
+      message: 'Match schedule and end time updated successfully.',
+      data: {
+        match: {
+          id: m.id,
+          matchTitle: m.match_title,
+          scheduledTime: m.scheduled_time,
+          matchEndTime: m.match_end_time,
+          match_end_time: m.match_end_time,
+          isExpired: Boolean(m.match_end_time && new Date(m.match_end_time).getTime() <= Date.now())
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.delete('/matches/:id', async (req, res, next) => {
   try {
@@ -1499,6 +1802,57 @@ router.delete('/matches/:id', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: 'Match fixture deleted successfully.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/matches/:id/status', async (req, res, next) => {
+  try {
+    const matchId = (req.params.id || '').trim();
+    const status = (req.body.status || '').trim().toLowerCase();
+    const tossWinner = req.body.toss_winner ? req.body.toss_winner.trim() : (req.body.tossWinner ? req.body.tossWinner.trim() : null);
+
+    if (!['upcoming', 'live', 'completed', 'abandoned'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_STATUS', message: "Status must be 'upcoming', 'live', 'completed', or 'abandoned'." }
+      });
+    }
+
+    const pool = getPool();
+    const [matches] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
+    if (matches.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Match fixture not found.' }
+      });
+    }
+
+    const isCompleted = status === 'completed' || status === 'abandoned';
+    await pool.query(
+      `UPDATE matches 
+       SET status = ?, 
+           toss_winner = COALESCE(?, toss_winner), 
+           settled = CASE WHEN ? THEN TRUE ELSE settled END,
+           settled_at = CASE WHEN ? AND settled_at IS NULL THEN NOW() ELSE settled_at END,
+           settled_by = CASE WHEN ? AND settled_by IS NULL THEN ? ELSE settled_by END
+       WHERE id = ?`,
+      [status, tossWinner, isCompleted, isCompleted, isCompleted, req.user.id, matchId]
+    );
+
+    await logAdminAction(req.user, 'update_match_status', 'match', null, matchId, { status, tossWinner, isCompleted }, req.ip);
+
+    return res.status(200).json({
+      success: true,
+      message: `Match status updated to ${status}.`,
+      data: {
+        match_id: matchId,
+        status,
+        settled: isCompleted,
+        toss_winner: tossWinner || matches[0].toss_winner
+      }
     });
   } catch (err) {
     next(err);
@@ -1641,13 +1995,6 @@ router.post('/settlement/preview', async (req, res, next) => {
        WHERE b.match_id = ? AND b.settlement_status = 'pending'`,
       [match.id]
     );
-
-    if (bets.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'NO_PENDING_BETS', message: 'This match has no pending bets eligible for settlement.' }
-      });
-    }
 
     let wonCount = 0;
     let lostCount = 0;
@@ -1809,14 +2156,6 @@ router.post('/settlement/process', async (req, res, next) => {
       [match.id]
     );
 
-    if (bets.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'NO_PENDING_BETS', message: 'This match has no pending bets eligible for settlement.' }
-      });
-    }
-
     let wonCount = 0;
     let lostCount = 0;
     let noResultCount = 0;
@@ -1942,6 +2281,8 @@ router.post('/settlement/process', async (req, res, next) => {
         match_title: match.match_title,
         declaredOutcome: cleanOutcome,
         declared_outcome: cleanOutcome,
+        status: 'completed',
+        settled: true,
         totalBetsSettled: bets.length,
         bets_settled: bets.length,
         wonCount,

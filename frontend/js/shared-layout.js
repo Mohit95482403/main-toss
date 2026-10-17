@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Shared Layout Component Engine (Day 2)
+ * DADDY TOSS BOOK - Shared Layout Component Engine (Day 2)
  * Renders and manages the Shared Header, Announcement Ticker, and Bottom Navigation.
  * Works natively in both HTTP development server and local file execution.
  */
@@ -49,18 +49,18 @@
 
     container.innerHTML = `
       <header class="app-header" role="banner">
-        <a href="${homeUrl}" class="header-brand" aria-label="IRONMAN TOSS BOOK - Go to Home">
+        <a href="${homeUrl}" class="header-brand" aria-label="DADDY TOSS BOOK - Go to Home">
           <div class="brand-logo-fallback" id="brand-logo-fallback">
             <div class="brand-icon-badge">
               ${ICONS.brandShield}
             </div>
             <div class="brand-text-group">
-              <span class="brand-title">IRONMAN</span>
+              <span class="brand-title">DADDY</span>
               <span class="brand-subtitle">TOSS BOOK</span>
             </div>
           </div>
           <!-- Optional image logo with fallback handling -->
-          <img src="${logoSrc}" alt="IRONMAN TOSS BOOK Logo" class="brand-logo-img" style="display: none;" id="brand-logo-img" />
+          <img src="${logoSrc}" alt="DADDY TOSS BOOK Logo" class="brand-logo-img" style="display: none;" id="brand-logo-img" />
         </a>
 
         <div class="header-balances" role="region" aria-label="Account Balances">
@@ -107,7 +107,7 @@
     const config = window.APP_CONFIG || {};
     const announcements = config.announcements && config.announcements.length > 0
       ? config.announcements
-      : ['WELCOME TO IRONMAN TOSS BOOK'];
+      : ['WELCOME TO DADDY TOSS BOOK'];
 
     // Generate items string with separator
     const itemsHtml = announcements

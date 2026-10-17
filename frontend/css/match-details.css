@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Match Details Page Styles (Day 8)
+ * DADDY TOSS BOOK - Match Details Page Styles (Day 8)
  * Back navigation bar, match summary hero, toss market rates preview,
  * venue & fixture metadata grid, rules card, and not-found states.
  */
@@ -21,19 +21,20 @@
   align-items: center;
   gap: 6px;
   font-size: 0.8125rem; /* 13px */
-  font-weight: 600;
-  color: var(--color-primary, #0860BE);
-  background: transparent;
-  border: none;
+  font-weight: 700;
+  color: var(--pink-primary, #E75480);
+  background: var(--pink-bg-secondary, #FFF0F5);
+  border: 1px solid var(--pink-border, #F2D3DF);
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: var(--radius-sm, 6px);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm, 8px);
   text-decoration: none;
   transition: all var(--transition-fast);
 }
 
 .back-nav-btn:hover {
-  background-color: var(--color-primary-subtle, #E8F2FC);
+  background-color: var(--pink-soft, #FCE4EC);
+  border-color: var(--pink-border-strong, #EABCCF);
 }
 
 [data-theme="dark"] .back-nav-btn {
@@ -55,11 +56,11 @@
    ========================================================================== */
 
 .match-summary-card {
-  background: linear-gradient(135deg, #0A4B94 0%, #0860BE 55%, #1D70CD 100%);
+  background: linear-gradient(135deg, var(--pink-primary-dark, #C93768) 0%, var(--pink-primary, #E75480) 55%, var(--pink-primary-hover, #D94370) 100%);
   color: #FFFFFF;
-  border-radius: var(--radius-xl, 16px);
+  border-radius: var(--radius-xl, 18px);
   padding: 16px 18px;
-  box-shadow: 0 4px 16px rgba(8, 96, 190, 0.25);
+  box-shadow: 0 6px 20px rgba(231, 84, 128, 0.28);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -68,7 +69,7 @@
 }
 
 [data-theme="dark"] .match-summary-card {
-  background: linear-gradient(135deg, #0F1D38 0%, #1A3668 60%, #204685 100%);
+  background: linear-gradient(135deg, #2D1522 0%, #4D1830 60%, #681E3E 100%);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
@@ -132,12 +133,17 @@
   font-size: 0.9375rem; /* 15px */
   font-weight: 800;
   letter-spacing: 0.02em;
+  overflow: hidden;
 }
 
 .match-team-name-lg {
   font-size: 0.9375rem; /* 15px */
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .match-captain-name {
@@ -193,14 +199,20 @@
    ========================================================================== */
 
 .toss-market-card {
-  background-color: var(--color-surface, #FFFFFF);
-  border: 1px solid var(--color-border, #E5E7EB);
-  border-radius: var(--radius-xl, 16px);
-  padding: 16px;
-  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+  background-color: var(--surface-primary, #FFFFFF);
+  border: 1px solid var(--border-primary, #F2D3DF);
+  border-radius: var(--radius-xl, 20px);
+  padding: 18px;
+  box-shadow: var(--shadow-card, 0 4px 18px rgba(130, 63, 91, 0.06));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.toss-market-card:hover {
+  box-shadow: var(--shadow-hover, 0 10px 28px rgba(130, 63, 91, 0.11));
+  border-color: var(--pink-border-strong, #EABCCF);
 }
 
 [data-theme="dark"] .toss-market-card {
@@ -216,28 +228,37 @@
 }
 
 .toss-market-title {
-  font-size: 0.9375rem; /* 15px */
-  font-weight: 700;
-  color: var(--color-text, #15171A);
+  font-family: var(--font-family-display);
+  font-size: 1rem; /* 16px */
+  font-weight: 800;
+  color: var(--text-primary, #352631);
+  letter-spacing: -0.01em;
 }
 
 .toss-rates-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .toss-rate-box {
-  background-color: var(--color-surface-subtle, #F8FAFC);
-  border: 1px solid var(--color-border-subtle, #E5E7EB);
-  border-radius: var(--radius-lg, 12px);
-  padding: 12px;
+  background: linear-gradient(135deg, #FFFFFF 0%, #FFF7FA 100%);
+  border: 1px solid var(--pink-border, #F3D5E0);
+  border-radius: var(--radius-md, 14px);
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 4px;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(180, 70, 115, 0.04);
+  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.toss-rate-box:hover {
+  border-color: var(--pink-primary, #E75480);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(180, 70, 115, 0.09);
 }
 
 [data-theme="dark"] .toss-rate-box {
@@ -246,38 +267,34 @@
 }
 
 .toss-rate-team {
-  font-size: 0.75rem; /* 12px */
-  font-weight: 600;
-  color: var(--color-text-secondary, #4B5563);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 700;
+  color: var(--text-primary, #352631);
 }
 
 .toss-rate-val {
   font-family: var(--font-family-mono, monospace);
-  font-size: 1.25rem; /* 20px */
+  font-size: 1.375rem; /* 22px */
   font-weight: 800;
-  color: var(--color-primary, #0860BE);
-}
-
-[data-theme="dark"] .toss-rate-val {
-  color: #60A5FA;
+  color: var(--pink-primary, #E75480);
 }
 
 .toss-rate-sub {
   font-size: 0.625rem; /* 10px */
-  color: var(--color-text-muted, #737B87);
+  color: var(--text-muted, #9A8994);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .toss-notice-box {
-  background-color: var(--color-primary-subtle, #E8F2FC);
-  border: 1px solid rgba(8, 96, 190, 0.2);
+  background-color: var(--pink-soft, #FCE4EC);
+  border: 1px solid var(--pink-border, #F2D3DF);
   border-radius: var(--radius-md, 8px);
   padding: 10px 12px;
   font-size: 0.75rem; /* 12px */
-  color: var(--color-primary, #0860BE);
+  color: var(--pink-primary-dark, #C93768);
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 [data-theme="dark"] .toss-notice-box {
@@ -303,13 +320,20 @@
 }
 
 .match-meta-card {
-  background-color: var(--color-surface, #FFFFFF);
-  border: 1px solid var(--color-border, #E5E7EB);
-  border-radius: var(--radius-lg, 12px);
+  background-color: var(--surface-primary, #FFFFFF);
+  border: 1px solid var(--border-primary, #F2D3DF);
+  border-radius: var(--radius-lg, 16px);
   padding: 14px 16px;
+  box-shadow: var(--shadow-card, 0 4px 18px rgba(130, 63, 91, 0.05));
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.match-meta-card:hover {
+  border-color: var(--pink-border-strong, #EABCCF);
+  transform: translateY(-1px);
 }
 
 [data-theme="dark"] .match-meta-card {
@@ -319,16 +343,16 @@
 
 .match-meta-label {
   font-size: 0.6875rem; /* 11px */
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted, #737B87);
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #9A8994);
 }
 
 .match-meta-val {
   font-size: 0.875rem; /* 14px */
-  font-weight: 600;
-  color: var(--color-text, #15171A);
+  font-weight: 700;
+  color: var(--text-primary, #352631);
   word-break: break-word;
 }
 
@@ -337,13 +361,14 @@
    ========================================================================== */
 
 .match-rules-card {
-  background-color: var(--color-surface, #FFFFFF);
-  border: 1px solid var(--color-border, #E5E7EB);
-  border-radius: var(--radius-xl, 16px);
-  padding: 16px;
+  background-color: var(--surface-primary, #FFFFFF);
+  border: 1px solid var(--border-primary, #F2D3DF);
+  border-radius: var(--radius-xl, 20px);
+  padding: 18px;
+  box-shadow: var(--shadow-card, 0 4px 18px rgba(130, 63, 91, 0.06));
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 [data-theme="dark"] .match-rules-card {
@@ -352,18 +377,20 @@
 }
 
 .match-rules-title {
-  font-size: 0.9375rem; /* 15px */
-  font-weight: 700;
-  color: var(--color-text, #15171A);
+  font-family: var(--font-family-display);
+  font-size: 1rem; /* 16px */
+  font-weight: 800;
+  color: var(--text-primary, #352631);
+  letter-spacing: -0.01em;
 }
 
 .match-rule-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   font-size: 0.8125rem; /* 13px */
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--color-border-subtle, #EEF0F2);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-secondary, #F7E6ED);
 }
 
 .match-rule-item:last-child {
@@ -377,13 +404,13 @@
 
 .match-rule-heading {
   font-weight: 700;
-  color: var(--color-text, #15171A);
+  color: var(--text-primary, #352631);
 }
 
 .match-rule-desc {
   font-size: 0.75rem; /* 12px */
-  color: var(--color-text-secondary, #4B5563);
-  line-height: 1.4;
+  color: var(--text-secondary, #786875);
+  line-height: 1.5;
 }
 
 /* ==========================================================================
@@ -396,11 +423,12 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 48px 16px;
-  background-color: var(--color-surface, #FFFFFF);
-  border: 1px dashed var(--color-border, #E5E7EB);
-  border-radius: var(--radius-xl, 16px);
-  gap: 12px;
+  padding: 48px 24px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF7FA 100%);
+  border: 1.5px dashed var(--border-primary, #F2D3DF);
+  border-radius: var(--radius-xl, 20px);
+  box-shadow: var(--shadow-card, 0 4px 18px rgba(130, 63, 91, 0.06));
+  gap: 14px;
 }
 
 [data-theme="dark"] .match-not-found {
@@ -409,14 +437,15 @@
 }
 
 .not-found-icon {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background-color: var(--color-surface-subtle, #F1F4F8);
+  background: var(--pink-soft, #FCE4EC);
+  border: 1.5px solid var(--pink-border, #F2D3DF);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-muted, #737B87);
+  color: var(--pink-primary, #E75480);
 }
 
 [data-theme="dark"] .not-found-icon {
@@ -424,20 +453,23 @@
 }
 
 .not-found-icon svg {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
 
 .not-found-title {
+  font-family: var(--font-family-display);
   font-size: 1.125rem; /* 18px */
-  font-weight: 700;
-  color: var(--color-text, #15171A);
+  font-weight: 800;
+  color: var(--text-primary, #352631);
+  letter-spacing: -0.01em;
 }
 
 .not-found-desc {
   font-size: 0.8125rem; /* 13px */
-  color: var(--color-text-secondary, #4B5563);
-  max-width: 300px;
+  color: var(--text-secondary, #786875);
+  max-width: 340px;
+  line-height: 1.5;
 }
 
 /* Small mobile responsiveness */

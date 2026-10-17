@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Authentication Validation & Form Utilities (Day 3)
+ * DADDY TOSS BOOK - Authentication Validation & Form Utilities (Day 3)
  * Reusable, accessible client-side validation, password toggles, and strength evaluator.
  */
 
@@ -82,7 +82,7 @@
 
     // Common patterns penalty
     const lower = password.toLowerCase();
-    const commonPatterns = ['password', '123456', 'qwerty', 'admin', 'ironman', 'welcome', 'letmein'];
+    const commonPatterns = ['password', '123456', 'qwerty', 'admin', 'ironman', 'daddy', 'welcome', 'letmein'];
     const hasCommon = commonPatterns.some(p => lower.includes(p));
     const hasRepeats = /(.)\1{3,}/.test(password);
 

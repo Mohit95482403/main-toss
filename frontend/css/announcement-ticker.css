@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Announcement Ticker Styles
+ * DADDY TOSS BOOK - Announcement Ticker Styles
  * Pale blue background, deep blue text, seamless looping, pause on hover/focus, accessible.
  */
 
@@ -7,8 +7,8 @@
   position: relative;
   width: 100%;
   height: var(--ticker-height, 32px);
-  background-color: var(--color-primary-subtle, #E8F2FC);
-  border-bottom: 1px solid rgba(8, 96, 190, 0.12);
+  background-color: var(--pink-bg-secondary, #FFF0F5);
+  border-bottom: 1px solid var(--pink-border, #F3D5E0);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -17,8 +17,8 @@
 }
 
 [data-theme="dark"] .announcement-ticker-container {
-  background-color: var(--color-primary-subtle, #1E293B);
-  border-bottom-color: rgba(59, 130, 246, 0.2);
+  background-color: var(--color-surface-subtle);
+  border-bottom-color: var(--color-border);
 }
 
 /* Left pinned announcement icon/badge */
@@ -28,11 +28,11 @@
   justify-content: center;
   padding: 0 var(--space-sm, 8px);
   height: 100%;
-  background-color: var(--color-primary, #0860BE);
+  background-color: var(--pink-primary, #E75480);
   color: #FFFFFF;
   flex-shrink: 0;
   z-index: 2;
-  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 2px 0 6px rgba(180, 80, 120, 0.15);
 }
 
 .ticker-badge svg {
@@ -72,16 +72,16 @@
   padding: 0 var(--space-lg, 16px);
   font-size: 0.75rem; /* 12px */
   font-weight: 600;
-  color: var(--color-primary, #0860BE);
+  color: var(--text-primary, #30232B);
   letter-spacing: 0.02em;
 }
 
 [data-theme="dark"] .ticker-item {
-  color: #93C5FD;
+  color: var(--color-text);
 }
 
 .ticker-separator {
-  color: rgba(8, 96, 190, 0.4);
+  color: var(--pink-primary, #E75480);
   font-size: 0.625rem;
 }
 

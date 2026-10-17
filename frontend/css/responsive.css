@@ -1,52 +1,229 @@
 /**
- * IRONMAN TOSS BOOK - Responsive Foundations & Media Queries
+ * DADDY TOSS BOOK - Responsive Foundations & Systematic Media Queries
+ * Tested Viewports: 320px, 375px, 425px, 768px, 1024px, 1366px, 1440px, 1920px.
+ * Guarantees zero horizontal overflow, balanced desktop spacing, and ergonomic touch targets.
  */
 
 /* ==========================================================================
-   Small Mobile Viewports (<= 360px)
+   0. Global Overflow Protection
    ========================================================================== */
 
-@media (max-width: 360px) {
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+  width: 100%;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   1. Ultra-Narrow Mobile Viewports (<= 340px, e.g. iPhone SE 1st gen / KaiOS)
+   ========================================================================== */
+
+@media (max-width: 340px) {
   :root {
-    --space-lg: 0.75rem; /* 12px padding for tight screens */
-    --font-size-base: 0.8125rem; /* 13px */
+    --space-4: 10px;
+    --page-padding-mobile: 10px;
+    --font-size-base: 0.8125rem;
+  }
+
+  .main-content {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  .app-header {
+    padding: 0 8px;
+    height: 54px;
+  }
+
+  .brand-title {
+    font-size: 0.75rem;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .balance-card-pill {
+    padding: 2px 6px;
+  }
+
+  .balance-amount {
+    font-size: 0.6875rem;
+  }
+
+  .balance-label {
+    font-size: 0.5rem;
+  }
+
+  .home-wallet-actions {
+    grid-template-columns: 1fr;
   }
 
   .btn {
-    padding: 0.5rem 0.875rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .match-info-boxes-grid {
+    grid-template-columns: 1fr;
   }
 }
 
 /* ==========================================================================
-   Tablet & Above Viewports (>= 768px)
+   2. Small Mobile Viewports (341px - 380px, e.g. iPhone SE / Galaxy S)
+   ========================================================================== */
+
+@media (max-width: 380px) {
+  :root {
+    --page-padding-mobile: 12px;
+  }
+
+  .main-content {
+    padding: 12px;
+    gap: 14px;
+  }
+
+  .home-wallet-card {
+    padding: 12px 14px;
+  }
+
+  .home-wallet-amount {
+    font-size: 1.125rem;
+  }
+
+  .btn-bet-on-toss {
+    padding: 12px 14px;
+    font-size: 0.875rem;
+  }
+
+  .bet-presets-row {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .bet-preset-btn {
+    padding: 6px 4px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   3. Standard Mobile Viewports (381px - 639px, e.g. iPhone 12/13/14, Pixel)
+   ========================================================================== */
+
+@media (min-width: 381px) and (max-width: 639px) {
+  .main-content {
+    padding: var(--space-4, 16px);
+    gap: var(--space-4, 16px);
+  }
+}
+
+/* ==========================================================================
+   4. Phablet & Small Tablet Viewports (640px - 767px)
+   ========================================================================== */
+
+@media (min-width: 640px) {
+  .home-wallet-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+  }
+
+  .home-wallet-actions {
+    width: auto;
+    display: flex;
+    gap: 12px;
+  }
+
+  .home-wallet-btn {
+    min-width: 120px;
+  }
+
+  .bets-summary-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .bet-modal-overlay {
+    align-items: center;
+    padding: var(--space-4, 16px);
+  }
+
+  .bet-modal-card {
+    border-radius: var(--radius-xl, 20px);
+  }
+}
+
+/* ==========================================================================
+   5. Tablet Viewports (768px - 1023px, e.g. iPad Portrait)
    ========================================================================== */
 
 @media (min-width: 768px) {
   .app-wrapper {
-    padding: var(--space-xl) var(--space-lg);
-    background-color: var(--color-background);
+    padding: var(--space-6, 24px) var(--space-4, 16px);
+    background-color: var(--pink-bg-secondary, #FFF0F5);
+    align-items: center;
   }
 
   .app-container {
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-lg);
-    min-height: calc(100vh - 3rem);
+    border-radius: var(--radius-xl, 20px);
+    border: 1px solid var(--pink-border, #F2D3DF);
+    box-shadow: 0 12px 36px rgba(180, 70, 115, 0.10);
+    min-height: calc(100vh - 48px);
+    overflow: hidden;
+  }
+
+  .app-header {
+    border-top-left-radius: var(--radius-xl, 20px);
+    border-top-right-radius: var(--radius-xl, 20px);
+  }
+
+  .bottom-nav {
+    border-left: 1px solid var(--pink-border, #F3D5E0);
+    border-right: 1px solid var(--pink-border, #F3D5E0);
+    border-top-left-radius: var(--radius-md, 12px);
+    border-top-right-radius: var(--radius-md, 12px);
   }
 }
 
 /* ==========================================================================
-   Desktop Viewports (>= 1024px)
+   6. Laptop & Desktop Viewports (1024px - 1439px)
    ========================================================================== */
 
 @media (min-width: 1024px) {
   .app-wrapper {
-    padding: var(--space-2xl) 0;
+    padding: var(--space-8, 32px) var(--space-6, 24px);
+  }
+
+  .admin-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   }
 }
 
 /* ==========================================================================
-   Reduced Motion Accessibility Preference
+   7. Standard & Large Desktop (>= 1440px and 1920px Full HD)
+   ========================================================================== */
+
+@media (min-width: 1440px) {
+  .admin-header-inner,
+  .admin-nav-inner,
+  .admin-main,
+  .page-container {
+    max-width: var(--content-max-width, 1440px);
+  }
+
+  /* Prevent over-stretching of cards on 1920px+ monitors */
+  .admin-card {
+    max-width: 100%;
+  }
+}
+
+/* ==========================================================================
+   8. Reduced Motion Accessibility Preference
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {

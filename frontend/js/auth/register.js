@@ -1,5 +1,5 @@
 /**
- * IRONMAN TOSS BOOK - Registration Form Controller (Day 3)
+ * DADDY TOSS BOOK - Registration Form Controller (Day 3)
  * Handles input validation, password strength meter, confirm password matching, and submission.
  */
 
@@ -236,7 +236,7 @@
           if (devAlert) {
             devAlert.innerHTML = `
               <strong>Account Created Successfully!</strong><br>
-              Welcome to IRONMAN TOSS BOOK, <strong>${user ? (user.username || user.fullName || 'Player') : 'User'}</strong>!<br>
+              Welcome to DADDY TOSS BOOK, <strong>${user ? (user.username || user.fullName || 'Player') : 'User'}</strong>!<br>
               <small class="text-muted">Account verified. Redirecting to home dashboard...</small>
             `;
             devAlert.classList.add('visible');
