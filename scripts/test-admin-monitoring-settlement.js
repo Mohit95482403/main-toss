@@ -230,7 +230,7 @@ async function runTests() {
     assert(Array.isArray(eligibleMatchesList), 'Eligible matches list returned');
     assert(eligibleMatchesList.length > 0, 'Found matches with pending bets eligible for settlement');
 
-    const targetMatch = eligibleMatchesList[0];
+    const targetMatch = eligibleMatchesList.find(m => (m.id || m.matchId) === 'MATCH-2026-001') || eligibleMatchesList[0];
     const targetMatchTitle = targetMatch.match_title || targetMatch.matchTitle;
     const targetTeamOne = targetMatch.team_one || targetMatch.teamOne;
     console.log(`    Selected Target Match for Settlement: Match #${targetMatch.id} (${targetMatchTitle})`);

@@ -156,6 +156,9 @@
             <button type="button" class="filter-btn" data-filter="no_result" aria-pressed="false">
               No Result <span class="filter-count">0</span>
             </button>
+            <button type="button" class="filter-btn" data-filter="cancelled" aria-pressed="false">
+              Cancelled <span class="filter-count">0</span>
+            </button>
           </nav>
         </section>
 
@@ -249,6 +252,73 @@
           <footer class="modal-footer">
             <button type="button" class="btn btn-secondary btn-sm" id="modal-footer-close-btn">
               Close
+            </button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Cancel Bet Confirmation Modal Dialog -->
+      <div 
+        id="cancel-bet-modal" 
+        class="modal-backdrop" 
+        role="dialog" 
+        aria-modal="true" 
+        aria-labelledby="cancel-modal-title" 
+        hidden
+      >
+        <div class="modal-card cancel-modal-card" role="document">
+          <header class="modal-header">
+            <div class="flex items-center gap-xs">
+              <span class="cancel-modal-warning-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              </span>
+              <h2 id="cancel-modal-title" class="modal-title">Cancel This Bet?</h2>
+            </div>
+            <button type="button" class="modal-close-btn" id="cancel-modal-close-btn" aria-label="Close cancel dialog">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </header>
+
+          <div class="modal-body">
+            <p class="text-sm text-secondary" id="cancel-modal-subtitle" style="margin-bottom: 12px;">
+              You are about to cancel your bet.
+            </p>
+
+            <div class="cancel-summary-box">
+              <div class="cancel-summary-row">
+                <span class="cancel-summary-label">Match</span>
+                <span class="cancel-summary-value font-bold" id="cancel-summary-match">—</span>
+              </div>
+              <div class="cancel-summary-row">
+                <span class="cancel-summary-label">Selection</span>
+                <span class="cancel-summary-value text-primary font-bold" id="cancel-summary-selection">—</span>
+              </div>
+              <div class="cancel-summary-row">
+                <span class="cancel-summary-label">Original Stake</span>
+                <span class="cancel-summary-value font-mono font-bold" id="cancel-summary-stake">₹0.00</span>
+              </div>
+              <div class="cancel-summary-row refund-highlight">
+                <span class="cancel-summary-label">Expected Refund</span>
+                <span class="cancel-summary-value font-mono font-bold text-success" id="cancel-summary-refund">₹0.00</span>
+              </div>
+            </div>
+
+            <p class="cancel-modal-note text-xs text-muted" style="margin-top: 12px; line-height: 1.4;">
+              Your stake will be returned to your available balance immediately upon confirmation. This action cannot be undone.
+            </p>
+
+            <div id="cancel-modal-error" class="cancel-modal-error-alert" style="display: none;" role="alert"></div>
+          </div>
+
+          <footer class="modal-footer cancel-modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" id="cancel-modal-keep-btn">
+              Keep Bet
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" id="cancel-modal-confirm-btn">
+              <span class="btn-text">Confirm Cancellation</span>
+              <span class="btn-spinner" style="display: none;" aria-hidden="true">
+                <span class="spinner-sm"></span>
+              </span>
             </button>
           </footer>
         </div>

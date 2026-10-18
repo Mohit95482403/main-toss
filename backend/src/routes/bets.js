@@ -33,7 +33,9 @@ router.get('/my-bets', async (req, res, next) => {
         SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) AS wonCount,
         COALESCE(SUM(CASE WHEN status = 'won' THEN payout ELSE 0 END), 0) AS wonReturn,
         SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) AS lostCount,
-        COALESCE(SUM(CASE WHEN status = 'lost' THEN stake ELSE 0 END), 0) AS lostStake
+        COALESCE(SUM(CASE WHEN status = 'lost' THEN stake ELSE 0 END), 0) AS lostStake,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelledCount,
+        COALESCE(SUM(CASE WHEN status = 'cancelled' THEN stake ELSE 0 END), 0) AS cancelledStake
        FROM bets
        WHERE user_id = ?`,
       [userId]
@@ -47,7 +49,9 @@ router.get('/my-bets', async (req, res, next) => {
       wonCount: parseInt(metricsRow.wonCount || 0, 10),
       wonReturn: parseFloat(metricsRow.wonReturn || 0),
       lostCount: parseInt(metricsRow.lostCount || 0, 10),
-      lostStake: parseFloat(metricsRow.lostStake || 0)
+      lostStake: parseFloat(metricsRow.lostStake || 0),
+      cancelledCount: parseInt(metricsRow.cancelledCount || 0, 10),
+      cancelledStake: parseFloat(metricsRow.cancelledStake || 0)
     };
 
     // 2. Build parameterized query for the player's bet records
@@ -57,7 +61,7 @@ router.get('/my-bets', async (req, res, next) => {
     if (filter !== 'all') {
       if (filter === 'live') {
         whereClauses.push("(b.status = 'live' OR b.status = 'pending')");
-      } else if (['won', 'lost', 'no_result'].includes(filter)) {
+      } else if (['won', 'lost', 'no_result', 'cancelled'].includes(filter)) {
         whereClauses.push('b.status = ?');
         queryParams.push(filter);
       }
@@ -83,6 +87,8 @@ router.get('/my-bets', async (req, res, next) => {
         b.status,
         b.settlement_status,
         b.payout,
+        b.refund_amount,
+        b.cancelled_at,
         b.settled_at,
         b.created_at,
         COALESCE(m.match_title, 'Match Fixture') AS match_title,
@@ -92,6 +98,10 @@ router.get('/my-bets', async (req, res, next) => {
         COALESCE(m.team_two, 'Team Two') AS team_two,
         m.team_two_logo,
         m.status AS match_status,
+        m.settled AS match_settled,
+        m.match_start_time,
+        m.match_end_time,
+        m.scheduled_time,
         m.toss_winner
        FROM bets b
        LEFT JOIN matches m ON m.id = b.match_id
@@ -100,6 +110,7 @@ router.get('/my-bets', async (req, res, next) => {
       queryParams
     );
 
+    const now = Date.now();
     const bets = rows.map((r) => {
       let resultText = 'Awaiting match toss declaration';
       if (r.status === 'won') {
@@ -108,11 +119,26 @@ router.get('/my-bets', async (req, res, next) => {
         resultText = `${r.toss_winner ? r.toss_winner : 'Opponent'} won the toss.`;
       } else if (r.status === 'no_result') {
         resultText = 'Match abandoned / no result. Stake refunded.';
+      } else if (r.status === 'cancelled') {
+        resultText = 'CANCELLED — Stake Refunded';
       }
 
       let selectedTeamLogo = null;
       if (r.selection === r.team_one) selectedTeamLogo = r.team_one_logo;
       else if (r.selection === r.team_two) selectedTeamLogo = r.team_two_logo;
+
+      // Evaluation of cancellation eligibility:
+      // A pending bet is cancellable only before the match starts:
+      // 1. Bet must be pending/live and unsettled
+      // 2. Match must be 'upcoming' and unsettled
+      // 3. Match start time (if set) and match end time must be in the future
+      const isPending = (r.status === 'pending' || r.status === 'live');
+      const isUnsettled = (r.settlement_status === 'pending') && !Boolean(r.match_settled);
+      const isUpcoming = (r.match_status === 'upcoming');
+      const isStartTimeFuture = !r.match_start_time || (new Date(r.match_start_time).getTime() > now);
+      const isEndTimeFuture = !r.match_end_time || (new Date(r.match_end_time).getTime() > now);
+
+      const canCancel = Boolean(isPending && isUnsettled && isUpcoming && isStartTimeFuture && isEndTimeFuture);
 
       return {
         id: r.id,
@@ -134,9 +160,12 @@ router.get('/my-bets', async (req, res, next) => {
         status: r.status,
         settlementStatus: r.settlement_status,
         payout: parseFloat(r.payout || 0),
+        refundAmount: parseFloat(r.refund_amount || 0),
         resultText,
+        canCancel,
         placedAt: r.created_at,
-        settledAt: r.settled_at
+        settledAt: r.settled_at,
+        cancelledAt: r.cancelled_at
       };
     });
 
@@ -430,6 +459,309 @@ async function handlePlaceBet(req, res, next) {
 
 router.post('/place', handlePlaceBet);
 router.post('/', handlePlaceBet);
+
+/**
+ * POST /api/bets/:betId/cancel (alias: POST /api/bets/cancel)
+ * Secure, transactional user wager cancellation before match start.
+ * Atomically marks bet as cancelled, releases exposure, refunds stake to available balance,
+ * and records immutable ledger record in coin_transactions.
+ */
+async function handleCancelBet(req, res, next) {
+  const pool = getPool();
+  let connection = null;
+
+  try {
+    const userId = req.user.id;
+    const rawBetId = req.params.betId || req.params.id || req.body.betId || req.body.bet_id || req.body.id;
+    const betId = rawBetId ? String(rawBetId).trim() : '';
+
+    if (!betId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_BET_ID', message: 'Bet identifier is required.' },
+        message: 'Bet identifier is required.'
+      });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Lock bet row to inspect current state
+    const [betRows] = await connection.query(
+      `SELECT id, user_id, match_id, market_name, selection, stake, odds, potential_return, status, settlement_status, payout, refund_amount, cancelled_at
+       FROM bets
+       WHERE id = ?
+       FOR UPDATE`,
+      [betId]
+    );
+
+    if (betRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'BET_NOT_FOUND', message: 'Bet ticket not found in database.' },
+        message: 'Bet ticket not found in database.'
+      });
+    }
+
+    const bet = betRows[0];
+
+    // 2. Strict ownership verification
+    if (bet.user_id !== userId) {
+      await connection.rollback();
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'You are not authorized to cancel this bet.' },
+        message: 'You are not authorized to cancel this bet.'
+      });
+    }
+
+    // 3. Verify bet is in a cancellable state
+    if (bet.status === 'cancelled' || bet.settlement_status === 'cancelled' || bet.cancelled_at !== null) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'ALREADY_CANCELLED', message: 'This bet has already been cancelled and refunded.' },
+        message: 'This bet has already been cancelled and refunded.'
+      });
+    }
+
+    if (bet.settlement_status === 'settled' || ['won', 'lost', 'no_result'].includes(bet.status)) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BET_ALREADY_SETTLED', message: 'Cannot cancel a bet that has already been settled.' },
+        message: 'Cannot cancel a bet that has already been settled.'
+      });
+    }
+
+    if (bet.status !== 'pending' && bet.status !== 'live') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BET_NOT_CANCELLABLE', message: `Bet is in "${bet.status}" status and cannot be cancelled.` },
+        message: `Bet is in "${bet.status}" status and cannot be cancelled.`
+      });
+    }
+
+    // 4. Lock match row and strictly evaluate cancellation deadline
+    const [matchRows] = await connection.query(
+      `SELECT id, match_title, competition, team_one, team_two, scheduled_time, match_start_time, match_end_time, status, settled
+       FROM matches
+       WHERE id = ?
+       FOR UPDATE`,
+      [bet.match_id]
+    );
+
+    if (matchRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: 'Associated match fixture not found.' },
+        message: 'Associated match fixture not found.'
+      });
+    }
+
+    const match = matchRows[0];
+
+    // Reject if match is settled
+    if (match.settled) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_SETTLED', message: 'Cannot cancel bet. Match has already been settled.' },
+        message: 'Cannot cancel bet. Match has already been settled.'
+      });
+    }
+
+    // Reject if match has completed or abandoned
+    if (match.status === 'completed' || match.status === 'abandoned') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_ENDED', message: `Cannot cancel bet. Match is marked as ${match.status}.` },
+        message: `Cannot cancel bet. Match is marked as ${match.status}.`
+      });
+    }
+
+    // Reject if match is already in progress / started (live)
+    if (match.status === 'live') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_STARTED', message: 'Cannot cancel bet. The match is already in progress / started.' },
+        message: 'Cannot cancel bet. The match is already in progress / started.'
+      });
+    }
+
+    if (match.status !== 'upcoming') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_NOT_CANCELLABLE', message: `Cannot cancel bet. Match status is "${match.status}".` },
+        message: `Cannot cancel bet. Match status is "${match.status}".`
+      });
+    }
+
+    const now = Date.now();
+
+    // Reject if scheduled start time has arrived or passed
+    if (match.match_start_time) {
+      const startTimeMs = new Date(match.match_start_time).getTime();
+      if (!isNaN(startTimeMs) && startTimeMs <= now) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          error: { code: 'MATCH_STARTED', message: 'Cannot cancel bet. The scheduled match start time has passed.' },
+          message: 'Cannot cancel bet. The scheduled match start time has passed.'
+        });
+      }
+    }
+
+    // Reject if match expiry has arrived or passed
+    if (match.match_end_time) {
+      const endTimeMs = new Date(match.match_end_time).getTime();
+      if (!isNaN(endTimeMs) && endTimeMs <= now) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          error: { code: 'MATCH_EXPIRED', message: 'Cannot cancel bet. Match has expired.' },
+          message: 'Cannot cancel bet. Match has expired.'
+        });
+      }
+    }
+
+    // 5. Lock player wallet row
+    const [walletRows] = await connection.query(
+      `SELECT id, user_id, available_balance, exposure_balance, version
+       FROM wallets
+       WHERE user_id = ?
+       FOR UPDATE`,
+      [userId]
+    );
+
+    if (walletRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'WALLET_NOT_FOUND', message: 'Player wallet record not found.' },
+        message: 'Player wallet record not found.'
+      });
+    }
+
+    const wallet = walletRows[0];
+    const refundStake = parseFloat(bet.stake);
+    const balanceBefore = parseFloat(wallet.available_balance || 0);
+    const balanceAfter = parseFloat((balanceBefore + refundStake).toFixed(2));
+
+    // 6. Transition bet status from pending to cancelled
+    const [updateBetResult] = await connection.query(
+      `UPDATE bets
+       SET status = 'cancelled',
+           settlement_status = 'cancelled',
+           refund_amount = ?,
+           cancelled_at = NOW(),
+           updated_at = NOW()
+       WHERE id = ? AND status IN ('pending', 'live') AND settlement_status = 'pending'`,
+      [refundStake, bet.id]
+    );
+
+    if (updateBetResult.affectedRows !== 1) {
+      await connection.rollback();
+      return res.status(409).json({
+        success: false,
+        error: { code: 'CONCURRENT_MODIFICATION', message: 'Bet state changed during processing. Please refresh and try again.' },
+        message: 'Bet state changed during processing. Please refresh and try again.'
+      });
+    }
+
+    // 7. Atomically refund stake to available balance and release exposure
+    await connection.query(
+      `UPDATE wallets
+       SET available_balance = available_balance + ?,
+           exposure_balance = GREATEST(0.00, exposure_balance - ?),
+           version = version + 1,
+           updated_at = NOW()
+       WHERE user_id = ?`,
+      [refundStake, refundStake, userId]
+    );
+
+    // 8. Record audit ledger entry in coin_transactions
+    const crypto = require('crypto');
+    const txnUuid = crypto.randomUUID();
+    const idempotencyKey = `REFUND-BET-${bet.id}`;
+
+    await connection.query(
+      `INSERT INTO coin_transactions (
+        transaction_uuid, user_id, username, admin_id, admin_username,
+        action_type, amount, balance_before, balance_after,
+        reason, idempotency_key, status, created_at
+      ) VALUES (?, ?, ?, NULL, NULL, 'BET_CANCEL_REFUND', ?, ?, ?, ?, ?, 'completed', NOW())`,
+      [
+        txnUuid,
+        userId,
+        req.user.username,
+        refundStake,
+        balanceBefore,
+        balanceAfter,
+        `Bet Cancellation Refund: ${bet.id} (${bet.selection} - ₹${refundStake.toFixed(2)})`,
+        idempotencyKey
+      ]
+    );
+
+    // 9. Fetch authoritative updated wallet balance
+    const [updatedWalletRows] = await connection.query(
+      'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
+      [userId]
+    );
+    const newWallet = updatedWalletRows[0];
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bet cancelled successfully. Your stake has been refunded.',
+      bet: {
+        id: bet.id,
+        status: 'cancelled',
+        settlementStatus: 'cancelled'
+      },
+      refundedAmount: refundStake,
+      balance: parseFloat(newWallet.available_balance),
+      data: {
+        bet: {
+          id: bet.id,
+          matchId: match.id,
+          matchTitle: match.match_title,
+          selection: bet.selection,
+          stake: refundStake,
+          status: 'cancelled',
+          settlementStatus: 'cancelled',
+          refundAmount: refundStake,
+          cancelledAt: new Date().toISOString()
+        },
+        refundedAmount: refundStake,
+        wallet: {
+          availableBalance: parseFloat(newWallet.available_balance),
+          exposureBalance: parseFloat(newWallet.exposure_balance),
+          currency: newWallet.currency || 'INR'
+        }
+      }
+    });
+  } catch (err) {
+    if (connection) {
+      try { await connection.rollback(); } catch (rbErr) {}
+    }
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+}
+
+router.post('/:betId/cancel', handleCancelBet);
+router.post('/cancel', handleCancelBet);
 
 module.exports = router;
 

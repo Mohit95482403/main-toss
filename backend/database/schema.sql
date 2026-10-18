@@ -127,11 +127,13 @@ CREATE TABLE IF NOT EXISTS bets (
   stake DECIMAL(12, 2) NOT NULL,
   odds DECIMAL(5, 2) NOT NULL,
   potential_return DECIMAL(12, 2) NOT NULL,
-  status ENUM('pending', 'live', 'won', 'lost', 'no_result') NOT NULL DEFAULT 'live',
-  settlement_status ENUM('pending', 'settled') NOT NULL DEFAULT 'pending',
+  status ENUM('pending', 'live', 'won', 'lost', 'no_result', 'cancelled') NOT NULL DEFAULT 'live',
+  settlement_status ENUM('pending', 'settled', 'cancelled') NOT NULL DEFAULT 'pending',
   payout DECIMAL(12, 2) DEFAULT 0.00,
+  refund_amount DECIMAL(12, 2) DEFAULT 0.00,
   settled_at TIMESTAMP NULL DEFAULT NULL,
   settled_by INT DEFAULT NULL,
+  cancelled_at TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -141,6 +143,7 @@ CREATE TABLE IF NOT EXISTS bets (
   INDEX idx_bets_match (match_id),
   INDEX idx_bets_status (status),
   INDEX idx_bets_settlement (settlement_status),
+  INDEX idx_bets_cancelled (cancelled_at),
   INDEX idx_bets_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -166,15 +169,15 @@ CREATE TABLE IF NOT EXISTS settlements (
   INDEX idx_settlement_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 8. Coin Transactions Ledger (Admin Player Coin Management)
+-- 8. Coin Transactions Ledger (Admin Player Coin Management & Refunds)
 CREATE TABLE IF NOT EXISTS coin_transactions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   transaction_uuid VARCHAR(36) NOT NULL UNIQUE,
   user_id INT NOT NULL,
   username VARCHAR(30) NOT NULL,
-  admin_id INT NOT NULL,
-  admin_username VARCHAR(50) NOT NULL,
-  action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT') NOT NULL,
+  admin_id INT NULL,
+  admin_username VARCHAR(50) NULL,
+  action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT', 'BET_CANCEL_REFUND') NOT NULL,
   amount DECIMAL(12, 2) NOT NULL,
   balance_before DECIMAL(12, 2) NOT NULL,
   balance_after DECIMAL(12, 2) NOT NULL,

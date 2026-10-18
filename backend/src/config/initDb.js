@@ -117,11 +117,13 @@ const TABLES_DDL = [
     stake DECIMAL(12, 2) NOT NULL,
     odds DECIMAL(5, 2) NOT NULL,
     potential_return DECIMAL(12, 2) NOT NULL,
-    status ENUM('pending', 'live', 'won', 'lost', 'no_result') NOT NULL DEFAULT 'live',
-    settlement_status ENUM('pending', 'settled') NOT NULL DEFAULT 'pending',
+    status ENUM('pending', 'live', 'won', 'lost', 'no_result', 'cancelled') NOT NULL DEFAULT 'live',
+    settlement_status ENUM('pending', 'settled', 'cancelled') NOT NULL DEFAULT 'pending',
     payout DECIMAL(12, 2) DEFAULT 0.00,
+    refund_amount DECIMAL(12, 2) DEFAULT 0.00,
     settled_at TIMESTAMP NULL DEFAULT NULL,
     settled_by INT DEFAULT NULL,
+    cancelled_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -131,6 +133,7 @@ const TABLES_DDL = [
     INDEX idx_bets_match (match_id),
     INDEX idx_bets_status (status),
     INDEX idx_bets_settlement (settlement_status),
+    INDEX idx_bets_cancelled (cancelled_at),
     INDEX idx_bets_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 
@@ -160,9 +163,9 @@ const TABLES_DDL = [
     transaction_uuid VARCHAR(36) NOT NULL UNIQUE,
     user_id INT NOT NULL,
     username VARCHAR(30) NOT NULL,
-    admin_id INT NOT NULL,
-    admin_username VARCHAR(50) NOT NULL,
-    action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT') NOT NULL,
+    admin_id INT NULL,
+    admin_username VARCHAR(50) NULL,
+    action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT', 'BET_CANCEL_REFUND') NOT NULL,
     amount DECIMAL(12, 2) NOT NULL,
     balance_before DECIMAL(12, 2) NOT NULL,
     balance_after DECIMAL(12, 2) NOT NULL,
@@ -267,6 +270,40 @@ async function initializeDatabase() {
       }
     } catch (logoErr) {
       console.warn('[DB INIT] team logo columns verification notice:', logoErr.message);
+    }
+
+    // Ensure bet cancellation & refund support exists idempotently
+    try {
+      await pool.query(
+        "ALTER TABLE bets MODIFY COLUMN status ENUM('pending', 'live', 'won', 'lost', 'no_result', 'cancelled') NOT NULL DEFAULT 'live'"
+      );
+      await pool.query(
+        "ALTER TABLE bets MODIFY COLUMN settlement_status ENUM('pending', 'settled', 'cancelled') NOT NULL DEFAULT 'pending'"
+      );
+      const [betCols] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bets' AND COLUMN_NAME IN ('cancelled_at', 'refund_amount')"
+      );
+      const existingBetCols = betCols.map(r => r.COLUMN_NAME);
+      if (!existingBetCols.includes('cancelled_at')) {
+        await pool.query('ALTER TABLE bets ADD COLUMN cancelled_at TIMESTAMP NULL DEFAULT NULL AFTER settled_by');
+        await pool.query('ALTER TABLE bets ADD INDEX idx_bets_cancelled (cancelled_at)');
+      }
+      if (!existingBetCols.includes('refund_amount')) {
+        await pool.query('ALTER TABLE bets ADD COLUMN refund_amount DECIMAL(12, 2) DEFAULT 0.00 AFTER payout');
+      }
+
+      await pool.query('ALTER TABLE coin_transactions MODIFY COLUMN admin_id INT NULL');
+      await pool.query('ALTER TABLE coin_transactions MODIFY COLUMN admin_username VARCHAR(50) NULL');
+      await pool.query("ALTER TABLE coin_transactions MODIFY COLUMN action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT', 'BET_CANCEL_REFUND') NOT NULL");
+
+      const [startCol] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME = 'match_start_time'"
+      );
+      if (startCol.length === 0) {
+        await pool.query('ALTER TABLE matches ADD COLUMN match_start_time DATETIME NULL DEFAULT NULL AFTER scheduled_time');
+      }
+    } catch (cancelErr) {
+      console.warn('[DB INIT] Bet cancellation schema verification notice:', cancelErr.message);
     }
 
     // Schema verification complete (automatic demo data seeding disabled)

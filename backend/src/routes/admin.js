@@ -1531,6 +1531,8 @@ router.get('/matches/:id/bets', async (req, res, next) => {
         b.status,
         b.settlement_status,
         b.payout,
+        b.refund_amount,
+        b.cancelled_at,
         b.created_at,
         b.settled_at
       FROM bets b
@@ -1553,6 +1555,7 @@ router.get('/matches/:id/bets', async (req, res, next) => {
         COUNT(CASE WHEN b.status = 'won' THEN 1 END) AS won_bets,
         COUNT(CASE WHEN b.status = 'lost' THEN 1 END) AS lost_bets,
         COUNT(CASE WHEN b.status = 'no_result' THEN 1 END) AS refund_bets,
+        COUNT(CASE WHEN b.status = 'cancelled' THEN 1 END) AS cancelled_bets,
         COALESCE(SUM(b.payout), 0.00) AS total_payout
       FROM bets b
       WHERE b.match_id = ?
@@ -1587,6 +1590,10 @@ router.get('/matches/:id/bets', async (req, res, next) => {
       settlementStatus: row.settlement_status,
       settlement_status: row.settlement_status,
       payout: parseFloat(row.payout || 0),
+      refundAmount: parseFloat(row.refund_amount || 0),
+      refund_amount: parseFloat(row.refund_amount || 0),
+      cancelledAt: row.cancelled_at,
+      cancelled_at: row.cancelled_at,
       createdAt: row.created_at,
       created_at: row.created_at,
       placed_at: row.created_at,
@@ -1615,6 +1622,8 @@ router.get('/matches/:id/bets', async (req, res, next) => {
       lost_bets: parseInt(summaryResult?.lost_bets || 0, 10),
       refundBets: parseInt(summaryResult?.refund_bets || 0, 10),
       refund_bets: parseInt(summaryResult?.refund_bets || 0, 10),
+      cancelledBets: parseInt(summaryResult?.cancelled_bets || 0, 10),
+      cancelled_bets: parseInt(summaryResult?.cancelled_bets || 0, 10),
       totalPayout: parseFloat(summaryResult?.total_payout || 0),
       total_payout: parseFloat(summaryResult?.total_payout || 0)
     };

@@ -540,6 +540,19 @@
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
+/* Status: Cancelled */
+.status-cancelled {
+  background-color: var(--color-danger-bg, #FEE2E2);
+  color: var(--color-danger, #B91C1C);
+  border: 1px solid rgba(185, 28, 28, 0.25);
+}
+
+[data-theme="dark"] .status-cancelled {
+  background-color: rgba(185, 28, 28, 0.2);
+  color: #F87171;
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
 /* Card Body Content */
 .bet-card-body {
   padding: 12px 14px;
@@ -623,6 +636,10 @@
   color: var(--color-danger, #D62828);
 }
 
+.metric-val.payout-refunded {
+  color: var(--color-warning-text, #B45309);
+}
+
 /* Card Footer: Settlement result explanation & View Details CTA */
 .bet-card-footer {
   padding: 8px 14px;
@@ -660,6 +677,76 @@
 .placed-time {
   white-space: nowrap;
   font-size: 0.625rem; /* 10px */
+}
+
+/* Cancel Bet Action Button */
+.btn-cancel-bet {
+  background: #FFF1F2;
+  border: 1px solid #FECDD3;
+  color: #E11D48;
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all var(--transition-fast);
+}
+
+.btn-cancel-bet:hover:not(:disabled) {
+  background-color: #FFE4E6;
+  border-color: #FDA4AF;
+  color: #BE123C;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.15);
+}
+
+.btn-cancel-bet:focus-visible {
+  outline: 2px solid #E11D48;
+  outline-offset: 1px;
+}
+
+.btn-cancel-bet:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .btn-cancel-bet {
+  background: rgba(225, 29, 72, 0.15);
+  border-color: rgba(225, 29, 72, 0.35);
+  color: #FB7185;
+}
+
+[data-theme="dark"] .btn-cancel-bet:hover:not(:disabled) {
+  background: rgba(225, 29, 72, 0.25);
+  border-color: #FB7185;
+  color: #FFF;
+}
+
+/* Cancelled - Stake Refunded Badge */
+.bet-badge-refunded {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.625rem; /* 10px */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 6px);
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .bet-badge-refunded {
+  background-color: rgba(220, 38, 38, 0.15);
+  color: #F87171;
+  border-color: rgba(220, 38, 38, 0.3);
 }
 
 .btn-bet-details {
@@ -908,6 +995,109 @@
 [data-theme="dark"] .modal-footer {
   background-color: #121824;
   border-top-color: #243042;
+}
+
+/* ==========================================================================
+   Cancel Bet Confirmation Modal
+   ========================================================================== */
+
+.cancel-modal-card {
+  max-width: 420px;
+}
+
+.cancel-modal-warning-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #E11D48;
+  flex-shrink: 0;
+}
+
+.cancel-summary-box {
+  background-color: var(--pink-bg-secondary, #FFF0F5);
+  border: 1px solid var(--border-primary, #F2D3DF);
+  border-radius: var(--radius-md, 10px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-theme="dark"] .cancel-summary-box {
+  background-color: #121824;
+  border-color: #243042;
+}
+
+.cancel-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  gap: 8px;
+}
+
+.cancel-summary-label {
+  color: var(--text-secondary, #786875);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.cancel-summary-value {
+  color: var(--text-primary, #352631);
+  text-align: right;
+}
+
+[data-theme="dark"] .cancel-summary-value {
+  color: #F1F5F9;
+}
+
+.cancel-summary-row.refund-highlight {
+  border-top: 1px dashed var(--border-primary, #F2D3DF);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+[data-theme="dark"] .cancel-summary-row.refund-highlight {
+  border-top-color: #243042;
+}
+
+.cancel-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancel-modal-error-alert {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #FEE2E2;
+  border: 1px solid #FCA5A5;
+  border-radius: var(--radius-sm, 6px);
+  color: #991B1B;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .cancel-modal-error-alert {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #FCA5A5;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spinner-rotate 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
 }
 
 /* ==========================================================================

@@ -38,7 +38,7 @@ router.get('/transactions', async (req, res, next) => {
     const queryParams = [userId];
 
     if (typeFilter === 'credit') {
-      whereClauses.push("ct.action_type = 'ADMIN_CREDIT'");
+      whereClauses.push("ct.action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND')");
     } else if (typeFilter === 'debit') {
       whereClauses.push("ct.action_type = 'ADMIN_DEBIT'");
     }
@@ -72,7 +72,7 @@ router.get('/transactions', async (req, res, next) => {
     // Concurrently compute total credits and debits from MySQL for this player
     const [[totalsRow]] = await pool.query(
       `SELECT
-        COALESCE(SUM(CASE WHEN action_type = 'ADMIN_CREDIT' THEN amount ELSE 0 END), 0) AS totalCredits,
+        COALESCE(SUM(CASE WHEN action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND') THEN amount ELSE 0 END), 0) AS totalCredits,
         COALESCE(SUM(CASE WHEN action_type = 'ADMIN_DEBIT' THEN amount ELSE 0 END), 0) AS totalDebits
        FROM coin_transactions
        WHERE user_id = ?`,
@@ -83,20 +83,31 @@ router.get('/transactions', async (req, res, next) => {
     const totalDebits = parseFloat(totalsRow.totalDebits || 0);
 
     const transactions = rows.map((r) => {
-      const isCredit = r.action_type === 'ADMIN_CREDIT';
+      const isCredit = r.action_type === 'ADMIN_CREDIT' || r.action_type === 'BET_CANCEL_REFUND';
       const createdDate = new Date(r.created_at);
+
+      let title = isCredit ? 'Account Credit' : 'Account Debit';
+      let subtitle = r.reason || (isCredit ? 'Admin Balance Credit' : 'Admin Balance Debit');
+      let category = isCredit ? 'Admin Credit' : 'Admin Debit';
+
+      if (r.action_type === 'BET_CANCEL_REFUND') {
+        title = 'Bet Refund (Cancelled)';
+        subtitle = r.reason || 'Stake Refund for Cancelled Bet';
+        category = 'Bet Refund';
+      }
 
       return {
         id: r.transaction_uuid || `TXN-${r.id}`,
         numericId: r.id,
-        title: isCredit ? 'Account Credit' : 'Account Debit',
-        subtitle: r.reason || (isCredit ? 'Admin Balance Credit' : 'Admin Balance Debit'),
+        actionType: r.action_type,
+        title,
+        subtitle,
         type: isCredit ? 'credit' : 'debit',
         amount: parseFloat(r.amount),
         openingBalance: parseFloat(r.balance_before),
         closingBalance: parseFloat(r.balance_after),
         status: r.status || 'completed',
-        category: isCredit ? 'Admin Credit' : 'Admin Debit',
+        category,
         referenceCode: r.transaction_uuid || `TXN-${r.id}`,
         remarks: r.reason,
         timestamp: r.created_at,

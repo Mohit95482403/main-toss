@@ -75,8 +75,12 @@
         return `<span class="bet-status-pill status-lost">${ICONS.cross} Lost</span>`;
       case 'live':
         return `<span class="bet-status-pill status-live"><span class="live-pulse-dot" aria-hidden="true"></span> Live</span>`;
+      case 'pending':
+        return `<span class="bet-status-pill status-live"><span class="live-pulse-dot" aria-hidden="true"></span> Pending</span>`;
       case 'no_result':
         return `<span class="bet-status-pill status-no-result">No Result</span>`;
+      case 'cancelled':
+        return `<span class="bet-status-pill status-cancelled">${ICONS.cross} Cancelled</span>`;
       default:
         return `<span class="bet-status-pill">${escapeHtml(status)}</span>`;
     }
@@ -109,9 +113,13 @@
 
     bets.forEach(bet => {
       const stake = typeof bet.stake === 'number' && !isNaN(bet.stake) ? bet.stake : 0;
+      if (bet.status === 'cancelled') {
+        // Excluded from active wagers, active exposure, and settlement metrics
+        return;
+      }
       totalStake += stake;
 
-      if (bet.status === 'live') {
+      if (bet.status === 'live' || bet.status === 'pending') {
         liveCount++;
         liveStake += stake;
       } else if (bet.status === 'won') {
@@ -147,8 +155,9 @@
   function renderBetCard(bet) {
     const isWon = bet.status === 'won';
     const isLost = bet.status === 'lost';
-    const isLive = bet.status === 'live';
+    const isLive = bet.status === 'live' || bet.status === 'pending';
     const isNoResult = bet.status === 'no_result';
+    const isCancelled = bet.status === 'cancelled';
 
     let returnLabel = 'Potential';
     let returnValClass = '';
@@ -165,6 +174,10 @@
     } else if (isNoResult) {
       returnLabel = 'Refunded';
       returnAmount = bet.stake;
+    } else if (isCancelled) {
+      returnLabel = 'Refunded';
+      returnValClass = 'payout-refunded';
+      returnAmount = typeof bet.refundAmount === 'number' && !isNaN(bet.refundAmount) ? bet.refundAmount : bet.stake;
     }
 
     return `
@@ -215,6 +228,18 @@
             ${escapeHtml(bet.resultText)}
           </span>
           <div class="bet-footer-right">
+            ${bet.canCancel ? `
+              <button 
+                type="button" 
+                class="btn-cancel-bet" 
+                data-bet-id="${escapeHtml(bet.id)}"
+                aria-label="Cancel bet ${escapeHtml(bet.id)}"
+              >
+                Cancel Bet
+              </button>
+            ` : (isCancelled ? `
+              <span class="bet-badge-refunded">CANCELLED — Stake Refunded</span>
+            ` : '')}
             <time class="placed-time text-muted" datetime="${escapeHtml(bet.placedAt)}">
               ${escapeHtml(bet.placedAt)}
             </time>
@@ -330,11 +355,25 @@
     const modalPayout = document.getElementById('modal-payout');
     const modalResultText = document.getElementById('modal-result-text');
 
+    // Cancel Bet Confirmation Modal Elements
+    const cancelModalBackdrop = document.getElementById('cancel-bet-modal');
+    const cancelModalCloseBtn = document.getElementById('cancel-modal-close-btn');
+    const cancelModalKeepBtn = document.getElementById('cancel-modal-keep-btn');
+    const cancelModalConfirmBtn = document.getElementById('cancel-modal-confirm-btn');
+    const cancelModalSubtitle = document.getElementById('cancel-modal-subtitle');
+    const cancelSummaryMatch = document.getElementById('cancel-summary-match');
+    const cancelSummarySelection = document.getElementById('cancel-summary-selection');
+    const cancelSummaryStake = document.getElementById('cancel-summary-stake');
+    const cancelSummaryRefund = document.getElementById('cancel-summary-refund');
+    const cancelModalError = document.getElementById('cancel-modal-error');
+
     if (!container) return;
 
     let currentFilter = 'all';
     let searchQuery = '';
     let lastActiveElement = null;
+    let betToCancel = null;
+    let isCancelling = false;
 
     /**
      * Update Dynamic Summary Cards
@@ -365,10 +404,11 @@
     function updateFilterCounts() {
       const counts = {
         all: userBets.length,
-        live: userBets.filter(b => b.status === 'live').length,
+        live: userBets.filter(b => b.status === 'live' || b.status === 'pending').length,
         won: userBets.filter(b => b.status === 'won').length,
         lost: userBets.filter(b => b.status === 'lost').length,
-        no_result: userBets.filter(b => b.status === 'no_result').length
+        no_result: userBets.filter(b => b.status === 'no_result').length,
+        cancelled: userBets.filter(b => b.status === 'cancelled').length
       };
 
       filterButtons.forEach(btn => {
@@ -388,7 +428,11 @@
 
       // 1. Status Filter
       if (currentFilter !== 'all') {
-        result = result.filter(b => b.status === currentFilter);
+        if (currentFilter === 'live') {
+          result = result.filter(b => b.status === 'live' || b.status === 'pending');
+        } else {
+          result = result.filter(b => b.status === currentFilter);
+        }
       }
 
       // 2. Search Query Filter
@@ -460,6 +504,17 @@
           openBetModal(betId);
         });
       });
+
+      // Bind Cancel Bet buttons
+      const cancelBtns = container.querySelectorAll('.btn-cancel-bet');
+      cancelBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const betId = btn.dataset.betId;
+          lastActiveElement = btn;
+          openCancelModal(betId);
+        });
+      });
     }
 
     /**
@@ -475,6 +530,139 @@
       });
 
       renderFeed();
+    }
+
+    /**
+     * Open Cancel Bet Confirmation Modal
+     */
+    function openCancelModal(betId) {
+      const bet = userBets.find(b => b.id === betId);
+      if (!bet || !cancelModalBackdrop) return;
+
+      betToCancel = bet;
+      isCancelling = false;
+
+      if (cancelModalSubtitle) {
+        cancelModalSubtitle.textContent = `You are about to cancel your bet on ${bet.selectedTeam || 'this selection'}.`;
+      }
+      if (cancelSummaryMatch) cancelSummaryMatch.textContent = bet.matchTitle || '—';
+      if (cancelSummarySelection) cancelSummarySelection.textContent = bet.selectedTeam || '—';
+      if (cancelSummaryStake) cancelSummaryStake.textContent = formatCurrency(bet.stake);
+      if (cancelSummaryRefund) cancelSummaryRefund.textContent = formatCurrency(bet.stake);
+
+      if (cancelModalError) {
+        cancelModalError.textContent = '';
+        cancelModalError.style.display = 'none';
+      }
+
+      if (cancelModalConfirmBtn) {
+        cancelModalConfirmBtn.disabled = false;
+        const btnText = cancelModalConfirmBtn.querySelector('.btn-text');
+        const btnSpinner = cancelModalConfirmBtn.querySelector('.btn-spinner');
+        if (btnText) btnText.textContent = 'Confirm Cancellation';
+        if (btnSpinner) btnSpinner.style.display = 'none';
+      }
+      if (cancelModalKeepBtn) {
+        cancelModalKeepBtn.disabled = false;
+      }
+
+      cancelModalBackdrop.removeAttribute('hidden');
+      document.body.style.overflow = 'hidden';
+
+      if (cancelModalConfirmBtn) {
+        setTimeout(() => cancelModalConfirmBtn.focus(), 50);
+      }
+    }
+
+    /**
+     * Close Cancel Bet Modal
+     */
+    function closeCancelModal() {
+      if (isCancelling) return;
+      if (!cancelModalBackdrop) return;
+      cancelModalBackdrop.setAttribute('hidden', '');
+      document.body.style.overflow = '';
+      betToCancel = null;
+
+      if (lastActiveElement && typeof lastActiveElement.focus === 'function') {
+        lastActiveElement.focus();
+      }
+    }
+
+    /**
+     * Submit Cancellation to Backend API
+     */
+    async function handleConfirmCancel() {
+      if (!betToCancel || isCancelling) return;
+
+      isCancelling = true;
+
+      if (cancelModalError) {
+        cancelModalError.textContent = '';
+        cancelModalError.style.display = 'none';
+      }
+
+      if (cancelModalConfirmBtn) {
+        cancelModalConfirmBtn.disabled = true;
+        const btnText = cancelModalConfirmBtn.querySelector('.btn-text');
+        const btnSpinner = cancelModalConfirmBtn.querySelector('.btn-spinner');
+        if (btnText) btnText.textContent = 'Cancelling...';
+        if (btnSpinner) btnSpinner.style.display = 'inline-block';
+      }
+      if (cancelModalKeepBtn) {
+        cancelModalKeepBtn.disabled = true;
+      }
+
+      const betId = betToCancel.id;
+      const originalStake = betToCancel.stake;
+
+      try {
+        const response = await window.ApiClient.post(`/bets/${encodeURIComponent(betId)}/cancel`, {});
+
+        isCancelling = false;
+        closeCancelModal();
+
+        const refundMsg = (response && response.message) 
+          ? response.message 
+          : `Bet cancelled successfully. ₹${originalStake.toFixed(2)} refunded to your balance.`;
+
+        if (window.SharedLayout && typeof window.SharedLayout.showToast === 'function') {
+          window.SharedLayout.showToast(refundMsg, 'success');
+        } else if (window.showAppToast) {
+          window.showAppToast(refundMsg, 'success');
+        }
+
+        // Authoritatively refresh balance
+        if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function') {
+          await window.ApiClient.refreshBalance().catch(() => {});
+        }
+
+        // Refresh Bets feed
+        loadUserBets();
+      } catch (err) {
+        isCancelling = false;
+        if (cancelModalConfirmBtn) {
+          cancelModalConfirmBtn.disabled = false;
+          const btnText = cancelModalConfirmBtn.querySelector('.btn-text');
+          const btnSpinner = cancelModalConfirmBtn.querySelector('.btn-spinner');
+          if (btnText) btnText.textContent = 'Confirm Cancellation';
+          if (btnSpinner) btnSpinner.style.display = 'none';
+        }
+        if (cancelModalKeepBtn) {
+          cancelModalKeepBtn.disabled = false;
+        }
+
+        const errMsg = (err && (err.message || (err.data && err.data.error))) 
+          ? (err.message || err.data.error) 
+          : 'Failed to cancel bet. The match may have already started or ended.';
+
+        if (cancelModalError) {
+          cancelModalError.textContent = errMsg;
+          cancelModalError.style.display = 'block';
+        } else if (window.SharedLayout && typeof window.SharedLayout.showToast === 'function') {
+          window.SharedLayout.showToast(errMsg, 'error');
+        }
+      }
     }
 
     /**
@@ -507,6 +695,9 @@
       } else if (bet.status === 'no_result') {
         returnLabel = 'Refund Amount';
         returnAmount = bet.stake;
+      } else if (bet.status === 'cancelled') {
+        returnLabel = 'Refunded Amount';
+        returnAmount = typeof bet.refundAmount === 'number' && !isNaN(bet.refundAmount) ? bet.refundAmount : bet.stake;
       }
 
       if (modalPayoutLabel) modalPayoutLabel.textContent = returnLabel;
@@ -549,9 +740,32 @@
         }
       });
     }
+
+    // Cancel modal event listeners
+    if (cancelModalCloseBtn) {
+      cancelModalCloseBtn.addEventListener('click', closeCancelModal);
+    }
+    if (cancelModalKeepBtn) {
+      cancelModalKeepBtn.addEventListener('click', closeCancelModal);
+    }
+    if (cancelModalConfirmBtn) {
+      cancelModalConfirmBtn.addEventListener('click', handleConfirmCancel);
+    }
+    if (cancelModalBackdrop) {
+      cancelModalBackdrop.addEventListener('click', (e) => {
+        if (e.target === cancelModalBackdrop) {
+          closeCancelModal();
+        }
+      });
+    }
+
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modalBackdrop && !modalBackdrop.hasAttribute('hidden')) {
-        closeBetModal();
+      if (e.key === 'Escape') {
+        if (cancelModalBackdrop && !cancelModalBackdrop.hasAttribute('hidden')) {
+          closeCancelModal();
+        } else if (modalBackdrop && !modalBackdrop.hasAttribute('hidden')) {
+          closeBetModal();
+        }
       }
     });
 
@@ -620,7 +834,16 @@
           betsLoaded = true;
           betsError = null;
           if (res && res.success && res.data && Array.isArray(res.data.bets)) {
-            userBets = res.data.bets;
+            userBets = res.data.bets.map(b => {
+              let dateGroup = b.dateGroup;
+              if (!dateGroup) {
+                const d = b.placedAt ? new Date(b.placedAt) : new Date();
+                dateGroup = isNaN(d.getTime()) 
+                  ? 'Recent Wagers' 
+                  : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+              }
+              return { ...b, dateGroup };
+            });
           } else {
             userBets = [];
           }
