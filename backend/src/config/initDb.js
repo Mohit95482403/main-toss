@@ -294,13 +294,85 @@ async function initializeDatabase() {
 
       await pool.query('ALTER TABLE coin_transactions MODIFY COLUMN admin_id INT NULL');
       await pool.query('ALTER TABLE coin_transactions MODIFY COLUMN admin_username VARCHAR(50) NULL');
-      await pool.query("ALTER TABLE coin_transactions MODIFY COLUMN action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT', 'BET_CANCEL_REFUND') NOT NULL");
+      await pool.query("ALTER TABLE coin_transactions MODIFY COLUMN action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'SETTLEMENT_REVERSAL_DEBIT', 'BET_RESETTLEMENT_PAYOUT') NOT NULL");
 
       const [startCol] = await pool.query(
         "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME = 'match_start_time'"
       );
       if (startCol.length === 0) {
         await pool.query('ALTER TABLE matches ADD COLUMN match_start_time DATETIME NULL DEFAULT NULL AFTER scheduled_time');
+      }
+
+      // Settlement reversal schema extensions:
+      // 1. Matches: status enum, settlement_version, settlement_status
+      try {
+        await pool.query(
+          "ALTER TABLE matches MODIFY COLUMN status ENUM('upcoming', 'live', 'completed', 'abandoned', 'settlement_reversed') NOT NULL DEFAULT 'upcoming'"
+        );
+        const [matchExtCols] = await pool.query(
+          "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME IN ('settlement_version', 'settlement_status')"
+        );
+        const existingMatchExtCols = matchExtCols.map(r => r.COLUMN_NAME);
+        if (!existingMatchExtCols.includes('settlement_version')) {
+          await pool.query('ALTER TABLE matches ADD COLUMN settlement_version INT NOT NULL DEFAULT 0 AFTER settled');
+          await pool.query('UPDATE matches SET settlement_version = 1 WHERE settled = 1');
+        }
+        if (!existingMatchExtCols.includes('settlement_status')) {
+          await pool.query("ALTER TABLE matches ADD COLUMN settlement_status ENUM('unsettled', 'settled', 'reversed', 'resettled') NOT NULL DEFAULT 'unsettled' AFTER settlement_version");
+          await pool.query("UPDATE matches SET settlement_status = 'settled' WHERE settled = 1");
+        }
+      } catch (mExtErr) {
+        console.warn('[DB INIT] Match settlement extension error:', mExtErr.message);
+      }
+
+      // 2. Bets: settlement_status enum, settlement_version
+      try {
+        await pool.query(
+          "ALTER TABLE bets MODIFY COLUMN settlement_status ENUM('pending', 'settled', 'cancelled', 'reversed') NOT NULL DEFAULT 'pending'"
+        );
+        const [betExtCols] = await pool.query(
+          "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bets' AND COLUMN_NAME = 'settlement_version'"
+        );
+        if (betExtCols.length === 0) {
+          await pool.query('ALTER TABLE bets ADD COLUMN settlement_version INT NULL DEFAULT NULL AFTER settlement_status');
+          await pool.query("UPDATE bets SET settlement_version = 1 WHERE settlement_status = 'settled'");
+        }
+      } catch (bExtErr) {
+        console.warn('[DB INIT] Bet settlement extension error:', bExtErr.message);
+      }
+
+      // 3. Settlements: version, status, reversal fields, corrected_by
+      try {
+        const [settlCols] = await pool.query(
+          "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'settlements' AND COLUMN_NAME IN ('version', 'status', 'reversal_reason', 'reversed_at', 'reversed_by_id', 'reversed_by_username', 'reversal_amount', 'corrected_by_settlement_uuid')"
+        );
+        const existingSettlCols = settlCols.map(r => r.COLUMN_NAME);
+        if (!existingSettlCols.includes('version')) {
+          await pool.query('ALTER TABLE settlements ADD COLUMN version INT NOT NULL DEFAULT 1 AFTER settlement_uuid');
+        }
+        if (!existingSettlCols.includes('status')) {
+          await pool.query("ALTER TABLE settlements ADD COLUMN status ENUM('current', 'reversed') NOT NULL DEFAULT 'current' AFTER version");
+        }
+        if (!existingSettlCols.includes('reversal_reason')) {
+          await pool.query('ALTER TABLE settlements ADD COLUMN reversal_reason TEXT NULL DEFAULT NULL AFTER notes');
+        }
+        if (!existingSettlCols.includes('reversed_at')) {
+          await pool.query('ALTER TABLE settlements ADD COLUMN reversed_at TIMESTAMP NULL DEFAULT NULL AFTER reversal_reason');
+        }
+        if (!existingSettlCols.includes('reversed_by_id')) {
+          await pool.query('ALTER TABLE settlements ADD COLUMN reversed_by_id INT NULL DEFAULT NULL AFTER reversed_at');
+        }
+        if (!existingSettlCols.includes('reversed_by_username')) {
+          await pool.query('ALTER TABLE settlements ADD COLUMN reversed_by_username VARCHAR(50) NULL DEFAULT NULL AFTER reversed_by_id');
+        }
+        if (!existingSettlCols.includes('reversal_amount')) {
+          await pool.query('ALTER TABLE settlements ADD COLUMN reversal_amount DECIMAL(12, 2) DEFAULT 0.00 AFTER reversed_by_username');
+        }
+        if (!existingSettlCols.includes('corrected_by_settlement_uuid')) {
+          await pool.query('ALTER TABLE settlements ADD COLUMN corrected_by_settlement_uuid VARCHAR(36) NULL DEFAULT NULL AFTER reversal_amount');
+        }
+      } catch (sExtErr) {
+        console.warn('[DB INIT] Settlements schema extension error:', sExtErr.message);
       }
     } catch (cancelErr) {
       console.warn('[DB INIT] Bet cancellation schema verification notice:', cancelErr.message);

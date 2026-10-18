@@ -1305,9 +1305,11 @@ router.get('/matches', async (req, res, next) => {
     }
 
     if (settlementFilter === 'settled') {
-      whereClauses.push('m.settled = TRUE');
+      whereClauses.push("m.settled = TRUE AND m.settlement_status != 'reversed'");
     } else if (settlementFilter === 'pending') {
       whereClauses.push('m.settled = FALSE');
+    } else if (settlementFilter === 'reversed') {
+      whereClauses.push("m.settlement_status = 'reversed'");
     }
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -1340,6 +1342,8 @@ router.get('/matches', async (req, res, next) => {
         m.status,
         m.toss_winner,
         m.settled,
+        m.settlement_version,
+        m.settlement_status,
         m.settled_at,
         m.created_at,
         COUNT(b.id) AS total_bets,
@@ -1402,6 +1406,10 @@ router.get('/matches', async (req, res, next) => {
       tossWinner: row.toss_winner,
       toss_winner: row.toss_winner,
       settled: Boolean(row.settled),
+      settlementVersion: parseInt(row.settlement_version || 0, 10),
+      settlement_version: parseInt(row.settlement_version || 0, 10),
+      settlementStatus: row.settlement_status || (row.settled ? 'settled' : 'unsettled'),
+      settlement_status: row.settlement_status || (row.settled ? 'settled' : 'unsettled'),
       settledAt: row.settled_at,
       settled_at: row.settled_at,
       createdAt: row.created_at,
@@ -1491,12 +1499,12 @@ router.get('/matches/:id/bets', async (req, res, next) => {
     const whereClauses = ['b.match_id = ?'];
     const queryParams = [matchId];
 
-    if (statusFilter !== 'all' && ['pending', 'live', 'won', 'lost', 'no_result'].includes(statusFilter)) {
+    if (statusFilter !== 'all' && ['pending', 'live', 'won', 'lost', 'no_result', 'cancelled'].includes(statusFilter)) {
       whereClauses.push('b.status = ?');
       queryParams.push(statusFilter);
     }
 
-    if (settlementFilter !== 'all' && ['pending', 'settled'].includes(settlementFilter)) {
+    if (settlementFilter !== 'all' && ['pending', 'settled', 'cancelled', 'reversed'].includes(settlementFilter)) {
       whereClauses.push('b.settlement_status = ?');
       queryParams.push(settlementFilter);
     }
@@ -1530,6 +1538,7 @@ router.get('/matches/:id/bets', async (req, res, next) => {
         b.potential_return,
         b.status,
         b.settlement_status,
+        b.settlement_version,
         b.payout,
         b.refund_amount,
         b.cancelled_at,
@@ -2147,7 +2156,7 @@ router.get('/settlement/eligible', async (req, res, next) => {
         COUNT(b.id) AS pending_bets_count,
         COALESCE(SUM(b.stake), 0.00) AS pending_total_stake
       FROM matches m
-      JOIN bets b ON b.match_id = m.id AND b.settlement_status = 'pending'
+      JOIN bets b ON b.match_id = m.id AND b.settlement_status IN ('pending', 'reversed') AND b.status != 'cancelled'
       WHERE m.settled = FALSE
       GROUP BY m.id
       ORDER BY pending_bets_count DESC, m.created_at DESC
@@ -2448,13 +2457,21 @@ router.post('/settlement/process', async (req, res, next) => {
 
       totalPayout += payoutAmount;
 
-      // Update bet ticket
+      // Update bet ticket with version
       await connection.query(
         `UPDATE bets 
-         SET status = ?, settlement_status = 'settled', payout = ?, settled_at = NOW(), settled_by = ? 
+         SET status = ?, settlement_status = 'settled', settlement_version = 1, payout = ?, settled_at = NOW(), settled_by = ? 
          WHERE id = ? AND settlement_status = 'pending'`,
         [resultStatus, payoutAmount, req.user.id, b.id]
       );
+
+      // Fetch wallet balance before
+      const [[wRow]] = await connection.query(
+        'SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE',
+        [b.user_id]
+      );
+      const balBefore = parseFloat((wRow && wRow.available_balance) || 0);
+      const balAfter = parseFloat((balBefore + payoutAmount).toFixed(2));
 
       // Update player wallet: release exposure and credit payout if won/refunded
       await connection.query(
@@ -2465,12 +2482,42 @@ router.post('/settlement/process', async (req, res, next) => {
          WHERE user_id = ?`,
         [payoutAmount, stakeNum, b.user_id]
       );
+
+      if (payoutAmount > 0) {
+        const crypto = require('crypto');
+        const payoutTxUuid = crypto.randomUUID();
+        const actionType = cleanOutcome === 'NO_RESULT' ? 'BET_CANCEL_REFUND' : 'BET_WON_PAYOUT';
+        const reasonText = cleanOutcome === 'NO_RESULT'
+          ? `Stake Refund (No Result): Bet ${b.id} on ${match.match_title}`
+          : `Win Payout: Bet ${b.id} on ${match.match_title} (${b.selection} @ ₹${payoutAmount.toFixed(2)})`;
+
+        await connection.query(
+          `INSERT INTO coin_transactions (
+            transaction_uuid, user_id, username, admin_id, admin_username,
+            action_type, amount, balance_before, balance_after,
+            reason, idempotency_key, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+          [
+            payoutTxUuid,
+            b.user_id,
+            b.username,
+            req.user.id,
+            req.user.username,
+            actionType,
+            payoutAmount,
+            balBefore,
+            balAfter,
+            reasonText,
+            `PAYOUT-${b.id}-v1`
+          ]
+        );
+      }
     }
 
     // 4. Update match to settled
     await connection.query(
       `UPDATE matches 
-       SET status = 'completed', toss_winner = ?, settled = TRUE, settled_at = NOW(), settled_by = ? 
+       SET status = 'completed', toss_winner = ?, settled = TRUE, settlement_version = 1, settlement_status = 'settled', settled_at = NOW(), settled_by = ? 
        WHERE id = ?`,
       [cleanOutcome, req.user.id, match.id]
     );
@@ -2481,8 +2528,8 @@ router.post('/settlement/process', async (req, res, next) => {
 
     await connection.query(
       `INSERT INTO settlements 
-       (settlement_uuid, match_id, declared_outcome, admin_id, admin_username, total_bets, won_bets, lost_bets, no_result_bets, total_stake, total_payout, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (settlement_uuid, version, status, match_id, declared_outcome, admin_id, admin_username, total_bets, won_bets, lost_bets, no_result_bets, total_stake, total_payout, notes, created_at)
+       VALUES (?, 1, 'current', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         settlementUuid,
         match.id,
@@ -2568,6 +2615,1406 @@ router.post('/settlement/process', async (req, res, next) => {
     }
   }
 });
+
+// =============================================================================
+// 12B. BET SETTLEMENT REVERSAL & SAFE RESETTLEMENT SYSTEM
+// =============================================================================
+
+/**
+ * 1. PREVIEW SETTLEMENT CORRECTION / FINANCIAL IMPACT (READ-ONLY)
+ */
+async function handlePreviewSettlementCorrection(req, res, next) {
+  try {
+    const pool = getPool();
+    const rawMatchId = req.params.matchId || req.body.matchId || req.body.match_id || req.query.matchId || req.query.match_id;
+    const rawCorrectedOutcome = req.body.proposedOutcome || req.body.proposed_outcome || req.body.correctedOutcome || req.body.corrected_outcome || req.body.outcome || req.query.proposedOutcome || req.query.correctedOutcome;
+    const reason = (req.body.reason || req.query.reason || '').trim();
+
+    if (!reason || reason.length < 5) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'REASON_REQUIRED', message: 'A mandatory explanation reason (at least 5 characters) is required.' }
+      });
+    }
+
+    if (!rawMatchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+      });
+    }
+
+    const cleanMatchId = String(rawMatchId).trim();
+
+    // Fetch match details
+    const [matchRows] = await pool.query(
+      `SELECT id, match_title, competition, team_one, team_two, status, toss_winner, settled, settlement_version, settlement_status, settled_at, settled_by
+       FROM matches WHERE id = ?`,
+      [cleanMatchId]
+    );
+
+    if (matchRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" not found.` }
+      });
+    }
+
+    const match = matchRows[0];
+
+    if (!match.settled && match.settlement_status !== 'reversed') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_NOT_SETTLED', message: `Match "${match.match_title}" has not been settled yet.` }
+      });
+    }
+
+    // Fetch latest active/current settlement
+    const [settlRows] = await pool.query(
+      `SELECT * FROM settlements WHERE match_id = ? ORDER BY id DESC LIMIT 1`,
+      [match.id]
+    );
+
+    const latestSettlement = settlRows.length > 0 ? settlRows[0] : null;
+
+    // Load all bets on this match with user info
+    const [bets] = await pool.query(
+      `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.odds, b.potential_return, b.status, b.settlement_status, b.payout, b.refund_amount, b.cancelled_at
+       FROM bets b
+       JOIN users u ON u.id = b.user_id
+       WHERE b.match_id = ?`,
+      [match.id]
+    );
+
+    // Filter cancelled bets vs settled/reversable bets
+    const cancelledBets = bets.filter(b => b.status === 'cancelled' || b.settlement_status === 'cancelled' || b.cancelled_at !== null);
+    const eligibleBets = bets.filter(b => !(b.status === 'cancelled' || b.settlement_status === 'cancelled' || b.cancelled_at !== null));
+
+    // Calculate original settlement metrics
+    const originalWinningBets = eligibleBets.filter(b => parseFloat(b.payout || 0) > 0);
+    const originalLosingBets = eligibleBets.filter(b => parseFloat(b.payout || 0) === 0);
+    const originalTotalPayout = originalWinningBets.reduce((sum, b) => sum + parseFloat(b.payout || 0), 0);
+    const originalTotalStake = eligibleBets.reduce((sum, b) => sum + parseFloat(b.stake || 0), 0);
+
+    // Group original payouts by player to evaluate balance reconciliation safety
+    const playerPayouts = {};
+    for (const b of originalWinningBets) {
+      const uId = b.user_id;
+      if (!playerPayouts[uId]) {
+        playerPayouts[uId] = {
+          userId: uId,
+          username: b.username,
+          payoutAmount: 0.00
+        };
+      }
+      playerPayouts[uId].payoutAmount += parseFloat(b.payout || 0);
+    }
+
+    // Check authoritative available balances for each recipient
+    const recipientUserIds = Object.keys(playerPayouts).map(id => parseInt(id, 10));
+    const insufficientBalanceUsers = [];
+    const playerBalanceMap = {};
+
+    if (recipientUserIds.length > 0) {
+      const [walletRows] = await pool.query(
+        `SELECT user_id, available_balance, exposure_balance FROM wallets WHERE user_id IN (?)`,
+        [recipientUserIds]
+      );
+
+      for (const w of walletRows) {
+        playerBalanceMap[w.user_id] = {
+          availableBalance: parseFloat(w.available_balance || 0),
+          exposureBalance: parseFloat(w.exposure_balance || 0)
+        };
+      }
+
+      for (const uId of recipientUserIds) {
+        const payout = playerPayouts[uId].payoutAmount;
+        const currentBal = (playerBalanceMap[uId] && playerBalanceMap[uId].availableBalance) || 0.00;
+        if (currentBal < payout) {
+          insufficientBalanceUsers.push({
+            userId: uId,
+            username: playerPayouts[uId].username,
+            currentBalance: currentBal,
+            requiredDeduction: parseFloat(payout.toFixed(2)),
+            shortfall: parseFloat((payout - currentBal).toFixed(2))
+          });
+        }
+      }
+    }
+
+    const canSafelyReverse = (insufficientBalanceUsers.length === 0);
+
+    // Simulated projected resettlement under proposed corrected outcome
+    let projectedResettlement = null;
+    const cleanCorrectedOutcome = rawCorrectedOutcome ? String(rawCorrectedOutcome).trim() : null;
+
+    if (cleanCorrectedOutcome) {
+      const validOutcomes = [match.team_one, match.team_two, 'NO_RESULT'];
+      if (!validOutcomes.includes(cleanCorrectedOutcome)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_CORRECTED_OUTCOME',
+            message: `Corrected outcome must be "${match.team_one}", "${match.team_two}", or "NO_RESULT". Received: "${cleanCorrectedOutcome}".`
+          }
+        });
+      }
+
+      let projWonCount = 0;
+      let projLostCount = 0;
+      let projNoResultCount = 0;
+      let projTotalPayout = 0;
+
+      for (const b of eligibleBets) {
+        const stake = parseFloat(b.stake || 0);
+        const potRet = parseFloat(b.potential_return || 0);
+        if (cleanCorrectedOutcome === 'NO_RESULT') {
+          projNoResultCount++;
+          projTotalPayout += stake;
+        } else if (b.selection === cleanCorrectedOutcome) {
+          projWonCount++;
+          projTotalPayout += potRet;
+        } else {
+          projLostCount++;
+        }
+      }
+
+      projectedResettlement = {
+        proposedOutcome: cleanCorrectedOutcome,
+        totalEligibleBets: eligibleBets.length,
+        projectedWonBets: projWonCount,
+        projectedLostBets: projLostCount,
+        projectedNoResultBets: projNoResultCount,
+        projectedTotalPayout: parseFloat(projTotalPayout.toFixed(2)),
+        netPayoutDifference: parseFloat((projTotalPayout - originalTotalPayout).toFixed(2))
+      };
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        match: {
+          id: match.id,
+          matchTitle: match.match_title,
+          competition: match.competition,
+          teamOne: match.team_one,
+          teamTwo: match.team_two,
+          status: match.status,
+          settled: Boolean(match.settled),
+          settlementVersion: match.settlement_version || 1,
+          settlementStatus: match.settlement_status || 'settled',
+          originalOutcome: match.toss_winner,
+          settledAt: match.settled_at
+        },
+        originalSettlement: {
+          settlementUuid: latestSettlement ? latestSettlement.settlement_uuid : null,
+          version: latestSettlement ? latestSettlement.version : (match.settlement_version || 1),
+          status: latestSettlement ? latestSettlement.status : 'current',
+          declaredOutcome: latestSettlement ? latestSettlement.declared_outcome : match.toss_winner,
+          totalBets: eligibleBets.length,
+          wonBets: originalWinningBets.length,
+          lostBets: originalLosingBets.length,
+          totalStake: parseFloat(originalTotalStake.toFixed(2)),
+          totalPayout: parseFloat(originalTotalPayout.toFixed(2)),
+          settledAt: latestSettlement ? latestSettlement.created_at : match.settled_at
+        },
+        cancelledBetsSummary: {
+          count: cancelledBets.length,
+          totalStake: parseFloat(cancelledBets.reduce((sum, b) => sum + parseFloat(b.stake || 0), 0).toFixed(2)),
+          note: 'Cancelled bets will remain cancelled and are strictly excluded from both reversal and resettlement.'
+        },
+        safetyCheck: {
+          canSafelyReverse,
+          totalAffectedRecipients: recipientUserIds.length,
+          totalReversalAmount: parseFloat(originalTotalPayout.toFixed(2)),
+          hasShortfall: insufficientBalanceUsers.length > 0,
+          insufficientBalanceUsers,
+          warningMessage: canSafelyReverse
+            ? 'All recipient accounts hold sufficient available balance to safely absorb the payout reversal.'
+            : `Reversal cannot proceed safely. ${insufficientBalanceUsers.length} player(s) have spent coins from the original payout and have insufficient balance.`
+        },
+        projectedResettlement,
+        reasonProvided: reason,
+        // Aliases for frontend flexibility
+        original: {
+          declaredOutcome: latestSettlement ? latestSettlement.declared_outcome : match.toss_winner,
+          originalTotalPayout: parseFloat(originalTotalPayout.toFixed(2)),
+          originalWonBets: originalWinningBets.length,
+          originalLostBets: originalLosingBets.length,
+          settlementVersion: latestSettlement ? latestSettlement.version : (match.settlement_version || 1)
+        },
+        projected: {
+          correctedOutcome: cleanCorrectedOutcome,
+          projectedPayout: projectedResettlement ? projectedResettlement.projectedTotalPayout : 0,
+          projectedWonBets: projectedResettlement ? projectedResettlement.projectedWonBets : 0,
+          projectedLostBets: projectedResettlement ? projectedResettlement.projectedLostBets : 0
+        },
+        balanceSafety: {
+          safe: canSafelyReverse,
+          checkedUsersCount: recipientUserIds.length,
+          shortfalls: insufficientBalanceUsers.map(u => ({
+            userId: u.userId,
+            username: u.username,
+            currentAvailable: u.currentBalance,
+            requiredPayout: u.requiredDeduction,
+            shortfall: u.shortfall
+          })),
+          message: canSafelyReverse
+            ? 'All recipient accounts hold sufficient available balance to safely absorb the payout reversal.'
+            : `Reversal cannot proceed safely. ${insufficientBalanceUsers.length} player(s) have spent coins from the original payout and have insufficient balance.`
+        },
+        affectedPlayersCount: recipientUserIds.length,
+        cancelledBetsExcluded: cancelledBets.length
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * 2. REVERSE SETTLEMENT
+ * Atomically compensates original settlement payouts, restores balances,
+ * updates bet & match states, and appends audit ledger records.
+ */
+async function handleReverseSettlement(req, res, next) {
+  const pool = getPool();
+  let connection = null;
+
+  try {
+    const rawMatchId = req.params.matchId || req.body.matchId || req.body.match_id;
+    const reason = (req.body.reason || '').trim();
+    const idempotencyKey = (req.body.idempotencyKey || req.body.idempotency_key || `REV-${Date.now()}`).trim();
+    const expectedSettlementVersion = req.body.expectedSettlementVersion !== undefined 
+      ? parseInt(req.body.expectedSettlementVersion, 10) 
+      : null;
+
+    if (!rawMatchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+      });
+    }
+
+    if (!reason || reason.length < 5) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'REASON_REQUIRED', message: 'A mandatory explanation reason (at least 5 characters) is required to reverse settlement.' }
+      });
+    }
+
+    const cleanMatchId = String(rawMatchId).trim();
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Row-lock match
+    const [matchRows] = await connection.query(
+      `SELECT id, match_title, team_one, team_two, status, settled, settlement_version, settlement_status, toss_winner
+       FROM matches WHERE id = ? FOR UPDATE`,
+      [cleanMatchId]
+    );
+
+    if (matchRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" does not exist.` }
+      });
+    }
+
+    const match = matchRows[0];
+
+    // Check if match is already reversed
+    if (!match.settled && match.settlement_status === 'reversed') {
+      await connection.rollback();
+      return res.status(409).json({
+        success: false,
+        error: { code: 'ALREADY_REVERSED', message: `Settlement for match "${match.match_title}" has already been reversed and is awaiting corrected resettlement.` }
+      });
+    }
+
+    if (!match.settled) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_NOT_SETTLED', message: `Match "${match.match_title}" is not settled. Only settled matches can be reversed.` }
+      });
+    }
+
+    if (expectedSettlementVersion !== null && match.settlement_version !== expectedSettlementVersion) {
+      await connection.rollback();
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'CONCURRENCY_CONFLICT',
+          message: `Settlement version mismatch. Expected version ${expectedSettlementVersion}, but match is currently at version ${match.settlement_version}. Please refresh and retry.`
+        }
+      });
+    }
+
+    // 2. Fetch and row-lock current active settlement record
+    const [settlRows] = await connection.query(
+      `SELECT * FROM settlements WHERE match_id = ? AND status = 'current' ORDER BY id DESC LIMIT 1 FOR UPDATE`,
+      [match.id]
+    );
+
+    if (settlRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NO_ACTIVE_SETTLEMENT', message: `No active settlement record found for match "${match.match_title}".` }
+      });
+    }
+
+    const currentSettlement = settlRows[0];
+
+    // 3. Row-lock all non-cancelled settled bets
+    const [bets] = await connection.query(
+      `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.payout, b.status, b.settlement_status
+       FROM bets b
+       JOIN users u ON u.id = b.user_id
+       WHERE b.match_id = ? AND b.settlement_status = 'settled' AND b.status != 'cancelled'
+       FOR UPDATE`,
+      [match.id]
+    );
+
+    // Group winning payouts by user
+    const winningBets = bets.filter(b => parseFloat(b.payout || 0) > 0);
+    const userPayoutMap = {};
+
+    for (const b of winningBets) {
+      const uId = b.user_id;
+      if (!userPayoutMap[uId]) {
+        userPayoutMap[uId] = {
+          userId: uId,
+          username: b.username,
+          totalPayout: 0.00
+        };
+      }
+      userPayoutMap[uId].totalPayout += parseFloat(b.payout || 0);
+    }
+
+    // 4. Verify balance safety for all recipients under row-lock
+    const recipientUserIds = Object.keys(userPayoutMap).map(id => parseInt(id, 10));
+    const insufficientBalanceUsers = [];
+    const walletMap = {};
+
+    if (recipientUserIds.length > 0) {
+      const [walletRows] = await connection.query(
+        `SELECT id, user_id, available_balance, exposure_balance, version FROM wallets WHERE user_id IN (?) FOR UPDATE`,
+        [recipientUserIds]
+      );
+
+      for (const w of walletRows) {
+        walletMap[w.user_id] = {
+          id: w.id,
+          availableBalance: parseFloat(w.available_balance || 0),
+          exposureBalance: parseFloat(w.exposure_balance || 0)
+        };
+      }
+
+      for (const uId of recipientUserIds) {
+        const payout = userPayoutMap[uId].totalPayout;
+        const currentBal = (walletMap[uId] && walletMap[uId].availableBalance) || 0.00;
+        if (currentBal < payout) {
+          insufficientBalanceUsers.push({
+            userId: uId,
+            username: userPayoutMap[uId].username,
+            currentBalance: currentBal,
+            requiredDeduction: parseFloat(payout.toFixed(2)),
+            shortfall: parseFloat((payout - currentBal).toFixed(2))
+          });
+        }
+      }
+
+      if (insufficientBalanceUsers.length > 0) {
+        await connection.rollback();
+        return res.status(422).json({
+          success: false,
+          error: {
+            code: 'INSUFFICIENT_BALANCE_FOR_REVERSAL',
+            message: `Settlement reversal cannot proceed safely. ${insufficientBalanceUsers.length} user(s) have spent their original winning payout and have insufficient available balance. Automatic negative balance is prevented.`,
+            details: insufficientBalanceUsers
+          }
+        });
+      }
+    }
+
+    // 5. Execute compensating debits for all winners
+    const crypto = require('crypto');
+    let totalReversalAmount = 0.00;
+
+    for (const b of winningBets) {
+      const payoutNum = parseFloat(b.payout);
+      totalReversalAmount += payoutNum;
+
+      const userWallet = walletMap[b.user_id];
+      const balBefore = userWallet.availableBalance;
+      const balAfter = parseFloat((balBefore - payoutNum).toFixed(2));
+      userWallet.availableBalance = balAfter;
+
+      // Deduct from wallet
+      await connection.query(
+        `UPDATE wallets 
+         SET available_balance = available_balance - ?,
+             version = version + 1,
+             updated_at = NOW()
+         WHERE user_id = ?`,
+        [payoutNum, b.user_id]
+      );
+
+      // Record compensating debit transaction in coin_transactions
+      const txnUuid = crypto.randomUUID();
+      const itemKey = `REV-${currentSettlement.settlement_uuid}-${b.id}`;
+
+      await connection.query(
+        `INSERT INTO coin_transactions (
+          transaction_uuid, user_id, username, admin_id, admin_username,
+          action_type, amount, balance_before, balance_after,
+          reason, idempotency_key, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, 'SETTLEMENT_REVERSAL_DEBIT', ?, ?, ?, ?, ?, 'completed', NOW())`,
+        [
+          txnUuid,
+          b.user_id,
+          b.username,
+          req.user.id,
+          req.user.username,
+          payoutNum,
+          balBefore,
+          balAfter,
+          `Settlement Reversal Debit: Bet ${b.id} on ${match.match_title} (Reason: ${reason})`,
+          itemKey
+        ]
+      );
+    }
+
+    // 6. Transition bet records: mark settlement_status = 'reversed', status = 'pending', payout = 0
+    // Cancelled bets (settlement_status = 'cancelled') are strictly excluded and stay cancelled!
+    await connection.query(
+      `UPDATE bets 
+       SET settlement_status = 'reversed',
+           status = 'pending',
+           payout = 0.00,
+           updated_at = NOW()
+       WHERE match_id = ? AND settlement_status = 'settled' AND status != 'cancelled'`,
+      [match.id]
+    );
+
+    // 7. Mark current settlement as reversed
+    await connection.query(
+      `UPDATE settlements
+       SET status = 'reversed',
+           reversal_reason = ?,
+           reversed_at = NOW(),
+           reversed_by_id = ?,
+           reversed_by_username = ?,
+           reversal_amount = ?
+       WHERE id = ?`,
+      [
+        reason,
+        req.user.id,
+        req.user.username,
+        totalReversalAmount,
+        currentSettlement.id
+      ]
+    );
+
+    // 8. Update match state to settlement_reversed
+    await connection.query(
+      `UPDATE matches 
+       SET settled = FALSE,
+           settlement_status = 'reversed',
+           status = 'settlement_reversed',
+           updated_at = NOW()
+       WHERE id = ?`,
+      [match.id]
+    );
+
+    // 9. Admin audit log
+    await connection.query(
+      `INSERT INTO admin_audit_logs 
+       (admin_id, admin_username, action_type, target_type, target_id, target_identifier, details, ip_address)
+       VALUES (?, ?, 'SETTLEMENT_REVERSAL', 'MATCH', NULL, ?, ?, ?)`,
+      [
+        req.user.id,
+        req.user.username,
+        match.id,
+        JSON.stringify({
+          matchId: match.id,
+          matchTitle: match.match_title,
+          reversedSettlementUuid: currentSettlement.settlement_uuid,
+          reversedOutcome: currentSettlement.declared_outcome,
+          reversalReason: reason,
+          totalReversalAmount: parseFloat(totalReversalAmount.toFixed(2)),
+          affectedBetsCount: bets.length,
+          winningBetsReversed: winningBets.length,
+          idempotencyKey
+        }),
+        req.ip || '127.0.0.1'
+      ]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `Settlement for match "${match.match_title}" has been successfully reversed. All financial payouts have been reconciled.`,
+      data: {
+        matchId: match.id,
+        matchTitle: match.match_title,
+        status: 'settlement_reversed',
+        settlementStatus: 'reversed',
+        settled: false,
+        reversedSettlement: {
+          settlementUuid: currentSettlement.settlement_uuid,
+          version: currentSettlement.version || 1,
+          declaredOutcome: currentSettlement.declared_outcome,
+          reversalReason: reason,
+          reversedAt: new Date().toISOString(),
+          reversedBy: req.user.username,
+          reversalAmount: parseFloat(totalReversalAmount.toFixed(2)),
+          winningBetsReversed: winningBets.length
+        }
+      }
+    });
+  } catch (err) {
+    if (connection) {
+      try { await connection.rollback(); } catch (rbErr) {}
+    }
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+}
+
+/**
+ * 3. RESETTLE MATCH WITH CORRECTED RESULT
+ * Evaluates eligible bets under the corrected outcome, credits payouts,
+ * records audit ledger transactions, and advances settlement version.
+ */
+async function handleResettleMatch(req, res, next) {
+  const pool = getPool();
+  let connection = null;
+
+  try {
+    const rawMatchId = req.params.matchId || req.body.matchId || req.body.match_id;
+    const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome || req.body.correctedOutcome;
+    const reason = (req.body.reason || '').trim();
+    const notes = req.body.notes;
+
+    if (!rawMatchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+      });
+    }
+
+    if (!rawOutcome || typeof rawOutcome !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_OUTCOME', message: 'Corrected declared outcome selection is required.' }
+      });
+    }
+
+    if (!reason || reason.length < 5) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'REASON_REQUIRED', message: 'A mandatory explanation reason (at least 5 characters) is required for resettlement.' }
+      });
+    }
+
+    const cleanMatchId = String(rawMatchId).trim();
+    const cleanOutcome = String(rawOutcome).trim();
+    const cleanNotes = notes ? String(notes).trim() : null;
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Row-lock match
+    const [matchRows] = await connection.query(
+      `SELECT id, match_title, team_one, team_two, status, settled, settlement_version, settlement_status
+       FROM matches WHERE id = ? FOR UPDATE`,
+      [cleanMatchId]
+    );
+
+    if (matchRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" does not exist.` }
+      });
+    }
+
+    const match = matchRows[0];
+
+    // Must be in reversed settlement state
+    if (match.settled && match.settlement_status !== 'reversed') {
+      await connection.rollback();
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'MUST_REVERSE_FIRST',
+          message: `Match "${match.match_title}" is currently settled. You must first reverse the existing settlement before submitting a corrected result.`
+        }
+      });
+    }
+
+    const validOutcomes = [match.team_one, match.team_two, 'NO_RESULT'];
+    if (!validOutcomes.includes(cleanOutcome)) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'OUTCOME_MISMATCH',
+          message: `Outcome must be "${match.team_one}", "${match.team_two}", or "NO_RESULT". Received: "${cleanOutcome}".`
+        }
+      });
+    }
+
+    // 2. Fetch latest reversed settlement to link versions
+    const [reversedSettls] = await connection.query(
+      `SELECT * FROM settlements WHERE match_id = ? AND status = 'reversed' ORDER BY id DESC LIMIT 1 FOR UPDATE`,
+      [match.id]
+    );
+
+    const latestReversedSettlement = reversedSettls.length > 0 ? reversedSettls[0] : null;
+    const newVersion = (latestReversedSettlement ? latestReversedSettlement.version + 1 : (match.settlement_version + 1 || 2));
+
+    // 3. Row-lock eligible bets: strictly exclude cancelled bets!
+    const [bets] = await connection.query(
+      `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.odds, b.potential_return
+       FROM bets b
+       JOIN users u ON u.id = b.user_id
+       WHERE b.match_id = ? AND b.settlement_status IN ('reversed', 'pending') AND b.status != 'cancelled'
+       FOR UPDATE`,
+      [match.id]
+    );
+
+    let wonCount = 0;
+    let lostCount = 0;
+    let noResultCount = 0;
+    let totalStake = 0;
+    let totalPayout = 0;
+
+    const crypto = require('crypto');
+    const newSettlementUuid = crypto.randomUUID();
+
+    // 4. Process each eligible bet
+    for (const b of bets) {
+      const stakeNum = parseFloat(b.stake);
+      const potentialRetNum = parseFloat(b.potential_return);
+      totalStake += stakeNum;
+
+      let resultStatus = 'lost';
+      let payoutAmount = 0.00;
+
+      if (cleanOutcome === 'NO_RESULT') {
+        resultStatus = 'no_result';
+        payoutAmount = stakeNum; // refund stake
+        noResultCount++;
+      } else if (b.selection === cleanOutcome) {
+        resultStatus = 'won';
+        payoutAmount = potentialRetNum;
+        wonCount++;
+      } else {
+        resultStatus = 'lost';
+        payoutAmount = 0.00;
+        lostCount++;
+      }
+
+      totalPayout += payoutAmount;
+
+      // Update bet ticket
+      await connection.query(
+        `UPDATE bets 
+         SET status = ?, settlement_status = 'settled', settlement_version = ?, payout = ?, settled_at = NOW(), settled_by = ? 
+         WHERE id = ?`,
+        [resultStatus, newVersion, payoutAmount, req.user.id, b.id]
+      );
+
+      // If winning / refunded, credit wallet and record ledger entry
+      if (payoutAmount > 0) {
+        // Fetch wallet balance before
+        const [[wRow]] = await connection.query(
+          `SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE`,
+          [b.user_id]
+        );
+        const balBefore = parseFloat((wRow && wRow.available_balance) || 0);
+        const balAfter = parseFloat((balBefore + payoutAmount).toFixed(2));
+
+        await connection.query(
+          `UPDATE wallets 
+           SET available_balance = available_balance + ?,
+               version = version + 1,
+               updated_at = NOW()
+           WHERE user_id = ?`,
+          [payoutAmount, b.user_id]
+        );
+
+        const txnUuid = crypto.randomUUID();
+        const actionType = cleanOutcome === 'NO_RESULT' ? 'BET_CANCEL_REFUND' : 'BET_RESETTLEMENT_PAYOUT';
+        const reasonText = cleanOutcome === 'NO_RESULT'
+          ? `Stake Refund (No Result Resettlement): Bet ${b.id} on ${match.match_title}`
+          : `Resettlement Win Payout: Bet ${b.id} on ${match.match_title} (${cleanOutcome} @ ₹${payoutAmount.toFixed(2)})`;
+
+        await connection.query(
+          `INSERT INTO coin_transactions (
+            transaction_uuid, user_id, username, admin_id, admin_username,
+            action_type, amount, balance_before, balance_after,
+            reason, idempotency_key, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+          [
+            txnUuid,
+            b.user_id,
+            b.username,
+            req.user.id,
+            req.user.username,
+            actionType,
+            payoutAmount,
+            balBefore,
+            balAfter,
+            reasonText,
+            `RESETTL-${newSettlementUuid}-${b.id}`
+          ]
+        );
+      }
+    }
+
+    // 5. Insert new settlement record
+    await connection.query(
+      `INSERT INTO settlements 
+       (settlement_uuid, version, status, match_id, declared_outcome, admin_id, admin_username, total_bets, won_bets, lost_bets, no_result_bets, total_stake, total_payout, notes, created_at)
+       VALUES (?, ?, 'current', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        newSettlementUuid,
+        newVersion,
+        match.id,
+        cleanOutcome,
+        req.user.id,
+        req.user.username,
+        bets.length,
+        wonCount,
+        lostCount,
+        noResultCount,
+        totalStake,
+        totalPayout,
+        cleanNotes ? `${cleanNotes} (Reason: ${reason})` : `Corrected Resettlement (Reason: ${reason})`
+      ]
+    );
+
+    // 6. Link previous reversed settlement to new settlement UUID
+    if (latestReversedSettlement) {
+      await connection.query(
+        `UPDATE settlements SET corrected_by_settlement_uuid = ? WHERE id = ?`,
+        [newSettlementUuid, latestReversedSettlement.id]
+      );
+    }
+
+    // 7. Update match record
+    await connection.query(
+      `UPDATE matches 
+       SET status = 'completed',
+           toss_winner = ?,
+           settled = TRUE,
+           settlement_version = ?,
+           settlement_status = 'resettled',
+           settled_at = NOW(),
+           settled_by = ?,
+           updated_at = NOW()
+       WHERE id = ?`,
+      [cleanOutcome, newVersion, req.user.id, match.id]
+    );
+
+    // 8. Admin audit log
+    await connection.query(
+      `INSERT INTO admin_audit_logs 
+       (admin_id, admin_username, action_type, target_type, target_id, target_identifier, details, ip_address)
+       VALUES (?, ?, 'SETTLEMENT_RESETTLED', 'MATCH', NULL, ?, ?, ?)`,
+      [
+        req.user.id,
+        req.user.username,
+        match.id,
+        JSON.stringify({
+          matchId: match.id,
+          matchTitle: match.match_title,
+          newSettlementUuid,
+          newVersion,
+          declaredOutcome: cleanOutcome,
+          correctionReason: reason,
+          totalBets: bets.length,
+          wonCount,
+          lostCount,
+          totalPayout: parseFloat(totalPayout.toFixed(2))
+        }),
+        req.ip || '127.0.0.1'
+      ]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `Match "${match.match_title}" successfully resettled with corrected outcome: ${cleanOutcome} (Settlement Version ${newVersion}).`,
+      data: {
+        settlementUuid: newSettlementUuid,
+        version: newVersion,
+        matchId: match.id,
+        matchTitle: match.match_title,
+        declaredOutcome: cleanOutcome,
+        status: 'completed',
+        settled: true,
+        settlementStatus: 'resettled',
+        totalBetsSettled: bets.length,
+        wonCount,
+        lostCount,
+        noResultCount,
+        totalStake: parseFloat(totalStake.toFixed(2)),
+        totalPayoutCredited: parseFloat(totalPayout.toFixed(2)),
+        settledBy: req.user.username,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    if (connection) {
+      try { await connection.rollback(); } catch (rbErr) {}
+    }
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+}
+
+/**
+ * 4. ATOMIC SINGLE-STEP CORRECTION AND RESETTLEMENT
+ * Reverses existing settlement and applies corrected outcome in a single atomic transaction.
+ */
+async function handleCorrectAndResettle(req, res, next) {
+  const pool = getPool();
+  let connection = null;
+
+  try {
+    const rawMatchId = req.params.matchId || req.body.matchId || req.body.match_id;
+    const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome || req.body.correctedOutcome;
+    const reason = (req.body.reason || '').trim();
+    const notes = req.body.notes;
+
+    if (!rawMatchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+      });
+    }
+
+    if (!rawOutcome || typeof rawOutcome !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_OUTCOME', message: 'Corrected declared outcome selection is required.' }
+      });
+    }
+
+    if (!reason || reason.length < 5) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'REASON_REQUIRED', message: 'A mandatory explanation reason (at least 5 characters) is required.' }
+      });
+    }
+
+    const cleanMatchId = String(rawMatchId).trim();
+    const cleanOutcome = String(rawOutcome).trim();
+    const cleanNotes = notes ? String(notes).trim() : null;
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Row-lock match
+    const [matchRows] = await connection.query(
+      `SELECT id, match_title, team_one, team_two, status, settled, settlement_version, settlement_status, toss_winner
+       FROM matches WHERE id = ? FOR UPDATE`,
+      [cleanMatchId]
+    );
+
+    if (matchRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" does not exist.` }
+      });
+    }
+
+    const match = matchRows[0];
+
+    if (!match.settled && match.settlement_status !== 'reversed') {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_NOT_SETTLED', message: `Match "${match.match_title}" has not been settled yet.` }
+      });
+    }
+
+    const validOutcomes = [match.team_one, match.team_two, 'NO_RESULT'];
+    if (!validOutcomes.includes(cleanOutcome)) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'OUTCOME_MISMATCH',
+          message: `Outcome must be "${match.team_one}", "${match.team_two}", or "NO_RESULT". Received: "${cleanOutcome}".`
+        }
+      });
+    }
+
+    // 2. Load latest current settlement if settled
+    const [settlRows] = await connection.query(
+      `SELECT * FROM settlements WHERE match_id = ? AND status = 'current' ORDER BY id DESC LIMIT 1 FOR UPDATE`,
+      [match.id]
+    );
+
+    const currentSettlement = settlRows.length > 0 ? settlRows[0] : null;
+    const crypto = require('crypto');
+    let totalReversalAmount = 0.00;
+
+    // 3. If match is currently settled, reverse original payouts
+    if (match.settled && currentSettlement) {
+      const [betsToReverse] = await connection.query(
+        `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.payout, b.status, b.settlement_status
+         FROM bets b
+         JOIN users u ON u.id = b.user_id
+         WHERE b.match_id = ? AND b.settlement_status = 'settled' AND b.status != 'cancelled'
+         FOR UPDATE`,
+        [match.id]
+      );
+
+      const winningBets = betsToReverse.filter(b => parseFloat(b.payout || 0) > 0);
+      const userPayoutMap = {};
+
+      for (const b of winningBets) {
+        const uId = b.user_id;
+        if (!userPayoutMap[uId]) {
+          userPayoutMap[uId] = { userId: uId, username: b.username, totalPayout: 0.00 };
+        }
+        userPayoutMap[uId].totalPayout += parseFloat(b.payout || 0);
+      }
+
+      // Check balance safety
+      const recipientUserIds = Object.keys(userPayoutMap).map(id => parseInt(id, 10));
+      const insufficientBalanceUsers = [];
+      const walletMap = {};
+
+      if (recipientUserIds.length > 0) {
+        const [walletRows] = await connection.query(
+          `SELECT id, user_id, available_balance, exposure_balance, version FROM wallets WHERE user_id IN (?) FOR UPDATE`,
+          [recipientUserIds]
+        );
+
+        for (const w of walletRows) {
+          walletMap[w.user_id] = {
+            id: w.id,
+            availableBalance: parseFloat(w.available_balance || 0),
+            exposureBalance: parseFloat(w.exposure_balance || 0)
+          };
+        }
+
+        for (const uId of recipientUserIds) {
+          const payout = userPayoutMap[uId].totalPayout;
+          const currentBal = (walletMap[uId] && walletMap[uId].availableBalance) || 0.00;
+          if (currentBal < payout) {
+            insufficientBalanceUsers.push({
+              userId: uId,
+              username: userPayoutMap[uId].username,
+              currentBalance: currentBal,
+              requiredDeduction: parseFloat(payout.toFixed(2)),
+              shortfall: parseFloat((payout - currentBal).toFixed(2))
+            });
+          }
+        }
+
+        if (insufficientBalanceUsers.length > 0) {
+          await connection.rollback();
+          return res.status(422).json({
+            success: false,
+            error: {
+              code: 'INSUFFICIENT_BALANCE_FOR_REVERSAL',
+              message: `Settlement reversal cannot proceed safely. ${insufficientBalanceUsers.length} user(s) have spent their original winning payout and have insufficient available balance. Automatic negative balance is prevented.`,
+              details: insufficientBalanceUsers
+            }
+          });
+        }
+
+        // Deduct payouts
+        for (const b of winningBets) {
+          const payoutNum = parseFloat(b.payout);
+          totalReversalAmount += payoutNum;
+
+          const userWallet = walletMap[b.user_id];
+          const balBefore = userWallet.availableBalance;
+          const balAfter = parseFloat((balBefore - payoutNum).toFixed(2));
+          userWallet.availableBalance = balAfter;
+
+          await connection.query(
+            `UPDATE wallets SET available_balance = available_balance - ?, version = version + 1, updated_at = NOW() WHERE user_id = ?`,
+            [payoutNum, b.user_id]
+          );
+
+          const txnUuid = crypto.randomUUID();
+          await connection.query(
+            `INSERT INTO coin_transactions (
+              transaction_uuid, user_id, username, admin_id, admin_username,
+              action_type, amount, balance_before, balance_after,
+              reason, idempotency_key, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, 'SETTLEMENT_REVERSAL_DEBIT', ?, ?, ?, ?, ?, 'completed', NOW())`,
+            [
+              txnUuid,
+              b.user_id,
+              b.username,
+              req.user.id,
+              req.user.username,
+              payoutNum,
+              balBefore,
+              balAfter,
+              `Settlement Reversal Debit: Bet ${b.id} on ${match.match_title} (Reason: ${reason})`,
+              `REV-${currentSettlement.settlement_uuid}-${b.id}`
+            ]
+          );
+        }
+      }
+
+      // Mark old settlement reversed
+      await connection.query(
+        `UPDATE settlements
+         SET status = 'reversed', reversal_reason = ?, reversed_at = NOW(), reversed_by_id = ?, reversed_by_username = ?, reversal_amount = ?
+         WHERE id = ?`,
+        [reason, req.user.id, req.user.username, totalReversalAmount, currentSettlement.id]
+      );
+    }
+
+    // 4. Now perform Resettlement with corrected outcome
+    const newVersion = (currentSettlement ? currentSettlement.version + 1 : (match.settlement_version + 1 || 2));
+    const newSettlementUuid = crypto.randomUUID();
+
+    // Load all eligible bets (non-cancelled)
+    const [bets] = await connection.query(
+      `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.odds, b.potential_return
+       FROM bets b
+       JOIN users u ON u.id = b.user_id
+       WHERE b.match_id = ? AND b.status != 'cancelled' AND b.settlement_status != 'cancelled'
+       FOR UPDATE`,
+      [match.id]
+    );
+
+    let wonCount = 0;
+    let lostCount = 0;
+    let noResultCount = 0;
+    let totalStake = 0;
+    let totalPayout = 0;
+
+    for (const b of bets) {
+      const stakeNum = parseFloat(b.stake);
+      const potentialRetNum = parseFloat(b.potential_return);
+      totalStake += stakeNum;
+
+      let resultStatus = 'lost';
+      let payoutAmount = 0.00;
+
+      if (cleanOutcome === 'NO_RESULT') {
+        resultStatus = 'no_result';
+        payoutAmount = stakeNum;
+        noResultCount++;
+      } else if (b.selection === cleanOutcome) {
+        resultStatus = 'won';
+        payoutAmount = potentialRetNum;
+        wonCount++;
+      } else {
+        resultStatus = 'lost';
+        payoutAmount = 0.00;
+        lostCount++;
+      }
+
+      totalPayout += payoutAmount;
+
+      await connection.query(
+        `UPDATE bets 
+         SET status = ?, settlement_status = 'settled', settlement_version = ?, payout = ?, settled_at = NOW(), settled_by = ? 
+         WHERE id = ?`,
+        [resultStatus, newVersion, payoutAmount, req.user.id, b.id]
+      );
+
+      if (payoutAmount > 0) {
+        const [[wRow]] = await connection.query(
+          `SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE`,
+          [b.user_id]
+        );
+        const balBefore = parseFloat((wRow && wRow.available_balance) || 0);
+        const balAfter = parseFloat((balBefore + payoutAmount).toFixed(2));
+
+        await connection.query(
+          `UPDATE wallets SET available_balance = available_balance + ?, version = version + 1, updated_at = NOW() WHERE user_id = ?`,
+          [payoutAmount, b.user_id]
+        );
+
+        const txnUuid = crypto.randomUUID();
+        const actionType = cleanOutcome === 'NO_RESULT' ? 'BET_CANCEL_REFUND' : 'BET_RESETTLEMENT_PAYOUT';
+        const reasonText = cleanOutcome === 'NO_RESULT'
+          ? `Stake Refund (No Result Resettlement): Bet ${b.id} on ${match.match_title}`
+          : `Resettlement Win Payout: Bet ${b.id} on ${match.match_title} (${cleanOutcome} @ ₹${payoutAmount.toFixed(2)})`;
+
+        await connection.query(
+          `INSERT INTO coin_transactions (
+            transaction_uuid, user_id, username, admin_id, admin_username,
+            action_type, amount, balance_before, balance_after,
+            reason, idempotency_key, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+          [
+            txnUuid,
+            b.user_id,
+            b.username,
+            req.user.id,
+            req.user.username,
+            actionType,
+            payoutAmount,
+            balBefore,
+            balAfter,
+            reasonText,
+            `RESETTL-${newSettlementUuid}-${b.id}`
+          ]
+        );
+      }
+    }
+
+    // Insert new settlement record
+    await connection.query(
+      `INSERT INTO settlements 
+       (settlement_uuid, version, status, match_id, declared_outcome, admin_id, admin_username, total_bets, won_bets, lost_bets, no_result_bets, total_stake, total_payout, notes, created_at)
+       VALUES (?, ?, 'current', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        newSettlementUuid,
+        newVersion,
+        match.id,
+        cleanOutcome,
+        req.user.id,
+        req.user.username,
+        bets.length,
+        wonCount,
+        lostCount,
+        noResultCount,
+        totalStake,
+        totalPayout,
+        cleanNotes ? `${cleanNotes} (Reason: ${reason})` : `Corrected Resettlement (Reason: ${reason})`
+      ]
+    );
+
+    if (currentSettlement) {
+      await connection.query(
+        `UPDATE settlements SET corrected_by_settlement_uuid = ? WHERE id = ?`,
+        [newSettlementUuid, currentSettlement.id]
+      );
+    }
+
+    // Update match record
+    await connection.query(
+      `UPDATE matches 
+       SET status = 'completed',
+           toss_winner = ?,
+           settled = TRUE,
+           settlement_version = ?,
+           settlement_status = 'resettled',
+           settled_at = NOW(),
+           settled_by = ?,
+           updated_at = NOW()
+       WHERE id = ?`,
+      [cleanOutcome, newVersion, req.user.id, match.id]
+    );
+
+    await connection.query(
+      `INSERT INTO admin_audit_logs 
+       (admin_id, admin_username, action_type, target_type, target_id, target_identifier, details, ip_address)
+       VALUES (?, ?, 'SETTLEMENT_CORRECT_AND_RESETTLE', 'MATCH', NULL, ?, ?, ?)`,
+      [
+        req.user.id,
+        req.user.username,
+        match.id,
+        JSON.stringify({
+          matchId: match.id,
+          matchTitle: match.match_title,
+          newSettlementUuid,
+          newVersion,
+          declaredOutcome: cleanOutcome,
+          correctionReason: reason,
+          totalBets: bets.length,
+          wonCount,
+          lostCount,
+          totalPayout: parseFloat(totalPayout.toFixed(2))
+        }),
+        req.ip || '127.0.0.1'
+      ]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `Match "${match.match_title}" successfully corrected and resettled with outcome: ${cleanOutcome} (Settlement Version ${newVersion}).`,
+      data: {
+        settlementUuid: newSettlementUuid,
+        version: newVersion,
+        matchId: match.id,
+        matchTitle: match.match_title,
+        declaredOutcome: cleanOutcome,
+        status: 'completed',
+        settled: true,
+        settlementStatus: 'resettled',
+        totalBetsSettled: bets.length,
+        wonCount,
+        lostCount,
+        noResultCount,
+        totalStake: parseFloat(totalStake.toFixed(2)),
+        totalPayoutCredited: parseFloat(totalPayout.toFixed(2)),
+        settledBy: req.user.username,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    if (connection) {
+      try { await connection.rollback(); } catch (rbErr) {}
+    }
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+}
+
+/**
+ * 5. GET SETTLEMENT HISTORY FOR A SPECIFIC MATCH
+ */
+async function handleGetMatchSettlementHistory(req, res, next) {
+  try {
+    const pool = getPool();
+    const rawMatchId = req.params.matchId || req.query.matchId || req.query.match_id;
+
+    if (!rawMatchId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' }
+      });
+    }
+
+    const cleanMatchId = String(rawMatchId).trim();
+
+    const [matchRows] = await pool.query(
+      `SELECT id, match_title, competition, team_one, team_two, status, settled, settlement_version, settlement_status, toss_winner, settled_at
+       FROM matches WHERE id = ?`,
+      [cleanMatchId]
+    );
+
+    if (matchRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" does not exist.` }
+      });
+    }
+
+    const match = matchRows[0];
+
+    const [settlements] = await pool.query(
+      `SELECT 
+        s.id,
+        s.settlement_uuid,
+        s.version,
+        s.status,
+        s.match_id,
+        s.declared_outcome,
+        s.admin_id,
+        s.admin_username,
+        s.total_bets,
+        s.won_bets,
+        s.lost_bets,
+        s.no_result_bets,
+        s.total_stake,
+        s.total_payout,
+        s.notes,
+        s.reversal_reason,
+        s.reversed_at,
+        s.reversed_by_id,
+        s.reversed_by_username,
+        s.reversal_amount,
+        s.corrected_by_settlement_uuid,
+        s.created_at
+       FROM settlements s
+       WHERE s.match_id = ?
+       ORDER BY s.version ASC, s.id ASC`,
+      [match.id]
+    );
+
+    const history = settlements.map(s => ({
+      id: s.id,
+      settlementUuid: s.settlement_uuid,
+      version: s.version || 1,
+      status: s.status,
+      isCurrent: s.status === 'current',
+      declaredOutcome: s.declared_outcome,
+      adminUsername: s.admin_username,
+      totalBets: parseInt(s.total_bets || 0, 10),
+      wonBets: parseInt(s.won_bets || 0, 10),
+      lostBets: parseInt(s.lost_bets || 0, 10),
+      noResultBets: parseInt(s.no_result_bets || 0, 10),
+      totalStake: parseFloat(s.total_stake || 0),
+      totalPayout: parseFloat(s.total_payout || 0),
+      notes: s.notes,
+      settledAt: s.created_at,
+      reversalReason: s.reversal_reason || null,
+      reversedAt: s.reversed_at || null,
+      reversedByUsername: s.reversed_by_username || null,
+      reversalAmount: parseFloat(s.reversal_amount || 0),
+      correctedBySettlementUuid: s.corrected_by_settlement_uuid || null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        match: {
+          id: match.id,
+          matchTitle: match.match_title,
+          competition: match.competition,
+          teamOne: match.team_one,
+          teamTwo: match.team_two,
+          status: match.status,
+          settled: Boolean(match.settled),
+          settlementVersion: match.settlement_version || 0,
+          settlementStatus: match.settlement_status || (match.settled ? 'settled' : 'unsettled'),
+          currentOutcome: match.toss_winner
+        },
+        settlements: history,
+        totalVersions: history.length,
+        currentSettlement: history.find(h => h.isCurrent) || null
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Route bindings for settlement reversal and resettlement
+router.post('/matches/:matchId/settlement/preview-correction', handlePreviewSettlementCorrection);
+router.post('/settlement/preview-correction', handlePreviewSettlementCorrection);
+
+router.post('/matches/:matchId/settlement/reverse', handleReverseSettlement);
+router.post('/settlement/reverse', handleReverseSettlement);
+
+router.post('/matches/:matchId/settlement/resettle', handleResettleMatch);
+router.post('/settlement/resettle', handleResettleMatch);
+
+router.post('/matches/:matchId/settlement/correct-and-resettle', handleCorrectAndResettle);
+router.post('/settlement/correct-and-resettle', handleCorrectAndResettle);
+
+router.get('/matches/:matchId/settlement/history', handleGetMatchSettlementHistory);
+router.get('/settlement/match/:matchId/history', handleGetMatchSettlementHistory);
 
 // =============================================================================
 // 13. BET SETTLEMENT: GET SETTLEMENT HISTORY

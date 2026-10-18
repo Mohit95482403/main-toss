@@ -1922,6 +1922,128 @@
     </div>
   </div>
 
+  <!-- 11. Match Result Correction & Settlement Reversal Modal -->
+  <div class="admin-modal-overlay" id="modal-correct-result" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="admin-modal-card admin-modal-lg" style="max-width: 780px;">
+      <header class="admin-modal-header" style="border-bottom-color: rgba(245, 158, 11, 0.3);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; color: #D97706; font-size: 18px;">
+            ⚖️
+          </div>
+          <div>
+            <h2 class="text-base font-bold" id="correct-result-modal-title">Correct Match Result &amp; Safe Resettlement</h2>
+            <div class="text-xs text-muted" id="correct-result-modal-subtitle">Reverse previous financial transactions and resettle with corrected outcome</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close aria-label="Close dialog">✕</button>
+      </header>
+
+      <div class="admin-modal-body" style="gap: 16px;">
+        <!-- Match & Current Settlement Banner -->
+        <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: var(--border-radius-md); padding: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="font-bold text-sm" id="correct-modal-match-title">India vs Australia</span>
+            <span class="badge-status settled" id="correct-modal-current-winner">Declared: India</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; font-size: 12px;">
+            <div><span class="text-muted">Match ID:</span> <strong id="correct-modal-match-id">--</strong></div>
+            <div><span class="text-muted">Settlement Version:</span> <strong id="correct-modal-version">v1</strong></div>
+            <div><span class="text-muted">Settled By:</span> <strong id="correct-modal-settled-by">admin</strong></div>
+            <div><span class="text-muted">Settled At:</span> <strong id="correct-modal-settled-at">--</strong></div>
+          </div>
+        </div>
+
+        <!-- Proposed Outcome Selection -->
+        <div class="field-group">
+          <label class="field-label font-bold" style="font-size: 13px;">1. Select Correct Official Result: <span class="text-danger">*</span></label>
+          <div class="outcome-options-grid" id="correct-outcome-options-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 6px;">
+            <!-- Generated dynamically -->
+          </div>
+        </div>
+
+        <!-- Mandatory Correction Reason -->
+        <div class="field-group">
+          <label for="correct-result-reason-input" class="field-label font-bold" style="font-size: 13px;">
+            2. Mandatory Reason for Result Correction: <span class="text-danger">*</span>
+          </label>
+          <textarea class="admin-search-input" id="correct-result-reason-input" rows="2" placeholder="e.g. BCCI match referee report confirmed Team 2 won the toss; result was entered erroneously..." required></textarea>
+          <div class="text-xs text-muted" style="margin-top: 4px;">
+            A detailed justification (minimum 5 characters) is required and will be permanently recorded in the immutable audit log and settlement ledger.
+          </div>
+        </div>
+
+        <!-- Action: Preview Button -->
+        <div style="display: flex; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-load-correction-preview" style="display: inline-flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>Review Financial Impact &amp; Check Balances</span>
+          </button>
+        </div>
+
+        <!-- Preview Results Container -->
+        <div id="correction-preview-container" style="display: none; border-top: 1px dashed var(--color-border); padding-top: 14px;">
+          <!-- Loaded via AJAX -->
+        </div>
+
+        <!-- Explicit Confirmation Checkbox -->
+        <div id="correction-confirmation-box" style="display: none; background: #FFFBEB; border: 1.5px solid #FDE68A; padding: 12px 14px; border-radius: var(--border-radius-md);">
+          <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="checkbox-confirm-correction" style="margin-top: 3px; width: 16px; height: 16px;">
+            <span class="text-xs" style="color: #92400E; font-weight: 600;">
+              I have reviewed the financial impact breakdown above. I confirm that reversing the existing settlement will create compensating ledger entries, and the corrected outcome will be applied atomically.
+            </span>
+          </label>
+        </div>
+
+        <!-- In-Modal Error Alert -->
+        <div id="correct-modal-error-box" class="alert alert-danger" style="display: none;">
+          <span class="alert-icon">❌</span>
+          <span class="alert-text" id="correct-modal-error-text"></span>
+        </div>
+      </div>
+
+      <footer class="admin-modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Cancel</button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-warning btn-sm" id="btn-execute-reverse-only" disabled title="Reverse previous settlement without declaring new winner yet">
+            Reverse Settlement Only
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-execute-correct-and-resettle" disabled title="Atomically reverse and resettle with corrected outcome">
+            Confirm Reversal &amp; Resettle
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 12. Settlement History & Version Audit Modal -->
+  <div class="admin-modal-overlay" id="modal-settlement-history" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="admin-modal-card admin-modal-lg" style="max-width: 780px;">
+      <header class="admin-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(231, 84, 128, 0.15); display: flex; align-items: center; justify-content: center; color: var(--pink-primary, #E75480); font-size: 18px;">
+            📜
+          </div>
+          <div>
+            <h2 class="text-base font-bold" id="settlement-history-modal-title">Match Settlement Version History</h2>
+            <div class="text-xs text-muted" id="settlement-history-modal-subtitle">Complete chronological audit trail of all settlements, reversals, and corrections</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close aria-label="Close dialog">✕</button>
+      </header>
+
+      <div class="admin-modal-body" style="gap: 14px;">
+        <div id="settlement-history-modal-content">
+          <div class="text-center text-muted" style="padding: 24px;">Loading settlement versions...</div>
+        </div>
+      </div>
+
+      <footer class="admin-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-modal-close>Close</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Shared Toast Mount Container -->
   <div class="app-toast-container" id="app-toast-container" aria-live="polite"></div>
 

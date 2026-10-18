@@ -38,9 +38,9 @@ router.get('/transactions', async (req, res, next) => {
     const queryParams = [userId];
 
     if (typeFilter === 'credit') {
-      whereClauses.push("ct.action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND')");
+      whereClauses.push("ct.action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'BET_RESETTLEMENT_PAYOUT')");
     } else if (typeFilter === 'debit') {
-      whereClauses.push("ct.action_type = 'ADMIN_DEBIT'");
+      whereClauses.push("ct.action_type IN ('ADMIN_DEBIT', 'SETTLEMENT_REVERSAL_DEBIT')");
     }
 
     if (search.length > 0) {
@@ -72,8 +72,8 @@ router.get('/transactions', async (req, res, next) => {
     // Concurrently compute total credits and debits from MySQL for this player
     const [[totalsRow]] = await pool.query(
       `SELECT
-        COALESCE(SUM(CASE WHEN action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND') THEN amount ELSE 0 END), 0) AS totalCredits,
-        COALESCE(SUM(CASE WHEN action_type = 'ADMIN_DEBIT' THEN amount ELSE 0 END), 0) AS totalDebits
+        COALESCE(SUM(CASE WHEN action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'BET_RESETTLEMENT_PAYOUT') THEN amount ELSE 0 END), 0) AS totalCredits,
+        COALESCE(SUM(CASE WHEN action_type IN ('ADMIN_DEBIT', 'SETTLEMENT_REVERSAL_DEBIT') THEN amount ELSE 0 END), 0) AS totalDebits
        FROM coin_transactions
        WHERE user_id = ?`,
       [userId]
@@ -83,7 +83,7 @@ router.get('/transactions', async (req, res, next) => {
     const totalDebits = parseFloat(totalsRow.totalDebits || 0);
 
     const transactions = rows.map((r) => {
-      const isCredit = r.action_type === 'ADMIN_CREDIT' || r.action_type === 'BET_CANCEL_REFUND';
+      const isCredit = ['ADMIN_CREDIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'BET_RESETTLEMENT_PAYOUT'].includes(r.action_type);
       const createdDate = new Date(r.created_at);
 
       let title = isCredit ? 'Account Credit' : 'Account Debit';
@@ -94,6 +94,18 @@ router.get('/transactions', async (req, res, next) => {
         title = 'Bet Refund (Cancelled)';
         subtitle = r.reason || 'Stake Refund for Cancelled Bet';
         category = 'Bet Refund';
+      } else if (r.action_type === 'BET_WON_PAYOUT') {
+        title = 'Bet Won (Payout)';
+        subtitle = r.reason || 'Official Toss Win Payout';
+        category = 'Bet Winnings';
+      } else if (r.action_type === 'BET_RESETTLEMENT_PAYOUT') {
+        title = 'Resettlement Payout';
+        subtitle = r.reason || 'Corrected Toss Win Payout';
+        category = 'Bet Winnings';
+      } else if (r.action_type === 'SETTLEMENT_REVERSAL_DEBIT') {
+        title = 'Settlement Reversal';
+        subtitle = r.reason || 'Payout Reversed (Result Correction)';
+        category = 'Settlement Reversal';
       }
 
       return {

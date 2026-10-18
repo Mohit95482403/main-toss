@@ -1973,12 +1973,25 @@
 
     tableBody.innerHTML = matches.map((m) => {
       const isSettled = m.settled === 1 || m.settled === true;
+      const settlementStatus = m.settlement_status || (isSettled ? 'settled' : 'unsettled');
+      const isReversed = settlementStatus === 'reversed';
+      const isResettled = settlementStatus === 'resettled';
+      const version = m.settlement_version || 0;
+
       const statusBadge = `<span class="admin-badge role-${(m.status || 'scheduled').toLowerCase()}">${escapeHtml(m.status || 'Scheduled')}</span>`;
-      const settlementBadge = isSettled
-        ? `<span class="badge-status settled">✓ Settled (${escapeHtml(m.toss_winner || 'Declared')})</span>`
-        : (m.pending_bets > 0
-            ? `<span class="badge-status pending">⏳ Pending (${m.pending_bets})</span>`
-            : `<span class="text-xs text-muted">No Pending</span>`);
+      
+      let settlementBadge;
+      if (isReversed) {
+        settlementBadge = `<span class="badge-status reversed" title="Settlement reversed by admin">⚠️ Reversed (v${version || 1})</span>`;
+      } else if (isResettled) {
+        settlementBadge = `<span class="badge-status resettled" title="Resettled with corrected result">✓ Resettled: ${escapeHtml(m.toss_winner || 'Declared')} (v${version || 2})</span>`;
+      } else if (isSettled) {
+        settlementBadge = `<span class="badge-status settled" title="Settled successfully">✓ Settled: ${escapeHtml(m.toss_winner || 'Declared')}</span>`;
+      } else if (m.pending_bets > 0) {
+        settlementBadge = `<span class="badge-status pending">⏳ Pending (${m.pending_bets})</span>`;
+      } else {
+        settlementBadge = `<span class="text-xs text-muted">No Pending</span>`;
+      }
 
       const rawEnd = m.match_end_time || m.matchEndTime;
       const isExpired = Boolean(m.isExpired || (rawEnd && new Date(rawEnd).getTime() <= Date.now()));
@@ -2021,9 +2034,24 @@
               <button type="button" class="btn btn-secondary btn-xs btn-edit-match-schedule" data-match-id="${m.id}" title="Edit match expiry & schedule">
                 Edit Expiry
               </button>
-              ${!isSettled && m.pending_bets > 0 ? `
+              ${!isSettled && !isReversed && m.pending_bets > 0 ? `
                 <button type="button" class="btn btn-primary btn-xs btn-settle-match-direct" data-match-id="${m.id}" title="Settle this match">
                   Settle
+                </button>
+              ` : ''}
+              ${(isSettled || isResettled) ? `
+                <button type="button" class="btn btn-warning btn-xs btn-correct-match-result" data-match-id="${m.id}" title="Correct result & reverse previous settlement">
+                  Correct Result
+                </button>
+              ` : ''}
+              ${isReversed ? `
+                <button type="button" class="btn btn-primary btn-xs btn-resettle-match-direct" data-match-id="${m.id}" title="Resettle match with corrected winner">
+                  Resettle Match
+                </button>
+              ` : ''}
+              ${(isSettled || isReversed || isResettled || version > 0) ? `
+                <button type="button" class="btn btn-secondary btn-xs btn-match-settlement-history" data-match-id="${m.id}" title="View settlement versions & history">
+                  Settlement History
                 </button>
               ` : ''}
               ${m.total_bets === 0 ? `
@@ -2055,10 +2083,30 @@
     tableBody.querySelectorAll('.btn-settle-match-direct').forEach((btn) => {
       btn.addEventListener('click', () => {
         const matchId = btn.dataset.matchId;
-        // Switch to settlement tab
         const settlementTabBtn = document.querySelector('[data-tab="settlement"]');
         if (settlementTabBtn) settlementTabBtn.click();
         selectMatchForSettlement(matchId);
+      });
+    });
+
+    tableBody.querySelectorAll('.btn-correct-match-result').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const matchId = btn.dataset.matchId;
+        openCorrectResultModal(matchId, false);
+      });
+    });
+
+    tableBody.querySelectorAll('.btn-resettle-match-direct').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const matchId = btn.dataset.matchId;
+        openCorrectResultModal(matchId, true);
+      });
+    });
+
+    tableBody.querySelectorAll('.btn-match-settlement-history').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const matchId = btn.dataset.matchId;
+        openMatchSettlementHistoryModal(matchId);
       });
     });
 
@@ -3241,6 +3289,576 @@
   }
 
   // ===========================================================================
+  // 7a. MATCH RESULT CORRECTION & SAFE RESETTLEMENT CONTROLLER
+  // ===========================================================================
+
+  const correctionState = {
+    matchId: null,
+    match: null,
+    isResettleOnly: false,
+    selectedOutcome: null,
+    reason: '',
+    preview: null,
+    isSubmitting: false
+  };
+
+  async function openCorrectResultModal(matchId, isResettleOnly = false) {
+    correctionState.matchId = matchId;
+    correctionState.isResettleOnly = Boolean(isResettleOnly);
+    correctionState.selectedOutcome = null;
+    correctionState.preview = null;
+    correctionState.isSubmitting = false;
+
+    const modalTitle = document.getElementById('correct-result-modal-title');
+    const modalSubtitle = document.getElementById('correct-result-modal-subtitle');
+    const matchTitleEl = document.getElementById('correct-modal-match-title');
+    const matchIdEl = document.getElementById('correct-modal-match-id');
+    const currentWinnerBadge = document.getElementById('correct-modal-current-winner');
+    const versionEl = document.getElementById('correct-modal-version');
+    const settledByEl = document.getElementById('correct-modal-settled-by');
+    const settledAtEl = document.getElementById('correct-modal-settled-at');
+    const reasonInput = document.getElementById('correct-result-reason-input');
+    const previewContainer = document.getElementById('correction-preview-container');
+    const confirmationBox = document.getElementById('correction-confirmation-box');
+    const confirmCheckbox = document.getElementById('checkbox-confirm-correction');
+    const reverseOnlyBtn = document.getElementById('btn-execute-reverse-only');
+    const resettleBtn = document.getElementById('btn-execute-correct-and-resettle');
+    const errorBox = document.getElementById('correct-modal-error-box');
+    const outcomeContainer = document.getElementById('correct-outcome-options-container');
+
+    if (errorBox) errorBox.style.display = 'none';
+    if (previewContainer) {
+      previewContainer.style.display = 'none';
+      previewContainer.innerHTML = '';
+    }
+    if (confirmationBox) confirmationBox.style.display = 'none';
+    if (confirmCheckbox) confirmCheckbox.checked = false;
+    if (reverseOnlyBtn) {
+      reverseOnlyBtn.disabled = true;
+      reverseOnlyBtn.style.display = isResettleOnly ? 'none' : 'inline-flex';
+    }
+    if (resettleBtn) {
+      resettleBtn.disabled = true;
+      resettleBtn.textContent = isResettleOnly ? 'Confirm Resettlement' : 'Confirm Reversal & Resettle';
+    }
+    if (reasonInput) reasonInput.value = '';
+
+    if (modalTitle) {
+      modalTitle.textContent = isResettleOnly
+        ? 'Resettle Match with Corrected Outcome'
+        : 'Correct Match Result & Safe Resettlement';
+    }
+    if (modalSubtitle) {
+      modalSubtitle.textContent = isResettleOnly
+        ? 'Enter and confirm the corrected official result to re-evaluate eligible bets'
+        : 'Reverse previous financial transactions and resettle with corrected outcome';
+    }
+
+    openModal('modal-correct-result');
+
+    try {
+      // Find match in local state or fetch from server
+      let match = (matchesState.matches || []).find((m) => String(m.id) === String(matchId));
+      if (!match) {
+        const res = await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/bets`);
+        match = res.data.match;
+      }
+      correctionState.match = match;
+
+      if (matchTitleEl) matchTitleEl.textContent = match.match_title || match.matchTitle || 'Match Fixture';
+      if (matchIdEl) matchIdEl.textContent = `#${match.id}`;
+      if (versionEl) versionEl.textContent = `Version ${match.settlement_version || (match.settled ? 1 : 0)}`;
+      if (settledByEl) settledByEl.textContent = match.settled_by || 'admin';
+      if (settledAtEl) settledAtEl.textContent = formatDateStr(match.settled_at || match.created_at);
+
+      if (currentWinnerBadge) {
+        if (match.settlement_status === 'reversed') {
+          currentWinnerBadge.className = 'badge-status reversed';
+          currentWinnerBadge.textContent = 'Status: Settlement Reversed';
+        } else {
+          currentWinnerBadge.className = 'badge-status settled';
+          currentWinnerBadge.textContent = `Current Winner: ${escapeHtml(match.toss_winner || 'Declared')}`;
+        }
+      }
+
+      // Populate outcome radio buttons
+      const team1 = match.team_one || match.teamOne || 'Team 1';
+      const team2 = match.team_two || match.teamTwo || 'Team 2';
+
+      if (outcomeContainer) {
+        outcomeContainer.innerHTML = `
+          <label class="outcome-option-card" id="correct-opt-team1" style="cursor: pointer; padding: 12px; border: 1.5px solid var(--color-border); border-radius: var(--border-radius-md); display: flex; align-items: center; gap: 10px; background: var(--color-surface);">
+            <input type="radio" name="corrected_outcome" value="${escapeHtml(team1)}" class="outcome-option-radio">
+            <div>
+              <div class="font-bold text-sm">${escapeHtml(team1)} Won Toss</div>
+              <div class="text-xs text-muted">Declare ${escapeHtml(team1)} as official winner</div>
+            </div>
+          </label>
+
+          <label class="outcome-option-card" id="correct-opt-team2" style="cursor: pointer; padding: 12px; border: 1.5px solid var(--color-border); border-radius: var(--border-radius-md); display: flex; align-items: center; gap: 10px; background: var(--color-surface);">
+            <input type="radio" name="corrected_outcome" value="${escapeHtml(team2)}" class="outcome-option-radio">
+            <div>
+              <div class="font-bold text-sm">${escapeHtml(team2)} Won Toss</div>
+              <div class="text-xs text-muted">Declare ${escapeHtml(team2)} as official winner</div>
+            </div>
+          </label>
+
+          <label class="outcome-option-card" id="correct-opt-no-result" style="cursor: pointer; padding: 12px; border: 1.5px solid var(--color-border); border-radius: var(--border-radius-md); display: flex; align-items: center; gap: 10px; background: var(--color-surface);">
+            <input type="radio" name="corrected_outcome" value="NO_RESULT" class="outcome-option-radio">
+            <div>
+              <div class="font-bold text-sm">No Result (Refund All)</div>
+              <div class="text-xs text-muted">Match abandoned/void; refund all active stakes</div>
+            </div>
+          </label>
+        `;
+
+        outcomeContainer.querySelectorAll('.outcome-option-card').forEach((card) => {
+          card.addEventListener('click', () => {
+            outcomeContainer.querySelectorAll('.outcome-option-card').forEach((c) => {
+              c.style.borderColor = 'var(--color-border)';
+              c.style.background = 'var(--color-surface)';
+            });
+            card.style.borderColor = 'var(--pink-primary, #E75480)';
+            card.style.background = 'var(--pink-bg-subtle, #FFF7FA)';
+            const radio = card.querySelector('input[type="radio"]');
+            if (radio) {
+              radio.checked = true;
+              correctionState.selectedOutcome = radio.value;
+            }
+          });
+        });
+      }
+    } catch (err) {
+      console.error('[OPEN CORRECT MODAL ERROR]', err);
+      notify(`Failed to load match details: ${err.message}`, 'error');
+    }
+  }
+
+  async function loadCorrectionPreview() {
+    const errorBox = document.getElementById('correct-modal-error-box');
+    const errorText = document.getElementById('correct-modal-error-text');
+    const previewContainer = document.getElementById('correction-preview-container');
+    const confirmationBox = document.getElementById('correction-confirmation-box');
+    const confirmCheckbox = document.getElementById('checkbox-confirm-correction');
+    const previewBtn = document.getElementById('btn-load-correction-preview');
+    const reverseOnlyBtn = document.getElementById('btn-execute-reverse-only');
+    const resettleBtn = document.getElementById('btn-execute-correct-and-resettle');
+    const reasonInput = document.getElementById('correct-result-reason-input');
+
+    if (errorBox) errorBox.style.display = 'none';
+
+    const proposedOutcome = correctionState.selectedOutcome;
+    const reason = (reasonInput?.value || '').trim();
+
+    if (!proposedOutcome) {
+      notify('Please select the corrected official toss result first.', 'warning');
+      return;
+    }
+
+    if (!reason || reason.length < 5) {
+      notify('A mandatory reason for result correction (minimum 5 characters) is required.', 'warning');
+      if (reasonInput) reasonInput.focus();
+      return;
+    }
+
+    correctionState.reason = reason;
+
+    if (previewBtn && window.SharedLayout?.setButtonLoading) {
+      window.SharedLayout.setButtonLoading(previewBtn, true, 'Analyzing...');
+    }
+
+    try {
+      const matchId = correctionState.matchId;
+      const res = await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/settlement/preview-correction`, {
+        method: 'POST',
+        body: JSON.stringify({ proposedOutcome, reason })
+      });
+
+      const p = res.data;
+      correctionState.preview = p;
+
+      const balanceSafe = p.balanceSafety?.safe === true;
+      const shortfalls = p.balanceSafety?.shortfalls || [];
+
+      let balanceSafetyHtml = '';
+      if (balanceSafe) {
+        balanceSafetyHtml = `
+          <div class="alert alert-success" style="margin-top: 12px; margin-bottom: 0;">
+            <span class="alert-icon">✓</span>
+            <span class="alert-text">
+              <strong>Balance Safety Verified:</strong> All ${p.balanceSafety.checkedUsersCount} affected winning accounts have sufficient available balances to process compensating reversal debits without creating negative balances.
+            </span>
+          </div>
+        `;
+      } else {
+        balanceSafetyHtml = `
+          <div class="shortfall-warning-box">
+            <div class="shortfall-warning-header">
+              <span>⚠️ BALANCE RECONCILIATION SHORTFALL DETECTED</span>
+            </div>
+            <p class="text-xs" style="color: #9F1239; margin-bottom: 8px;">
+              ${escapeHtml(p.balanceSafety.message || 'Cannot safely reverse settlement. One or more players spent their winning payout and do not have sufficient available balance.')}
+            </p>
+            <table class="shortfall-table">
+              <thead>
+                <tr>
+                  <th>Player Username</th>
+                  <th class="text-right">Available Balance</th>
+                  <th class="text-right">Payout to Reverse</th>
+                  <th class="text-right">Shortfall</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${shortfalls.map(s => `
+                  <tr>
+                    <td><strong>${escapeHtml(s.username)}</strong> (ID #${s.userId})</td>
+                    <td class="text-right font-mono">${formatMoney(s.currentAvailable)}</td>
+                    <td class="text-right font-mono text-danger">-${formatMoney(s.requiredPayout)}</td>
+                    <td class="text-right font-mono font-bold text-danger">-${formatMoney(s.shortfall)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="text-2xs text-muted" style="margin-top: 8px; color: #BE123C;">
+              Reversal operation is blocked by strict financial policy to prevent negative balances without manual administrative debt authorization.
+            </div>
+          </div>
+        `;
+      }
+
+      let diffHtml = '';
+      const payoutDiff = p.projected.projectedPayout - p.original.originalTotalPayout;
+      const diffSign = payoutDiff >= 0 ? '+' : '';
+
+      previewContainer.innerHTML = `
+        <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+          <span>Financial Impact &amp; Resettlement Preview</span>
+          <span class="badge-status ${balanceSafe ? 'settled' : 'lost'}">
+            ${balanceSafe ? 'Reconciliation Safe' : 'Reconciliation Blocked'}
+          </span>
+        </div>
+
+        <div class="reversal-impact-grid">
+          <div class="impact-card warning-card">
+            <span class="impact-card-title">Previous Settlement (v${p.original.settlementVersion || 1})</span>
+            <span class="impact-card-val text-warning">${escapeHtml(p.original.declaredOutcome)}</span>
+            <span class="impact-card-sub">${p.original.originalWonBets} Won | Total Paid: <strong>${formatMoney(p.original.originalTotalPayout)}</strong></span>
+          </div>
+
+          <div class="impact-card success-card">
+            <span class="impact-card-title">Corrected Outcome</span>
+            <span class="impact-card-val text-success">${escapeHtml(p.projected.correctedOutcome)}</span>
+            <span class="impact-card-sub">${p.projected.projectedWonBets} Won | New Payout: <strong>${formatMoney(p.projected.projectedPayout)}</strong></span>
+          </div>
+
+          <div class="impact-card">
+            <span class="impact-card-title">Payout Differential</span>
+            <span class="impact-card-val ${payoutDiff >= 0 ? 'text-primary' : 'text-success'}">
+              ${diffSign}${formatMoney(payoutDiff)}
+            </span>
+            <span class="impact-card-sub">Affected Players: <strong>${p.affectedPlayersCount}</strong></span>
+          </div>
+        </div>
+
+        <table class="settlement-diff-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th class="text-right">Original Settlement</th>
+              <th class="text-right">Corrected Settlement</th>
+              <th class="text-right">Variance / Compensation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Declared Winner</td>
+              <td class="text-right font-bold">${escapeHtml(p.original.declaredOutcome)}</td>
+              <td class="text-right font-bold text-primary">${escapeHtml(p.projected.correctedOutcome)}</td>
+              <td class="text-right text-muted">Result Correction</td>
+            </tr>
+            <tr>
+              <td>Winning Bets</td>
+              <td class="text-right">${p.original.originalWonBets}</td>
+              <td class="text-right font-bold text-success">${p.projected.projectedWonBets}</td>
+              <td class="text-right">${p.projected.projectedWonBets - p.original.originalWonBets >= 0 ? '+' : ''}${p.projected.projectedWonBets - p.original.originalWonBets}</td>
+            </tr>
+            <tr>
+              <td>Losing Bets</td>
+              <td class="text-right">${p.original.originalLostBets}</td>
+              <td class="text-right font-bold text-danger">${p.projected.projectedLostBets}</td>
+              <td class="text-right">${p.projected.projectedLostBets - p.original.originalLostBets >= 0 ? '+' : ''}${p.projected.projectedLostBets - p.original.originalLostBets}</td>
+            </tr>
+            <tr>
+              <td>Total Payout Amount</td>
+              <td class="text-right font-mono font-bold">${formatMoney(p.original.originalTotalPayout)}</td>
+              <td class="text-right font-mono font-bold text-success">${formatMoney(p.projected.projectedPayout)}</td>
+              <td class="text-right font-mono font-bold ${payoutDiff >= 0 ? 'text-primary' : 'text-success'}">
+                ${diffSign}${formatMoney(payoutDiff)}
+              </td>
+            </tr>
+            <tr>
+              <td>Cancelled Bets (Preserved)</td>
+              <td class="text-right">${p.cancelledBetsExcluded}</td>
+              <td class="text-right">${p.cancelledBetsExcluded}</td>
+              <td class="text-right text-muted">Strictly Excluded</td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${balanceSafetyHtml}
+      `;
+
+      previewContainer.style.display = 'block';
+
+      if (balanceSafe) {
+        if (confirmationBox) confirmationBox.style.display = 'block';
+        if (confirmCheckbox) {
+          confirmCheckbox.checked = false;
+          confirmCheckbox.onchange = () => {
+            const checked = confirmCheckbox.checked;
+            if (reverseOnlyBtn) reverseOnlyBtn.disabled = !checked;
+            if (resettleBtn) resettleBtn.disabled = !checked;
+          };
+        }
+      } else {
+        if (confirmationBox) confirmationBox.style.display = 'none';
+        if (reverseOnlyBtn) reverseOnlyBtn.disabled = true;
+        if (resettleBtn) resettleBtn.disabled = true;
+      }
+
+    } catch (err) {
+      console.error('[LOAD CORRECTION PREVIEW ERROR]', err);
+      if (errorBox && errorText) {
+        errorText.textContent = err.message || 'Failed to calculate financial preview.';
+        errorBox.style.display = 'flex';
+      }
+      notify(`Preview failed: ${err.message}`, 'error');
+    } finally {
+      if (previewBtn && window.SharedLayout?.setButtonLoading) {
+        window.SharedLayout.setButtonLoading(previewBtn, false);
+      }
+    }
+  }
+
+  async function executeReverseSettlement() {
+    const reverseBtn = document.getElementById('btn-execute-reverse-only');
+    const errorBox = document.getElementById('correct-modal-error-box');
+    const errorText = document.getElementById('correct-modal-error-text');
+
+    if (errorBox) errorBox.style.display = 'none';
+
+    const matchId = correctionState.matchId;
+    const reason = (correctionState.reason || '').trim();
+
+    if (!reason || reason.length < 5) {
+      notify('Mandatory reason (min 5 characters) is required for settlement reversal.', 'warning');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to REVERSE the settlement for match #${matchId}? This will remove previous payouts via compensating debit entries and mark the settlement as reversed.`)) {
+      return;
+    }
+
+    if (reverseBtn && window.SharedLayout?.setButtonLoading) {
+      window.SharedLayout.setButtonLoading(reverseBtn, true, 'Reversing...');
+    }
+
+    try {
+      const res = await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/settlement/reverse`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      });
+
+      notify(res.message || 'Settlement reversed successfully.', 'success');
+      broadcastMatchesChanged('MATCH_SETTLEMENT_REVERSED', matchId);
+
+      closeModal('modal-correct-result');
+      await loadMatches();
+      await loadSettlement();
+    } catch (err) {
+      console.error('[REVERSE SETTLEMENT ERROR]', err);
+      if (errorBox && errorText) {
+        errorText.textContent = err.message || 'Settlement reversal failed. Database rolled back cleanly.';
+        errorBox.style.display = 'flex';
+      }
+      notify(`Reversal failed: ${err.message}`, 'error');
+    } finally {
+      if (reverseBtn && window.SharedLayout?.setButtonLoading) {
+        window.SharedLayout.setButtonLoading(reverseBtn, false);
+      }
+    }
+  }
+
+  async function executeCorrectAndResettle() {
+    const resettleBtn = document.getElementById('btn-execute-correct-and-resettle');
+    const errorBox = document.getElementById('correct-modal-error-box');
+    const errorText = document.getElementById('correct-modal-error-text');
+
+    if (errorBox) errorBox.style.display = 'none';
+
+    const matchId = correctionState.matchId;
+    const correctedOutcome = correctionState.selectedOutcome;
+    const reason = (correctionState.reason || '').trim();
+    const isResettleOnly = correctionState.isResettleOnly;
+
+    if (!correctedOutcome) {
+      notify('Please select the corrected toss result.', 'warning');
+      return;
+    }
+
+    if (!reason || reason.length < 5) {
+      notify('Mandatory reason (min 5 characters) is required for result correction.', 'warning');
+      return;
+    }
+
+    const actionText = isResettleOnly ? 'resettle' : 'reverse and resettle';
+    if (!confirm(`Confirm ${actionText} match #${matchId} with corrected outcome: "${correctedOutcome}"?`)) {
+      return;
+    }
+
+    if (resettleBtn && window.SharedLayout?.setButtonLoading) {
+      window.SharedLayout.setButtonLoading(resettleBtn, true, 'Processing...');
+    }
+
+    try {
+      const endpoint = isResettleOnly
+        ? `/admin/matches/${encodeURIComponent(matchId)}/settlement/resettle`
+        : `/admin/matches/${encodeURIComponent(matchId)}/settlement/correct-and-resettle`;
+
+      const res = await apiFetch(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({ correctedOutcome, reason })
+      });
+
+      notify(res.message || `Match corrected and resettled successfully (v${res.data?.version || 2})!`, 'success');
+      broadcastMatchesChanged('MATCH_RESETTLED', matchId);
+
+      closeModal('modal-correct-result');
+      await loadMatches();
+      await loadSettlement();
+    } catch (err) {
+      console.error('[CORRECT & RESETTLE ERROR]', err);
+      if (errorBox && errorText) {
+        errorText.textContent = err.message || 'Resettlement failed. Database rolled back cleanly.';
+        errorBox.style.display = 'flex';
+      }
+      notify(`Resettlement failed: ${err.message}`, 'error');
+    } finally {
+      if (resettleBtn && window.SharedLayout?.setButtonLoading) {
+        window.SharedLayout.setButtonLoading(resettleBtn, false);
+      }
+    }
+  }
+
+  async function openMatchSettlementHistoryModal(matchId) {
+    const titleEl = document.getElementById('settlement-history-modal-title');
+    const contentEl = document.getElementById('settlement-history-modal-content');
+
+    if (titleEl) titleEl.textContent = `Match #${matchId} Settlement History`;
+    if (contentEl) contentEl.innerHTML = '<div class="text-center text-muted" style="padding: 24px;">Retrieving versioned audit records...</div>';
+
+    openModal('modal-settlement-history');
+
+    try {
+      const res = await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/settlement/history`);
+      const payload = res.data || {};
+      const match = payload.match || {};
+      const settlements = payload.settlements || [];
+
+      if (titleEl) {
+        titleEl.textContent = `${match.matchTitle || ('Match #' + matchId)} Settlement History`;
+      }
+
+      if (settlements.length === 0) {
+        contentEl.innerHTML = `
+          <div class="alert alert-info" style="margin: 0;">
+            <span class="alert-icon">ℹ️</span>
+            <span class="alert-text">
+              No formal settlements have been recorded for match #${escapeHtml(matchId)} yet.
+            </span>
+          </div>
+        `;
+        return;
+      }
+
+      contentEl.innerHTML = `
+        <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--border-radius-md); padding: 12px 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span class="font-bold text-sm">${escapeHtml(match.matchTitle)}</span>
+              <div class="text-xs text-muted">${escapeHtml(match.competition || 'Cricket')} | Match #${escapeHtml(match.id)}</div>
+            </div>
+            <div>
+              <span class="badge-status ${match.settlementStatus === 'reversed' ? 'reversed' : 'settled'}">
+                Current State: ${escapeHtml(match.settlementStatus || (match.settled ? 'settled' : 'unsettled'))} (v${match.settlementVersion || 1})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settlement-timeline">
+          ${settlements.map((s) => {
+            const isReversed = s.status === 'reversed';
+            const isCurrent = s.isCurrent === true;
+
+            return `
+              <div class="timeline-item ${isCurrent ? 'current' : ''} ${isReversed ? 'reversed' : ''}">
+                <div class="timeline-dot ${isReversed ? 'reversed' : ''}"></div>
+                <div class="timeline-header">
+                  <div class="timeline-version-tag">
+                    <span>Settlement Version ${s.version || 1}</span>
+                    ${isCurrent ? '<span class="badge-status settled" style="font-size: 10px; padding: 2px 6px;">Current Active</span>' : ''}
+                    ${isReversed ? '<span class="badge-status reversed" style="font-size: 10px; padding: 2px 6px;">Reversed</span>' : ''}
+                  </div>
+                  <span class="text-xs text-muted">${formatDateStr(s.settledAt)}</span>
+                </div>
+
+                <div class="timeline-body">
+                  <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+                    <div><span class="text-muted">Declared Outcome:</span> <strong>${escapeHtml(s.declaredOutcome)}</strong></div>
+                    <div><span class="text-muted">Settled By Admin:</span> <strong>${escapeHtml(s.adminUsername || 'admin')}</strong></div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 4px; padding: 8px; background: #fff; border-radius: 6px; border: 1px solid var(--color-border);">
+                    <div><span class="text-muted">Total Bets:</span> <strong>${s.totalBets}</strong></div>
+                    <div><span class="text-muted">Won:</span> <strong class="text-success">${s.wonBets}</strong></div>
+                    <div><span class="text-muted">Lost:</span> <strong class="text-danger">${s.lostBets}</strong></div>
+                    <div><span class="text-muted">Payout:</span> <strong class="text-primary">${formatMoney(s.totalPayout)}</strong></div>
+                  </div>
+
+                  ${s.notes ? `
+                    <div style="margin-top: 4px;">
+                      <span class="text-muted">Settlement Notes:</span> <em>${escapeHtml(s.notes)}</em>
+                    </div>
+                  ` : ''}
+
+                  ${isReversed ? `
+                    <div style="margin-top: 6px; padding: 8px; background: #FEF3C7; border: 1px solid #FCD34D; border-radius: 6px; color: #92400E;">
+                      <div class="font-bold text-xs" style="margin-bottom: 2px;">⚠️ Settlement Reversal Audit Details:</div>
+                      <div>Reason: <strong>${escapeHtml(s.reversalReason || 'Incorrect result entered')}</strong></div>
+                      <div>Reversed At: <span>${formatDateStr(s.reversedAt)}</span> by <strong>${escapeHtml(s.reversedByUsername || 'admin')}</strong></div>
+                      <div>Compensating Reversal Debited: <strong>${formatMoney(s.reversalAmount)}</strong></div>
+                    </div>
+                  ` : ''}
+
+                  <div class="text-2xs text-muted font-mono" style="margin-top: 4px;">
+                    UUID: ${escapeHtml(s.settlementUuid || s.id)}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch (err) {
+      console.error('[SETTLEMENT HISTORY MODAL ERROR]', err);
+      contentEl.innerHTML = `<div class="text-center text-danger" style="padding: 24px;">Failed to load settlement history: ${escapeHtml(err.message)}</div>`;
+      notify(`Failed to load settlement history: ${err.message}`, 'error');
+    }
+  }
+
+
+  // ===========================================================================
   // 7b. PLAYER COIN MANAGEMENT
   // ===========================================================================
 
@@ -4240,6 +4858,28 @@
           coinsState.historyPage++;
           loadCoinHistory();
         }
+      });
+    }
+
+    // Result Correction & Resettlement Modal Buttons
+    const loadCorrectionPreviewBtn = document.getElementById('btn-load-correction-preview');
+    if (loadCorrectionPreviewBtn) {
+      loadCorrectionPreviewBtn.addEventListener('click', () => {
+        loadCorrectionPreview();
+      });
+    }
+
+    const executeReverseOnlyBtn = document.getElementById('btn-execute-reverse-only');
+    if (executeReverseOnlyBtn) {
+      executeReverseOnlyBtn.addEventListener('click', () => {
+        executeReverseSettlement();
+      });
+    }
+
+    const executeCorrectAndResettleBtn = document.getElementById('btn-execute-correct-and-resettle');
+    if (executeCorrectAndResettleBtn) {
+      executeCorrectAndResettleBtn.addEventListener('click', () => {
+        executeCorrectAndResettle();
       });
     }
 
