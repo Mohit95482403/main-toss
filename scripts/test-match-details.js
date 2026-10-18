@@ -124,9 +124,9 @@ assert(invalidMatch === null, 'Invalid match ID returns null safely');
 const homeHtml = fs.readFileSync(homeHtmlPath, 'utf8');
 const homeJs = fs.readFileSync(homeJsPath, 'utf8');
 
-assert(homeHtml.includes('href="pages/match-details.html?id=MATCH-2026-001"'), 'Featured match card links directly to match-details.html?id=MATCH-2026-001');
+assert(homeHtml.includes('id="featured-match"'), 'Featured match card is present on Home page');
 assert(homeHtml.includes('script src="js/matches-data.js"'), 'index.html includes matches-data.js script');
-assert(homeJs.includes('pages/match-details.html?id='), 'home.js renders match card links targeting pages/match-details.html');
+assert(!homeHtml.includes('href="pages/match-details.html'), 'Featured match card no longer navigates to match-details.html');
 
 // 5. CSS Token & Responsive Verification
 const cssContent = fs.readFileSync(detailsCssPath, 'utf8');

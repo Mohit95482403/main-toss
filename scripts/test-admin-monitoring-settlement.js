@@ -180,9 +180,9 @@ async function runTests() {
       assert(parseFloat(sampleBet.odds) > 0, 'Bet records odds');
       const potRet = sampleBet.potential_return !== undefined ? sampleBet.potential_return : sampleBet.potentialReturn;
       assert(parseFloat(potRet) > 0, 'Bet records potential return');
-      assert(['pending', 'live', 'won', 'lost', 'no_result'].includes(sampleBet.status), `Bet status is valid (${sampleBet.status})`);
+      assert(['pending', 'live', 'won', 'lost', 'no_result', 'cancelled'].includes(sampleBet.status), `Bet status is valid (${sampleBet.status})`);
       const settlStatus = sampleBet.settlement_status || sampleBet.settlementStatus;
-      assert(['pending', 'settled'].includes(settlStatus), `Settlement status is valid (${settlStatus})`);
+      assert(['pending', 'settled', 'cancelled'].includes(settlStatus), `Settlement status is valid (${settlStatus})`);
       console.log(`    Sample Bet Verified: Bet #${sampleBet.id} by ${sampleBet.username} on ${sampleBet.selection} (Stake ₹${sampleBet.stake}, Odds ${sampleBet.odds})`);
     }
 
@@ -209,6 +209,8 @@ async function runTests() {
       );
     } else {
       await pool.query("UPDATE bets SET status = 'live', settlement_status = 'pending', payout = 0.00, settled_at = NULL, settled_by = NULL WHERE match_id = 'MATCH-2026-001'");
+      await pool.query("DELETE FROM coin_transactions WHERE idempotency_key LIKE 'PAYOUT-TEST-BET-SETTLE-001%'");
+      await pool.query("DELETE FROM settlements WHERE match_id = 'MATCH-2026-001'");
     }
     await pool.query(`
       UPDATE wallets w

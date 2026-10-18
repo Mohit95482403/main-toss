@@ -21,12 +21,12 @@ router.get('/', async (req, res, next) => {
     // 1. Calculate real-time counts for active/eligible matches from MySQL (excluding expired matches)
     const [[countsRow]] = await pool.query(`
       SELECT
-        COUNT(CASE WHEN status IN ('live', 'upcoming') AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NOT NULL AND match_end_time > NOW()) THEN 1 END) AS totalAll,
-        SUM(CASE WHEN status = 'live' AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NOT NULL AND match_end_time > NOW()) THEN 1 ELSE 0 END) AS totalLive,
-        SUM(CASE WHEN status = 'upcoming' AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NOT NULL AND match_end_time > NOW()) THEN 1 ELSE 0 END) AS totalUpcoming
+        COUNT(CASE WHEN status IN ('live', 'upcoming') AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NULL OR match_end_time > UTC_TIMESTAMP() OR match_end_time > NOW()) THEN 1 END) AS totalAll,
+        SUM(CASE WHEN status = 'live' AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NULL OR match_end_time > UTC_TIMESTAMP() OR match_end_time > NOW()) THEN 1 ELSE 0 END) AS totalLive,
+        SUM(CASE WHEN status = 'upcoming' AND (settled = 0 OR settled IS FALSE) AND (match_end_time IS NULL OR match_end_time > UTC_TIMESTAMP() OR match_end_time > NOW()) THEN 1 ELSE 0 END) AS totalUpcoming
       FROM matches
       WHERE status IN ('live', 'upcoming') AND (settled = 0 OR settled IS FALSE)
-        AND (match_end_time IS NOT NULL AND match_end_time > NOW())
+        AND (match_end_time IS NULL OR match_end_time > UTC_TIMESTAMP() OR match_end_time > NOW())
     `);
 
     const counts = {
@@ -39,7 +39,7 @@ router.get('/', async (req, res, next) => {
     // 2. Build parameterized query for fixtures
     // Mandatory filter: ONLY active, unsettled, UNEXPIRED matches are eligible for the user's Home page
     const whereClauses = [
-      "(match_end_time IS NOT NULL AND match_end_time > NOW())"
+      "(match_end_time IS NULL OR match_end_time > UTC_TIMESTAMP() OR match_end_time > NOW())"
     ];
     const queryParams = [];
 
@@ -89,8 +89,8 @@ router.get('/', async (req, res, next) => {
        ${whereSql}
        ORDER BY
          CASE WHEN status = 'live' THEN 1 WHEN status = 'upcoming' THEN 2 ELSE 3 END,
-         match_end_time ASC,
-         created_at DESC`,
+         created_at DESC,
+         match_end_time ASC`,
       queryParams
     );
 

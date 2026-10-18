@@ -7,6 +7,12 @@
 (function () {
   'use strict';
 
+  // Deprecated: Match details page has been completely removed. Redirect immediately to Home fixtures.
+  if (typeof window !== 'undefined' && window.location) {
+    window.location.replace('../index.html');
+    return;
+  }
+
   // SVGs for Icons
   const ICONS = {
     clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,

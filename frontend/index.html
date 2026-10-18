@@ -85,8 +85,8 @@
           </div>
         </section>
 
-        <!-- Featured / Highlighted Live Match Card (Navigates to Match Details Page) -->
-        <a href="pages/match-details.html?id=MATCH-2026-001" class="featured-match-card" id="featured-match" data-match-id="MATCH-2026-001" aria-label="Featured Match: India vs Australia, Status: Live Toss" style="display: none;">
+        <!-- Featured / Highlighted Live Match Card (Direct Interactive Toss Betting) -->
+        <div class="featured-match-card" id="featured-match" data-match-id="MATCH-2026-001" role="button" tabindex="0" aria-label="Featured Match: India vs Australia, Status: Live Toss" style="display: none; cursor: pointer;">
           <header class="featured-header">
             <span class="featured-tournament">
               🏆 ICC Men's T20 World Cup
@@ -119,8 +119,9 @@
               <span>Locks in 12m &bull; Match 24</span>
             </div>
             <span>Melbourne Cricket Ground</span>
+            <button type="button" class="btn btn-primary btn-xs featured-bet-btn" data-action="bet" aria-label="Bet on Featured Match" style="margin-left: auto; font-weight: 700; border-radius: 9999px; padding: 4px 14px;">BET ON TOSS</button>
           </footer>
-        </a>
+        </div>
 
         <!-- Match Categories / Filter Toolbar -->
         <section aria-labelledby="fixtures-heading">

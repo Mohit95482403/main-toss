@@ -292,8 +292,10 @@
     }
 
     featuredCard.style.display = 'flex';
-    featuredCard.href = `pages/match-details.html?id=${encodeURIComponent(featured.id)}`;
+    featuredCard.removeAttribute('href');
     featuredCard.setAttribute('data-match-id', featured.id);
+    featuredCard.setAttribute('role', 'button');
+    featuredCard.setAttribute('tabindex', '0');
     featuredCard.setAttribute('aria-label', `Featured Match: ${featured.matchTitle}, Status: ${featured.status}`);
 
     const tourneyEl = featuredCard.querySelector('.featured-tournament');
@@ -498,9 +500,10 @@
         const eligibleMatches = (result.matches || []).filter(m => {
           if (m.status === 'completed' || m.status === 'abandoned' || m.settled) return false;
           const rawEnd = m.matchEndTime || m.match_end_time;
-          if (!rawEnd) return false; // missing end time is not treated as future
-          const expiryMs = new Date(rawEnd).getTime();
-          if (isNaN(expiryMs) || expiryMs <= nowMs) return false;
+          if (rawEnd) {
+            const expiryMs = new Date(rawEnd).getTime();
+            if (!isNaN(expiryMs) && expiryMs <= nowMs) return false;
+          }
           return true;
         });
 
@@ -1199,7 +1202,28 @@
       }
     };
 
-    // Delegate "BET ON TOSS" click on match cards
+    // Click & Keyboard handlers on Featured Match Card to directly open bet slip
+    const featuredCardEl = document.getElementById('featured-match');
+    if (featuredCardEl) {
+      featuredCardEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        const matchId = featuredCardEl.getAttribute('data-match-id');
+        if (matchId) {
+          openBetModal(matchId);
+        }
+      });
+      featuredCardEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const matchId = featuredCardEl.getAttribute('data-match-id');
+          if (matchId) {
+            openBetModal(matchId);
+          }
+        }
+      });
+    }
+
+    // Delegate "BET ON TOSS" and card click on match feed cards
     const feedContainer = document.getElementById('match-feed-container');
     if (feedContainer) {
       feedContainer.addEventListener('click', (e) => {
@@ -1207,6 +1231,15 @@
         if (betBtn) {
           e.preventDefault();
           const matchId = betBtn.getAttribute('data-match-id');
+          if (matchId) {
+            openBetModal(matchId);
+          }
+          return;
+        }
+
+        const matchCard = e.target.closest('.match-card[data-match-id]');
+        if (matchCard && !e.target.closest('.btn-disabled')) {
+          const matchId = matchCard.getAttribute('data-match-id');
           if (matchId) {
             openBetModal(matchId);
           }
