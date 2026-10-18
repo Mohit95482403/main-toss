@@ -1716,6 +1716,8 @@ async function handleAdminCreateMatch(req, res, next) {
     const teamTwoRate = parseFloat(req.body.team_two_rate || req.body.teamTwoRate || 1.90);
 
     const scheduledTime = (req.body.scheduled_time || req.body.scheduledTime || '').trim() || 'Schedule TBA';
+    const rawStartTime = req.body.match_start_time || req.body.matchStartTime || req.body.start_time || req.body.startTime;
+    const matchStartTime = rawStartTime ? parseExpiryDateTime(rawStartTime) : null;
     const rawEndTime = req.body.match_end_time || req.body.matchEndTime || req.body.end_time || req.body.endTime;
     const matchEndTime = parseExpiryDateTime(rawEndTime);
 
@@ -1792,8 +1794,8 @@ async function handleAdminCreateMatch(req, res, next) {
         id, competition, stage, match_title,
         team_one, team_one_abbr, team_one_rate, team_one_logo,
         team_two, team_two_abbr, team_two_rate, team_two_logo,
-        scheduled_time, match_end_time, venue, status, toss_winner, settled, settled_at, settled_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
+        scheduled_time, match_start_time, match_end_time, venue, status, toss_winner, settled, settled_at, settled_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
       [
         matchId,
         competition,
@@ -1808,6 +1810,7 @@ async function handleAdminCreateMatch(req, res, next) {
         teamTwoRate,
         teamTwoLogo,
         scheduledTime,
+        matchStartTime,
         matchEndTime,
         venue,
         status

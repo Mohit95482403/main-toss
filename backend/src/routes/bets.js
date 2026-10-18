@@ -128,17 +128,19 @@ router.get('/my-bets', async (req, res, next) => {
       else if (r.selection === r.team_two) selectedTeamLogo = r.team_two_logo;
 
       // Evaluation of cancellation eligibility:
-      // A pending bet is cancellable only before the match starts:
+      // A pending bet is cancellable before the match ends / is settled:
       // 1. Bet must be pending/live and unsettled
-      // 2. Match must be 'upcoming' and unsettled
-      // 3. Match start time (if set) and match end time must be in the future
+      // 2. Match must not be settled (match_settled == 0)
+      // 3. Match status must not be completed, abandoned, or closed
+      // 4. Match start time (if set) must not have passed
+      // 5. Match end time (if set) must not have passed
       const isPending = (r.status === 'pending' || r.status === 'live');
       const isUnsettled = (r.settlement_status === 'pending') && !Boolean(r.match_settled);
-      const isUpcoming = (r.match_status === 'upcoming');
+      const isNotClosed = !['completed', 'abandoned', 'closed'].includes(r.match_status);
       const isStartTimeFuture = !r.match_start_time || (new Date(r.match_start_time).getTime() > now);
       const isEndTimeFuture = !r.match_end_time || (new Date(r.match_end_time).getTime() > now);
 
-      const canCancel = Boolean(isPending && isUnsettled && isUpcoming && isStartTimeFuture && isEndTimeFuture);
+      const canCancel = Boolean(isPending && isUnsettled && isNotClosed && isStartTimeFuture && isEndTimeFuture);
 
       return {
         id: r.id,
@@ -575,31 +577,12 @@ async function handleCancelBet(req, res, next) {
     }
 
     // Reject if match has completed or abandoned
-    if (match.status === 'completed' || match.status === 'abandoned') {
+    if (match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
       await connection.rollback();
       return res.status(400).json({
         success: false,
         error: { code: 'MATCH_ENDED', message: `Cannot cancel bet. Match is marked as ${match.status}.` },
         message: `Cannot cancel bet. Match is marked as ${match.status}.`
-      });
-    }
-
-    // Reject if match is already in progress / started (live)
-    if (match.status === 'live') {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MATCH_STARTED', message: 'Cannot cancel bet. The match is already in progress / started.' },
-        message: 'Cannot cancel bet. The match is already in progress / started.'
-      });
-    }
-
-    if (match.status !== 'upcoming') {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MATCH_NOT_CANCELLABLE', message: `Cannot cancel bet. Match status is "${match.status}".` },
-        message: `Cannot cancel bet. Match status is "${match.status}".`
       });
     }
 
