@@ -54,9 +54,8 @@ function hashPayload(payload) {
 function sanitizeKey(rawKey) {
   if (!rawKey) return null;
   const str = String(rawKey).trim();
-  if (str.length === 0 || str.length > 150) return null;
-  // Allow alphanumeric, dashes, colons, underscores
-  if (!/^[a-zA-Z0-9_\-:]+$/.test(str)) return null;
+  // Allow alphanumeric, dashes, colons, underscores, and dots (e.g. UUIDs, timestamps, decimals)
+  if (!/^[a-zA-Z0-9_\-.:]+$/.test(str)) return null;
   return str;
 }
 

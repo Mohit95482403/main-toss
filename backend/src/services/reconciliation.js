@@ -81,16 +81,67 @@ async function reconcileUserWallet(pool, userId) {
   const pendingExposureCalculated = parseFloat(exposureRow.pendingStakeTotal || 0);
   const exposureDifference = Math.round((storedExposure - pendingExposureCalculated) * 100) / 100;
 
+  // 4. Invariant checks across ledger history
+  const [txRows] = await p.query(
+    `SELECT id, transaction_uuid, action_type, amount, balance_before, balance_after, bet_id, match_id
+     FROM coin_transactions
+     WHERE user_id = ?
+     ORDER BY created_at ASC, id ASC`,
+    [userId]
+  );
+
+  let ledgerStepMathConsistent = true;
+  const seenTxnUuids = new Set();
+  let hasDuplicateTxnUuids = false;
+  const betDebitsCount = {};
+  const betRefundsCount = {};
+
+  for (const tx of txRows) {
+    if (seenTxnUuids.has(tx.transaction_uuid)) {
+      hasDuplicateTxnUuids = true;
+    }
+    seenTxnUuids.add(tx.transaction_uuid);
+
+    const isCredit = ['ADMIN_CREDIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'BET_RESETTLEMENT_PAYOUT'].includes(tx.action_type);
+    const amt = parseFloat(tx.amount || 0);
+    const before = parseFloat(tx.balance_before || 0);
+    const after = parseFloat(tx.balance_after || 0);
+    const expectedAfter = Math.round((before + (isCredit ? amt : -amt)) * 100) / 100;
+    if (Math.abs(after - expectedAfter) > 0.01) {
+      ledgerStepMathConsistent = false;
+    }
+
+    if (tx.bet_id) {
+      if (tx.action_type === 'BET_STAKE_DEBIT') {
+        betDebitsCount[tx.bet_id] = (betDebitsCount[tx.bet_id] || 0) + 1;
+      } else if (tx.action_type === 'BET_CANCEL_REFUND') {
+        betRefundsCount[tx.bet_id] = (betRefundsCount[tx.bet_id] || 0) + 1;
+      }
+    }
+  }
+
+  const hasDuplicateBetDebits = Object.values(betDebitsCount).some(c => c > 1);
+  const hasDuplicateRefunds = Object.values(betRefundsCount).some(c => c > 1);
+
   // Check consistency (tolerating sub-cent roundoff < 0.005)
   const isBalanceConsistent = Math.abs(balanceDifference) < 0.01;
   const isExposureConsistent = Math.abs(exposureDifference) < 0.01;
-  const isConsistent = isBalanceConsistent && isExposureConsistent;
+  const invariantsPassed = ledgerStepMathConsistent && !hasDuplicateTxnUuids && !hasDuplicateBetDebits && !hasDuplicateRefunds;
+  const isConsistent = isBalanceConsistent && isExposureConsistent && invariantsPassed;
 
   let explanation = 'Wallet balances and ledger records match authoritative financial state.';
   if (!isBalanceConsistent) {
     explanation = `Available balance discrepancy detected: Stored balance (${storedBalance.toFixed(2)}) differs from net ledger sum (${ledgerCalculatedBalance.toFixed(2)}) by ${balanceDifference > 0 ? '+' : ''}${balanceDifference.toFixed(2)}.`;
   } else if (!isExposureConsistent) {
     explanation = `Exposure balance discrepancy detected: Stored exposure (${storedExposure.toFixed(2)}) differs from active pending tickets (${pendingExposureCalculated.toFixed(2)}) by ${exposureDifference > 0 ? '+' : ''}${exposureDifference.toFixed(2)}.`;
+  } else if (!ledgerStepMathConsistent) {
+    explanation = 'Transaction ledger step math invariant failed: one or more transactions have balance_after != balance_before + signed(amount).';
+  } else if (hasDuplicateTxnUuids) {
+    explanation = 'Duplicate transaction UUID detected in coin_transactions.';
+  } else if (hasDuplicateBetDebits) {
+    explanation = 'Duplicate bet stake debit detected for one or more bet tickets.';
+  } else if (hasDuplicateRefunds) {
+    explanation = 'Duplicate cancellation refund detected for one or more bet tickets.';
   }
 
   return {
@@ -118,6 +169,15 @@ async function reconcileUserWallet(pool, userId) {
     exposure: {
       pendingBetsCount: parseInt(exposureRow.pendingBetsCount || 0, 10),
       calculatedExposure: pendingExposureCalculated
+    },
+    invariants: {
+      balanceAgreesWithLedger: isBalanceConsistent,
+      exposureAgreesWithPendingBets: isExposureConsistent,
+      ledgerStepMathConsistent,
+      noDuplicateTxnReferences: !hasDuplicateTxnUuids,
+      noDuplicateBetDebits: !hasDuplicateBetDebits,
+      noDuplicateRefunds: !hasDuplicateRefunds,
+      allInvariantsSatisfied: invariantsPassed
     },
     discrepancy: {
       hasDiscrepancy: !isConsistent,

@@ -12,6 +12,7 @@ const { createUserAccount } = require('../services/userService');
 const { uploadTeamLogos, deleteUploadedFile } = require('../middleware/uploadLogo');
 const { reserveIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey, executeWithRetry } = require('../utils/idempotency');
 const { reconcileUserWallet, reconcileAllWallets } = require('../services/reconciliation');
+const walletService = require('../services/walletService');
 
 const router = express.Router();
 
@@ -2361,7 +2362,7 @@ router.post('/settlement/process', async (req, res, next) => {
     const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
     const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome;
     const notes = req.body.notes;
-    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+    const rawIdempotencyKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
 
     if (!rawMatchId) {
       return res.status(400).json({
@@ -2503,54 +2504,30 @@ router.post('/settlement/process', async (req, res, next) => {
             [resultStatus, payoutAmount, req.user.id, b.id]
           );
 
-          // Fetch wallet balance before
-          const [[wRow]] = await connection.query(
-            'SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE',
-            [b.user_id]
-          );
-          const balBefore = parseFloat((wRow && wRow.available_balance) || 0);
-          const balAfter = parseFloat((balBefore + payoutAmount).toFixed(2));
-
-          // Update player wallet: release exposure and credit payout if won/refunded
-          await connection.query(
-            `UPDATE wallets 
-             SET available_balance = available_balance + ?,
-                 exposure_balance = GREATEST(0.00, exposure_balance - ?),
-                 version = version + 1
-             WHERE user_id = ?`,
-            [payoutAmount, stakeNum, b.user_id]
-          );
-
           if (payoutAmount > 0) {
-            const payoutTxUuid = crypto.randomUUID();
             const actionType = cleanOutcome === 'NO_RESULT' ? 'BET_CANCEL_REFUND' : 'BET_WON_PAYOUT';
             const reasonText = cleanOutcome === 'NO_RESULT'
               ? `Stake Refund (No Result): Bet ${b.id} on ${match.match_title}`
               : `Win Payout: Bet ${b.id} on ${match.match_title} (${b.selection} @ ₹${payoutAmount.toFixed(2)})`;
 
-            await connection.query(
-              `INSERT INTO coin_transactions (
-                transaction_uuid, user_id, username, admin_id, admin_username,
-                action_type, amount, balance_before, balance_after,
-                reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
-              [
-                payoutTxUuid,
-                b.user_id,
-                b.username,
-                req.user.id,
-                req.user.username,
-                actionType,
-                payoutAmount,
-                balBefore,
-                balAfter,
-                reasonText,
-                `PAYOUT-${b.id}-v1`,
-                b.id,
-                match.id,
-                settlementUuid
-              ]
-            );
+            await walletService.creditWinningPayout({
+              userId: b.user_id,
+              username: b.username,
+              matchId: match.id,
+              betId: b.id,
+              settlementUuid,
+              payout: payoutAmount,
+              stake: stakeNum,
+              idempotencyKey: `PAYOUT-${b.id}-v1`,
+              reason: reasonText,
+              connection
+            });
+          } else {
+            await walletService.clearExposureOnly({
+              userId: b.user_id,
+              stake: stakeNum,
+              connection
+            });
           }
         }
 
@@ -2946,7 +2923,7 @@ async function handleReverseSettlement(req, res, next) {
   try {
     const rawMatchId = req.params.matchId || req.body.matchId || req.body.match_id;
     const reason = (req.body.reason || '').trim();
-    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+    const rawIdempotencyKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
     const idempotencyKey = (rawIdempotencyKey || `REV-${Date.now()}`).trim();
     const expectedSettlementVersion = req.body.expectedSettlementVersion !== undefined 
       ? parseInt(req.body.expectedSettlementVersion, 10) 
@@ -3143,42 +3120,19 @@ async function handleReverseSettlement(req, res, next) {
       const balAfter = parseFloat((balBefore - payoutNum).toFixed(2));
       userWallet.availableBalance = balAfter;
 
-      // Deduct from wallet
-      await connection.query(
-        `UPDATE wallets 
-         SET available_balance = available_balance - ?,
-             version = version + 1,
-             updated_at = NOW()
-         WHERE user_id = ?`,
-        [payoutNum, b.user_id]
-      );
-
-      // Record compensating debit transaction in coin_transactions
-      const txnUuid = crypto.randomUUID();
       const itemKey = `REV-${currentSettlement.settlement_uuid}-${b.id}`;
 
-      await connection.query(
-        `INSERT INTO coin_transactions (
-          transaction_uuid, user_id, username, admin_id, admin_username,
-          action_type, amount, balance_before, balance_after,
-          reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
-        ) VALUES (?, ?, ?, ?, ?, 'SETTLEMENT_REVERSAL_DEBIT', ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
-        [
-          txnUuid,
-          b.user_id,
-          b.username,
-          req.user.id,
-          req.user.username,
-          payoutNum,
-          balBefore,
-          balAfter,
-          `Settlement Reversal Debit: Bet ${b.id} on ${match.match_title} (Reason: ${reason})`,
-          itemKey,
-          b.id,
-          match.id,
-          currentSettlement.settlement_uuid
-        ]
-      );
+      await walletService.reverseSettlementDebit({
+        userId: b.user_id,
+        username: b.username,
+        matchId: match.id,
+        betId: b.id,
+        settlementUuid: currentSettlement.settlement_uuid,
+        reversalAmount: payoutNum,
+        idempotencyKey: itemKey,
+        reason: `Settlement Reversal Debit: Bet ${b.id} on ${match.match_title} (Reason: ${reason})`,
+        connection
+      });
     }
 
     // 6. Transition bet records: mark settlement_status = 'reversed', status = 'pending', payout = 0
@@ -3310,7 +3264,7 @@ async function handleResettleMatch(req, res, next) {
     const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome || req.body.correctedOutcome;
     const reason = (req.body.reason || '').trim();
     const notes = req.body.notes;
-    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+    const rawIdempotencyKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
 
     if (!rawMatchId) {
       return res.status(400).json({
@@ -3896,47 +3850,22 @@ async function handleCorrectAndResettle(req, res, next) {
       );
 
       if (payoutAmount > 0) {
-        const [[wRow]] = await connection.query(
-          `SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE`,
-          [b.user_id]
-        );
-        const balBefore = parseFloat((wRow && wRow.available_balance) || 0);
-        const balAfter = parseFloat((balBefore + payoutAmount).toFixed(2));
-
-        await connection.query(
-          `UPDATE wallets SET available_balance = available_balance + ?, version = version + 1, updated_at = NOW() WHERE user_id = ?`,
-          [payoutAmount, b.user_id]
-        );
-
-        const txnUuid = crypto.randomUUID();
         const actionType = cleanOutcome === 'NO_RESULT' ? 'BET_CANCEL_REFUND' : 'BET_RESETTLEMENT_PAYOUT';
         const reasonText = cleanOutcome === 'NO_RESULT'
           ? `Stake Refund (No Result Resettlement): Bet ${b.id} on ${match.match_title}`
           : `Resettlement Win Payout: Bet ${b.id} on ${match.match_title} (${cleanOutcome} @ ₹${payoutAmount.toFixed(2)})`;
 
-        await connection.query(
-          `INSERT INTO coin_transactions (
-            transaction_uuid, user_id, username, admin_id, admin_username,
-            action_type, amount, balance_before, balance_after,
-            reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
-          [
-            txnUuid,
-            b.user_id,
-            b.username,
-            req.user.id,
-            req.user.username,
-            actionType,
-            payoutAmount,
-            balBefore,
-            balAfter,
-            reasonText,
-            `RESETTL-${newSettlementUuid}-${b.id}`,
-            b.id,
-            match.id,
-            newSettlementUuid
-          ]
-        );
+        await walletService.creditResettlementPayout({
+          userId: b.user_id,
+          username: b.username,
+          matchId: match.id,
+          betId: b.id,
+          settlementUuid: newSettlementUuid,
+          payout: payoutAmount,
+          idempotencyKey: `RESETTL-${newSettlementUuid}-${b.id}`,
+          reason: reasonText,
+          connection
+        });
       }
     }
 
@@ -4484,7 +4413,7 @@ router.post('/coins/adjust', async (req, res, next) => {
       });
     }
 
-    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+    const rawIdempotencyKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
     const cleanIdempotencyKey = rawIdempotencyKey ? String(rawIdempotencyKey).trim() : null;
     let idemp = null;
 
@@ -4558,57 +4487,21 @@ router.post('/coins/adjust', async (req, res, next) => {
     const currentBalance = parseFloat(player.available_balance || 0);
     let newBalance;
 
-    if (actionType === 'ADMIN_DEBIT') {
-      if (currentBalance < cleanAmount) {
-        await connection.rollback();
-        connection.release();
-        connection = null;
-        if (idemp && idemp.isNew && !idemp.skipped) {
-          await releaseIdempotencyKey(pool, idemp.cleanKey);
-        }
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'INSUFFICIENT_FUNDS',
-            message: `Insufficient balance: Player ${player.username} has ${currentBalance.toFixed(2)} coins available, cannot deduct ${cleanAmount.toFixed(2)} coins.`
-          }
-        });
-      }
-      newBalance = Math.round((currentBalance - cleanAmount) * 100) / 100;
-    } else {
-      newBalance = Math.round((currentBalance + cleanAmount) * 100) / 100;
-    }
+    // Apply balance change and ledger record via centralized walletService
+    const adjResult = await walletService.applyAdminAdjustment({
+      adminId: req.user.id,
+      adminUsername: req.user.username,
+      userId: parsedUserId,
+      username: player.username,
+      actionType,
+      amount: cleanAmount,
+      reason: cleanReason,
+      idempotencyKey: cleanIdempotencyKey,
+      connection
+    });
 
-    // Update wallet available_balance
-    await connection.query(
-      `UPDATE wallets 
-       SET available_balance = ?, version = version + 1
-       WHERE user_id = ?`,
-      [newBalance, parsedUserId]
-    );
-
-    // Record adjustment in coin_transactions
-    const crypto = require('crypto');
-    const transactionUuid = crypto.randomUUID();
-
-    await connection.query(
-      `INSERT INTO coin_transactions 
-       (transaction_uuid, user_id, username, admin_id, admin_username, action_type, amount, balance_before, balance_after, reason, idempotency_key, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')`,
-      [
-        transactionUuid,
-        parsedUserId,
-        player.username,
-        req.user.id,
-        req.user.username,
-        actionType,
-        cleanAmount,
-        currentBalance,
-        newBalance,
-        cleanReason,
-        cleanIdempotencyKey
-      ]
-    );
+    newBalance = adjResult.balanceAfter;
+    const transactionUuid = adjResult.transactionUuid;
 
     // Commit database changes
     await connection.commit();
@@ -4680,7 +4573,7 @@ router.post('/coins/adjust', async (req, res, next) => {
  * GET /api/admin/coins/history
  * Paginated list of coin adjustments with filtering support
  */
-router.get('/coins/history', async (req, res, next) => {
+async function handleAdminTransactionHistory(req, res, next) {
   try {
     const pool = getPool();
     const page = Math.max(1, parseInt(req.query.page || 1, 10));
@@ -4693,6 +4586,11 @@ router.get('/coins/history', async (req, res, next) => {
     const startDate = (req.query.startDate || '').trim();
     const endDate = (req.query.endDate || '').trim();
 
+    const search = (req.query.search || '').trim();
+    const statusFilter = (req.query.status || '').trim().toLowerCase();
+    const betIdFilter = (req.query.betId || '').trim();
+    const matchIdFilter = (req.query.matchId || '').trim();
+
     let whereConditions = ['1=1'];
     const queryParams = [];
 
@@ -4704,9 +4602,30 @@ router.get('/coins/history', async (req, res, next) => {
       queryParams.push(`%${usernameFilter}%`);
     }
 
-    if (actionFilter && ['ADMIN_CREDIT', 'ADMIN_DEBIT'].includes(actionFilter)) {
+    if (actionFilter) {
       whereConditions.push('ct.action_type = ?');
       queryParams.push(actionFilter);
+    }
+
+    if (statusFilter) {
+      whereConditions.push('ct.status = ?');
+      queryParams.push(statusFilter);
+    }
+
+    if (betIdFilter) {
+      whereConditions.push('ct.bet_id = ?');
+      queryParams.push(betIdFilter);
+    }
+
+    if (matchIdFilter) {
+      whereConditions.push('ct.match_id = ?');
+      queryParams.push(matchIdFilter);
+    }
+
+    if (search.length > 0) {
+      whereConditions.push('(ct.transaction_uuid LIKE ? OR ct.username LIKE ? OR ct.reason LIKE ? OR ct.bet_id LIKE ? OR ct.match_id LIKE ?)');
+      const pattern = `%${search}%`;
+      queryParams.push(pattern, pattern, pattern, pattern, pattern);
     }
 
     if (startDate) {
@@ -4741,8 +4660,14 @@ router.get('/coins/history', async (req, res, next) => {
         ct.balance_before,
         ct.balance_after,
         ct.reason,
+        ct.metadata,
+        ct.bet_id,
+        ct.match_id,
+        ct.settlement_uuid,
+        ct.related_transaction_id,
         ct.status,
-        ct.created_at
+        ct.created_at,
+        ct.updated_at
        FROM coin_transactions ct
        WHERE ${whereClause}
        ORDER BY ct.created_at DESC, ct.id DESC
@@ -4752,6 +4677,7 @@ router.get('/coins/history', async (req, res, next) => {
 
     const formattedHistory = rows.map(r => ({
       id: r.id,
+      transactionId: r.transaction_uuid,
       transactionUuid: r.transaction_uuid,
       transaction_uuid: r.transaction_uuid,
       userId: r.user_id,
@@ -4769,9 +4695,15 @@ router.get('/coins/history', async (req, res, next) => {
       balanceAfter: parseFloat(r.balance_after || 0),
       balance_after: parseFloat(r.balance_after || 0),
       reason: r.reason,
+      betId: r.bet_id,
+      matchId: r.match_id,
+      settlementUuid: r.settlement_uuid,
+      relatedTransactionId: r.related_transaction_id,
       status: r.status,
       createdAt: r.created_at,
-      created_at: r.created_at
+      created_at: r.created_at,
+      updatedAt: r.updated_at,
+      updated_at: r.updated_at
     }));
 
     return res.status(200).json({
@@ -4789,7 +4721,10 @@ router.get('/coins/history', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}
+
+router.get('/coins/history', handleAdminTransactionHistory);
+router.get('/transactions', handleAdminTransactionHistory);
 
 // =============================================================================
 // 14. FINANCIAL INTEGRITY: WALLET & LEDGER RECONCILIATION

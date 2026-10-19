@@ -10,8 +10,10 @@ const {
   reserveIdempotencyKey,
   completeIdempotencyKey,
   releaseIdempotencyKey,
-  executeWithRetry
+  executeWithRetry,
+  sanitizeKey
 } = require('../utils/idempotency');
+const walletService = require('../services/walletService');
 
 const router = express.Router();
 
@@ -275,7 +277,7 @@ async function handlePlaceBet(req, res, next) {
   }
 
   const stake = parseFloat(stakeNum.toFixed(2));
-  const cleanIdempotencyKey = rawIdempotencyKey ? String(rawIdempotencyKey).trim() : null;
+  const cleanIdempotencyKey = sanitizeKey(rawIdempotencyKey);
 
   try {
     const result = await executeWithRetry(async () => {
@@ -429,64 +431,23 @@ async function handlePlaceBet(req, res, next) {
           [betId, userId, match.id, selection, stake, rate, potentialReturn, cleanIdempotencyKey]
         );
 
-        // Deduct stake atomically with conditional balance check
-        const [walletUpdateRes] = await connection.query(
-          `UPDATE wallets
-           SET available_balance = available_balance - ?,
-               exposure_balance = exposure_balance + ?,
-               version = version + 1,
-               updated_at = NOW()
-           WHERE user_id = ? AND available_balance >= ?`,
-          [stake, stake, userId, stake]
-        );
+        // Deduct stake and record ledger entry atomically via centralized walletService
+        const debitResult = await walletService.placeBetDebit({
+          userId,
+          username: req.user.username,
+          matchId: match.id,
+          betId,
+          stake,
+          idempotencyKey: cleanIdempotencyKey ? `STAKE-${cleanIdempotencyKey}` : `STAKE-${betId}`,
+          reason: `Bet Placed: ${betId} on ${match.match_title} (${selection} @ ₹${stake.toFixed(2)})`,
+          connection
+        });
 
-        if (walletUpdateRes.affectedRows !== 1) {
-          await connection.rollback();
-          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
-          return {
-            httpStatus: 400,
-            body: {
-              success: false,
-              error: {
-                code: 'INSUFFICIENT_BALANCE',
-                message: `Insufficient available balance. Required: ₹${stake.toFixed(2)}, Available: ₹${availableBalance.toFixed(2)}.`
-              }
-            }
-          };
-        }
-
-        // Record in coin_transactions: BET_STAKE_DEBIT
-        const crypto = require('crypto');
-        const stakeTxUuid = crypto.randomUUID();
-        const stakeTxnKey = cleanIdempotencyKey ? `STAKE-${cleanIdempotencyKey}` : `STAKE-${betId}`;
-        const balBefore = availableBalance;
-        const balAfter = parseFloat((availableBalance - stake).toFixed(2));
-
-        await connection.query(
-          `INSERT INTO coin_transactions (
-            transaction_uuid, user_id, username, admin_id, admin_username,
-            action_type, amount, balance_before, balance_after,
-            reason, bet_id, match_id, idempotency_key, status, created_at
-          ) VALUES (?, ?, ?, NULL, NULL, 'BET_STAKE_DEBIT', ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
-          [
-            stakeTxUuid,
-            userId,
-            req.user.username,
-            stake,
-            balBefore,
-            balAfter,
-            `Bet Placed: ${betId} on ${match.match_title} (${selection} @ ₹${stake.toFixed(2)})`,
-            betId,
-            match.id,
-            stakeTxnKey
-          ]
-        );
-
-        const [updatedWalletRows] = await connection.query(
-          'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
-          [userId]
-        );
-        const newWallet = updatedWalletRows[0];
+        const newWallet = {
+          available_balance: debitResult.availableBalance,
+          exposure_balance: debitResult.exposureBalance,
+          currency: wallet.currency || 'INR'
+        };
 
         const responsePayload = {
           success: true,
@@ -566,7 +527,7 @@ async function handleCancelBet(req, res, next) {
   }
 
   const clientKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
-  const cancelIdempotencyKey = clientKey ? String(clientKey).trim() : null;
+  const cancelIdempotencyKey = sanitizeKey(clientKey);
 
   try {
     const result = await executeWithRetry(async () => {
@@ -777,47 +738,23 @@ async function handleCancelBet(req, res, next) {
           };
         }
 
-        // 7. Atomically refund stake to available balance and release exposure
-        await connection.query(
-          `UPDATE wallets
-           SET available_balance = available_balance + ?,
-               exposure_balance = GREATEST(0.00, exposure_balance - ?),
-               version = version + 1,
-               updated_at = NOW()
-           WHERE user_id = ?`,
-          [refundStake, refundStake, userId]
-        );
+        // 7. Atomically refund stake and record ledger entry via centralized walletService
+        const refundResult = await walletService.refundCancelledBet({
+          userId,
+          username: req.user.username,
+          matchId: match.id,
+          betId: bet.id,
+          stake: refundStake,
+          idempotencyKey: cancelIdempotencyKey,
+          reason: `Bet Cancellation Refund: ${bet.id} (${bet.selection} - ₹${refundStake.toFixed(2)})`,
+          connection
+        });
 
-        // 8. Record audit ledger entry in coin_transactions
-        const crypto = require('crypto');
-        const txnUuid = crypto.randomUUID();
-
-        await connection.query(
-          `INSERT INTO coin_transactions (
-            transaction_uuid, user_id, username, admin_id, admin_username,
-            action_type, amount, balance_before, balance_after,
-            reason, bet_id, match_id, idempotency_key, status, created_at
-          ) VALUES (?, ?, ?, NULL, NULL, 'BET_CANCEL_REFUND', ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
-          [
-            txnUuid,
-            userId,
-            req.user.username,
-            refundStake,
-            balanceBefore,
-            balanceAfter,
-            `Bet Cancellation Refund: ${bet.id} (${bet.selection} - ₹${refundStake.toFixed(2)})`,
-            bet.id,
-            match.id,
-            cancelIdempotencyKey
-          ]
-        );
-
-        // 9. Fetch authoritative updated wallet balance
-        const [updatedWalletRows] = await connection.query(
-          'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
-          [userId]
-        );
-        const newWallet = updatedWalletRows[0];
+        const newWallet = {
+          available_balance: refundResult.availableBalance,
+          exposure_balance: refundResult.exposureBalance,
+          currency: wallet.currency || 'INR'
+        };
 
         const responsePayload = {
           success: true,
