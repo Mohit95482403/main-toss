@@ -658,6 +658,9 @@
     // Setup Bet On Toss Modal Popup
     setupBetModal();
 
+    // Setup Active Toss Bets Feed & Cancellation System
+    setupActiveBetsSystem();
+
     // Initial load
     loadMatchesData(false);
   }
@@ -745,6 +748,399 @@
     if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function' && window.ApiClient.isAuthenticated()) {
       window.ApiClient.refreshBalance().then(syncDisplayBalances).catch(() => {});
     }
+  }
+
+  /**
+   * Helper: Format team logo URL
+   */
+  function formatLogoUrl(url) {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    if (url.startsWith('/uploads')) {
+      if (typeof window !== 'undefined' && window.location.port !== '5000' && window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) {
+        try {
+          const origin = new URL(window.APP_CONFIG.apiBaseUrl).origin;
+          return `${origin}${url}`;
+        } catch (e) {}
+      }
+    }
+    return url;
+  }
+
+  /**
+   * Setup Active Toss Bets Feed & Cancellation System
+   * Renders the user's active wagers directly on the Home page conforming strictly to the reference screenshot.
+   */
+  let loadActiveBets = null;
+
+  function setupActiveBetsSystem() {
+    const sectionEl = document.getElementById('home-active-bets-section');
+    const containerEl = document.getElementById('home-active-bets-container');
+    const countBadge = document.getElementById('active-bets-count-badge');
+
+    // Cancel modal elements
+    const cancelModal = document.getElementById('cancel-bet-modal');
+    const cancelCloseX = document.getElementById('cancel-modal-close-x');
+    const cancelKeepBtn = document.getElementById('cancel-modal-keep-btn');
+    const cancelConfirmBtn = document.getElementById('cancel-modal-confirm-btn');
+    const cancelSelectionEl = document.getElementById('cancel-modal-selection');
+    const cancelStakeEl = document.getElementById('cancel-modal-stake');
+    const cancelErrorEl = document.getElementById('cancel-modal-error');
+    const cancelSpinner = document.getElementById('cancel-modal-spinner');
+
+    if (!sectionEl || !containerEl) return;
+
+    let pendingCancelBet = null;
+    let isCancelling = false;
+    let activeBetsState = [];
+
+    function formatCurrency(val) {
+      const num = Number(val) || 0;
+      return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatEndTimeDisplay(dateInput, scheduledTime) {
+      if (!dateInput && scheduledTime) return scheduledTime;
+      if (!dateInput) return 'TBA';
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return scheduledTime || 'TBA';
+
+      const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const now = new Date();
+      const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      if (isToday) return timeStr;
+
+      const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+      return `${dateStr}, ${timeStr}`;
+    }
+
+    function renderTeamLogoOrCrest(name, logoUrl) {
+      const formatted = logoUrl ? formatLogoUrl(logoUrl) : null;
+      if (formatted) {
+        return `<img src="${escapeHtml(formatted)}" alt="${escapeHtml(name)}" onerror="this.onerror=null; this.parentElement.innerHTML='${escapeHtml((name || 'T').substring(0, 3).toUpperCase())}';">`;
+      }
+      const abbr = (name || 'TM').substring(0, 3).toUpperCase();
+      return `<span>${escapeHtml(abbr)}</span>`;
+    }
+
+    function closeCancelModal() {
+      if (isCancelling) return;
+      if (cancelModal) {
+        cancelModal.style.display = 'none';
+        cancelModal.setAttribute('aria-hidden', 'true');
+      }
+      document.body.classList.remove('no-scroll');
+      if (cancelErrorEl) {
+        cancelErrorEl.style.display = 'none';
+        cancelErrorEl.textContent = '';
+      }
+      pendingCancelBet = null;
+    }
+
+    function openCancelModal(bet) {
+      if (!bet || !cancelModal) return;
+      pendingCancelBet = bet;
+
+      if (cancelSelectionEl) cancelSelectionEl.textContent = bet.selectedTeam || bet.selection || 'Your Selection';
+      if (cancelStakeEl) cancelStakeEl.textContent = `₹${formatCurrency(bet.stake)}`;
+      if (cancelErrorEl) {
+        cancelErrorEl.style.display = 'none';
+        cancelErrorEl.textContent = '';
+      }
+
+      if (cancelConfirmBtn) {
+        cancelConfirmBtn.disabled = false;
+        const btnText = cancelConfirmBtn.querySelector('.btn-text');
+        if (btnText) btnText.textContent = 'CONFIRM CANCELLATION';
+        if (cancelSpinner) cancelSpinner.style.display = 'none';
+      }
+      if (cancelKeepBtn) cancelKeepBtn.disabled = false;
+
+      cancelModal.style.display = 'flex';
+      cancelModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+    }
+
+    async function executeBetCancellation() {
+      if (!pendingCancelBet || isCancelling) return;
+      isCancelling = true;
+
+      if (cancelErrorEl) {
+        cancelErrorEl.style.display = 'none';
+        cancelErrorEl.textContent = '';
+      }
+
+      if (cancelConfirmBtn) {
+        cancelConfirmBtn.disabled = true;
+        const btnText = cancelConfirmBtn.querySelector('.btn-text');
+        if (btnText) btnText.textContent = 'Cancelling...';
+        if (cancelSpinner) cancelSpinner.style.display = 'inline-block';
+      }
+      if (cancelKeepBtn) cancelKeepBtn.disabled = true;
+
+      const betId = pendingCancelBet.id;
+      const stakeAmount = pendingCancelBet.stake;
+
+      try {
+        const idempotencyKey = 'CANCEL-HOME-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+        const res = await window.ApiClient.post(`/bets/${encodeURIComponent(betId)}/cancel`, { idempotencyKey });
+
+        isCancelling = false;
+        closeCancelModal();
+
+        const refundMsg = (res && res.message) 
+          ? res.message 
+          : `Bet cancelled successfully. ₹${formatCurrency(stakeAmount)} refunded to your balance.`;
+
+        if (window.SharedLayout && typeof window.SharedLayout.showToast === 'function') {
+          window.SharedLayout.showToast(refundMsg, 'success');
+        } else if (window.showAppToast) {
+          window.showAppToast(refundMsg, 'success');
+        } else {
+          alert(refundMsg);
+        }
+
+        // Authoritatively sync wallet balance everywhere
+        if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function') {
+          await window.ApiClient.refreshBalance().catch(() => {});
+        }
+
+        // Re-render active bets immediately
+        await loadActiveBets();
+
+      } catch (err) {
+        isCancelling = false;
+        if (cancelConfirmBtn) {
+          cancelConfirmBtn.disabled = false;
+          const btnText = cancelConfirmBtn.querySelector('.btn-text');
+          if (btnText) btnText.textContent = 'CONFIRM CANCELLATION';
+          if (cancelSpinner) cancelSpinner.style.display = 'none';
+        }
+        if (cancelKeepBtn) cancelKeepBtn.disabled = false;
+
+        const errObj = (err && (err.error || err)) || {};
+        const errMsg = errObj.message || err.message || 'Unable to cancel this bet. The match may have already started or ended.';
+        
+        if (cancelErrorEl) {
+          cancelErrorEl.textContent = errMsg;
+          cancelErrorEl.style.display = 'block';
+        }
+      }
+    }
+
+    // Modal event bindings
+    if (cancelCloseX) cancelCloseX.addEventListener('click', closeCancelModal);
+    if (cancelKeepBtn) cancelKeepBtn.addEventListener('click', closeCancelModal);
+    if (cancelConfirmBtn) cancelConfirmBtn.addEventListener('click', executeBetCancellation);
+    if (cancelModal) {
+      cancelModal.addEventListener('click', (e) => {
+        if (e.target === cancelModal) closeCancelModal();
+      });
+    }
+
+    // Render an individual active bet card conforming to reference screenshot
+    function renderActiveBetCard(bet) {
+      const isTeamOneChoice = (bet.selectedTeam === bet.teamOne);
+      const isTeamTwoChoice = (bet.selectedTeam === bet.teamTwo);
+
+      const rawRate = Number(bet.rate || bet.odds || 1.90);
+      const displayRate = rawRate.toFixed(2);
+
+      const endTimeText = formatEndTimeDisplay(bet.matchEndTime, bet.scheduledTime);
+
+      return `
+        <article class="active-bet-card" data-bet-id="${escapeHtml(bet.id)}" data-match-id="${escapeHtml(bet.matchId)}" aria-label="Active Bet: ${escapeHtml(bet.selectedTeam)} in ${escapeHtml(bet.matchTitle)}">
+          <!-- Section A: Match Information Header -->
+          <header class="active-bet-header">
+            <div class="active-bet-header-meta">
+              <div class="active-bet-competition-badge-row">
+                <span class="active-bet-sport-pill">
+                  🏏 ${escapeHtml(bet.sport || 'CRICKET')}
+                </span>
+                <span class="match-status-badge status-${bet.matchStatus === 'live' ? 'live' : 'upcoming'}">
+                  ${bet.matchStatus === 'live' ? '<span class="live-pulse-dot" aria-hidden="true"></span> Live Toss' : 'Upcoming'}
+                </span>
+              </div>
+              <h3 class="active-bet-match-title" title="${escapeHtml(bet.competition || bet.matchTitle)}">
+                ${escapeHtml(bet.competition || bet.matchTitle)}
+              </h3>
+            </div>
+            <div class="active-bet-header-badges">
+              ${bet.scheduledTime ? `
+                <span class="active-bet-countdown-pill" title="Scheduled Match Time">
+                  ${ICONS.clock}
+                  <span>${escapeHtml(bet.scheduledTime)}</span>
+                </span>
+              ` : ''}
+            </div>
+          </header>
+
+          <!-- Section B: Competing Teams Panels -->
+          <div class="active-bet-teams-row">
+            <div class="active-bet-team-panel ${isTeamOneChoice ? 'is-user-choice' : ''}">
+              <div class="active-bet-team-crest">
+                ${renderTeamLogoOrCrest(bet.teamOne, bet.teamOneLogo)}
+              </div>
+              <div class="active-bet-team-info">
+                <span class="active-bet-team-name">${escapeHtml(bet.teamOne)}</span>
+                <span class="active-bet-team-rate">Rate ${bet.teamOneRate ? bet.teamOneRate.toFixed(2) : '1.90'}</span>
+              </div>
+            </div>
+
+            <div class="active-bet-vs-badge" aria-hidden="true">VS</div>
+
+            <div class="active-bet-team-panel ${isTeamTwoChoice ? 'is-user-choice' : ''}">
+              <div class="active-bet-team-crest">
+                ${renderTeamLogoOrCrest(bet.teamTwo, bet.teamTwoLogo)}
+              </div>
+              <div class="active-bet-team-info">
+                <span class="active-bet-team-name">${escapeHtml(bet.teamTwo)}</span>
+                <span class="active-bet-team-rate">Rate ${bet.teamTwoRate ? bet.teamTwoRate.toFixed(2) : '1.90'}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section C: User's Actual Selection & Stake Banner -->
+          <div class="active-bet-selection-banner">
+            <strong>
+              YOUR BET: <span style="text-decoration: underline;">${escapeHtml(bet.selectedTeam)}</span> (<span class="stake-val">₹${formatCurrency(bet.stake)}</span>)
+            </strong>
+          </div>
+
+          <!-- Section D: Timing and Toss Rate Panels -->
+          <div class="active-bet-info-grid">
+            <div class="active-bet-info-box">
+              <span class="active-bet-info-label">ENDTIME</span>
+              <span class="active-bet-info-val">${escapeHtml(endTimeText)}</span>
+            </div>
+            <div class="active-bet-info-box">
+              <span class="active-bet-info-label">TOSS RATE</span>
+              <span class="active-bet-info-val">${escapeHtml(displayRate)}</span>
+            </div>
+          </div>
+
+          <!-- Section E: Action Buttons -->
+          <div class="active-bet-actions-row">
+            <button type="button" class="btn-active-bet-more" data-action="bet-more" data-match-id="${escapeHtml(bet.matchId)}" aria-label="Bet more on ${escapeHtml(bet.matchTitle)}">
+              BET MORE
+            </button>
+            <button type="button" class="btn-active-bet-cancel" data-action="cancel-bet" data-bet-id="${escapeHtml(bet.id)}" ${bet.canCancel ? '' : 'disabled title="Bet cancellation cutoff has passed or match has started"'} aria-label="Cancel bet on ${escapeHtml(bet.selectedTeam)}">
+              ${bet.canCancel ? 'CANCEL BET' : 'CANCEL CLOSED'}
+            </button>
+          </div>
+        </article>
+      `;
+    }
+
+    loadActiveBets = async function () {
+      if (!window.ApiClient || !window.ApiClient.isAuthenticated()) {
+        sectionEl.style.display = 'none';
+        containerEl.innerHTML = '';
+        activeBetsState = [];
+        return;
+      }
+
+      try {
+        const res = await window.ApiClient.get('/bets/my-active-bets');
+        const activeBets = (res && res.data && Array.isArray(res.data.activeBets)) 
+          ? res.data.activeBets 
+          : [];
+        
+        activeBetsState = activeBets;
+
+        if (countBadge) {
+          countBadge.textContent = String(activeBets.length);
+        }
+
+        if (activeBets.length === 0) {
+          sectionEl.style.display = 'block';
+          containerEl.innerHTML = `
+            <div class="active-bets-empty-card">
+              <div class="active-bets-empty-icon" aria-hidden="true">
+                ${ICONS.empty}
+              </div>
+              <h3 class="active-bets-empty-title">No active bets yet</h3>
+              <p class="active-bets-empty-subtext">You haven't placed any toss wagers on current fixtures.</p>
+              <button type="button" class="btn btn-primary btn-sm active-bets-empty-action" id="browse-fixtures-btn">
+                BROWSE MATCH FIXTURES &rarr;
+              </button>
+            </div>
+          `;
+
+          const browseBtn = document.getElementById('browse-fixtures-btn');
+          if (browseBtn) {
+            browseBtn.addEventListener('click', () => {
+              const fixturesEl = document.getElementById('fixtures-heading') || document.getElementById('match-feed-container');
+              if (fixturesEl) {
+                fixturesEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            });
+          }
+          return;
+        }
+
+        // Render Active Bet Cards
+        sectionEl.style.display = 'block';
+        containerEl.innerHTML = activeBets.map(renderActiveBetCard).join('');
+
+      } catch (err) {
+        console.warn('[ACTIVE BETS] Failed to load active bets:', err.message);
+        sectionEl.style.display = 'block';
+        containerEl.innerHTML = `
+          <div class="active-bets-empty-card" style="border-style: solid; border-color: #fecdd3;">
+            <p class="text-xs text-secondary" style="margin: 0;">Unable to refresh active bets.</p>
+            <button type="button" class="btn btn-secondary btn-xs" id="retry-active-bets-btn" style="margin-top: 4px;">
+              Retry
+            </button>
+          </div>
+        `;
+        const retryBtn = document.getElementById('retry-active-bets-btn');
+        if (retryBtn) retryBtn.addEventListener('click', () => loadActiveBets());
+      }
+    };
+
+    // Container click delegation for BET MORE and CANCEL BET
+    containerEl.addEventListener('click', (e) => {
+      const moreBtn = e.target.closest('[data-action="bet-more"]');
+      if (moreBtn) {
+        e.preventDefault();
+        const matchId = moreBtn.getAttribute('data-match-id');
+        if (matchId && typeof window.openBetModal === 'function') {
+          window.openBetModal(matchId);
+        }
+        return;
+      }
+
+      const cancelBtn = e.target.closest('[data-action="cancel-bet"]');
+      if (cancelBtn) {
+        e.preventDefault();
+        if (cancelBtn.disabled) return;
+        const betId = cancelBtn.getAttribute('data-bet-id');
+        const bet = activeBetsState.find(b => String(b.id) === String(betId));
+        if (bet) {
+          openCancelModal(bet);
+        }
+        return;
+      }
+    });
+
+    // Event listeners for seamless real-time sync
+    window.addEventListener('itb:auth-changed', loadActiveBets);
+    window.addEventListener('itb:balance-updated', () => {
+      loadActiveBets();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && window.ApiClient && window.ApiClient.isAuthenticated()) {
+        loadActiveBets();
+      }
+    });
+
+    // Expose globally
+    window.loadActiveBets = loadActiveBets;
+
+    // Initial load
+    loadActiveBets();
   }
 
   /**
@@ -1157,6 +1553,11 @@
               }
             }));
           } catch (evtErr) {}
+        }
+
+        // Immediately update active bets list on Home page
+        if (typeof loadActiveBets === 'function') {
+          loadActiveBets();
         }
 
         // Reset input

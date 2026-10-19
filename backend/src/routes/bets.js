@@ -192,6 +192,128 @@ router.get('/my-bets', async (req, res, next) => {
 });
 
 /**
+ * GET /api/bets/my-active-bets
+ * Returns the authenticated user's current eligible active bets with associated match metadata.
+ * Excludes cancelled, settled, and concluded match bets.
+ */
+router.get('/my-active-bets', async (req, res, next) => {
+  try {
+    const pool = getPool();
+    const userId = req.user.id;
+    const now = Date.now();
+
+    const [rows] = await pool.query(
+      `SELECT
+        b.id,
+        b.match_id,
+        b.market_name,
+        b.selection,
+        b.stake,
+        b.odds,
+        b.potential_return,
+        b.status,
+        b.settlement_status,
+        b.created_at,
+        COALESCE(m.match_title, 'Match Fixture') AS match_title,
+        COALESCE(m.competition, 'Cricket Tournament') AS competition,
+        COALESCE(m.team_one, 'Team One') AS team_one,
+        m.team_one_abbr,
+        m.team_one_rate,
+        m.team_one_logo,
+        COALESCE(m.team_two, 'Team Two') AS team_two,
+        m.team_two_abbr,
+        m.team_two_rate,
+        m.team_two_logo,
+        m.status AS match_status,
+        m.settled AS match_settled,
+        m.match_start_time,
+        m.match_end_time,
+        m.scheduled_time,
+        m.venue
+       FROM bets b
+       JOIN matches m ON m.id = b.match_id
+       WHERE b.user_id = ?
+         AND b.status IN ('pending', 'live')
+         AND b.settlement_status = 'pending'
+         AND (m.settled = 0 OR m.settled IS NULL)
+         AND m.status NOT IN ('completed', 'abandoned', 'closed')
+       ORDER BY b.created_at DESC`,
+      [userId]
+    );
+
+    const activeBets = rows.map((r) => {
+      let selectedTeamLogo = null;
+      let selectionRate = r.odds;
+      if (r.selection === r.team_one) {
+        selectedTeamLogo = r.team_one_logo;
+        selectionRate = r.team_one_rate || r.odds;
+      } else if (r.selection === r.team_two) {
+        selectedTeamLogo = r.team_two_logo;
+        selectionRate = r.team_two_rate || r.odds;
+      }
+
+      // Cancellation eligibility checks:
+      const isPending = (r.status === 'pending' || r.status === 'live');
+      const isUnsettled = (r.settlement_status === 'pending') && !Boolean(r.match_settled);
+      const isNotClosed = !['completed', 'abandoned', 'closed'].includes(r.match_status);
+      const isStartTimeFuture = !r.match_start_time || (new Date(r.match_start_time).getTime() > now);
+      const isEndTimeFuture = !r.match_end_time || (new Date(r.match_end_time).getTime() > now);
+
+      const canCancel = Boolean(isPending && isUnsettled && isNotClosed && isStartTimeFuture && isEndTimeFuture);
+
+      const stakeNum = parseFloat(r.stake);
+      const rateNum = parseFloat(selectionRate || r.odds);
+      const potReturn = parseFloat(r.potential_return || (stakeNum * rateNum).toFixed(2));
+      const potProfit = Math.max(0, parseFloat((potReturn - stakeNum).toFixed(2)));
+
+      return {
+        id: r.id,
+        betId: r.id,
+        matchId: r.match_id,
+        competition: r.competition,
+        matchTitle: r.match_title,
+        sport: 'CRICKET',
+        teamOne: r.team_one,
+        teamOneAbbr: r.team_one_abbr || r.team_one.substring(0, 4).toUpperCase(),
+        teamOneLogo: r.team_one_logo || null,
+        teamOneRate: parseFloat(r.team_one_rate || r.odds),
+        teamTwo: r.team_two,
+        teamTwoAbbr: r.team_two_abbr || r.team_two.substring(0, 4).toUpperCase(),
+        teamTwoLogo: r.team_two_logo || null,
+        teamTwoRate: parseFloat(r.team_two_rate || r.odds),
+        selection: r.selection,
+        selectedTeam: r.selection,
+        selectedTeamLogo,
+        stake: stakeNum,
+        rate: rateNum,
+        odds: rateNum,
+        potentialReturn: potReturn,
+        potentialProfit: potProfit,
+        status: r.status,
+        settlementStatus: r.settlement_status,
+        matchStatus: r.match_status,
+        scheduledTime: r.scheduled_time,
+        matchStartTime: r.match_start_time,
+        matchEndTime: r.match_end_time,
+        venue: r.venue,
+        canCancel,
+        placedAt: r.created_at
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        activeBets,
+        count: activeBets.length
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /api/bets/place (alias: POST /api/bets)
  * Secure, transactional player wager placement.
  * Validates match state, selection, stake, and available balance with row locks.

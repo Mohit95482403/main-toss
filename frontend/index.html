@@ -85,6 +85,22 @@
           </div>
         </section>
 
+        <!-- User's Active Bets Section (Mounted dynamically when logged in with active bets) -->
+        <section class="home-active-bets-section" id="home-active-bets-section" aria-labelledby="active-bets-heading" style="display: none;">
+          <div class="flex items-center justify-between" style="margin-bottom: var(--space-xs);">
+            <div class="flex items-center gap-xs">
+              <h2 id="active-bets-heading" class="h4" style="margin: 0; font-family: var(--font-family-display); font-weight: 800; font-size: 1.15rem; color: var(--text-primary);">
+                Your Active Bets
+              </h2>
+              <span class="badge badge-primary text-xs" id="active-bets-count-badge">0</span>
+            </div>
+            <a href="pages/bets.html" class="text-xs font-semibold text-secondary hover-pink" style="text-decoration: none;">View All &rarr;</a>
+          </div>
+          <div id="home-active-bets-container" class="home-active-bets-container" role="region" aria-live="polite">
+            <!-- Rendered dynamically by home.js -->
+          </div>
+        </section>
+
         <!-- Featured / Highlighted Live Match Card (Direct Interactive Toss Betting) -->
         <div class="featured-match-card" id="featured-match" data-match-id="MATCH-2026-001" role="button" tabindex="0" aria-label="Featured Match: India vs Australia, Status: Live Toss" style="display: none; cursor: pointer;">
           <header class="featured-header">
@@ -439,6 +455,40 @@
         </div>
 
       </div>
+    </div>
+  </div>
+
+  <!-- Bet Cancellation Confirmation Dialog (Accessible Modal) -->
+  <div id="cancel-bet-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title" aria-hidden="true" style="display: none;">
+    <div class="modal-card cancel-modal-card">
+      <header class="modal-header">
+        <div class="flex items-center gap-xs">
+          <div class="cancel-modal-icon-badge" aria-hidden="true">⚠️</div>
+          <h3 id="cancel-modal-title" class="modal-title" style="font-size: 1.125rem; font-weight: 800;">Cancel this bet?</h3>
+        </div>
+        <button type="button" class="modal-close-btn" id="cancel-modal-close-x" aria-label="Close dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="modal-body">
+        <p class="cancel-modal-message" id="cancel-modal-message">
+          Are you sure you want to cancel your bet on <strong id="cancel-modal-selection">Team</strong> for <strong id="cancel-modal-stake">₹0.00</strong>?
+        </p>
+        <div class="cancel-modal-notice-box">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <span>Your stake will be refunded if the bet is eligible for cancellation.</span>
+        </div>
+        <div id="cancel-modal-error" class="modal-error-banner" style="display: none;"></div>
+      </div>
+      <footer class="modal-footer cancel-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" id="cancel-modal-keep-btn">
+          KEEP BET
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" id="cancel-modal-confirm-btn">
+          <span class="btn-text">CONFIRM CANCELLATION</span>
+          <span class="btn-spinner" id="cancel-modal-spinner" style="display: none;" aria-hidden="true"></span>
+        </button>
+      </footer>
     </div>
   </div>
 
