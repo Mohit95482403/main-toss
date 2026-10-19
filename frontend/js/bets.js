@@ -617,7 +617,8 @@
       const originalStake = betToCancel.stake;
 
       try {
-        const response = await window.ApiClient.post(`/bets/${encodeURIComponent(betId)}/cancel`, {});
+        const idempotencyKey = 'CANCEL-UI-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+        const response = await window.ApiClient.post(`/bets/${encodeURIComponent(betId)}/cancel`, { idempotencyKey });
 
         isCancelling = false;
         closeCancelModal();

@@ -3190,9 +3190,10 @@
       const notesInput = document.getElementById('settlement-notes-input');
       const notes = notesInput ? notesInput.value.trim() : '';
 
+      const idempotencyKey = `settle-${matchId}-${Date.now()}`;
       const res = await apiFetch('/admin/settlement/process', {
         method: 'POST',
-        body: JSON.stringify({ matchId, declaredOutcome, notes })
+        body: JSON.stringify({ matchId, declaredOutcome, notes, idempotencyKey })
       });
 
       notify(`Match settled successfully! ${res.data.bets_settled} bets processed.`, 'success');
@@ -3664,9 +3665,10 @@
     }
 
     try {
+      const idempotencyKey = `rev-${matchId}-${Date.now()}`;
       const res = await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/settlement/reverse`, {
         method: 'POST',
-        body: JSON.stringify({ reason })
+        body: JSON.stringify({ reason, idempotencyKey })
       });
 
       notify(res.message || 'Settlement reversed successfully.', 'success');
@@ -3725,9 +3727,10 @@
         ? `/admin/matches/${encodeURIComponent(matchId)}/settlement/resettle`
         : `/admin/matches/${encodeURIComponent(matchId)}/settlement/correct-and-resettle`;
 
+      const idempotencyKey = `resettle-${matchId}-${Date.now()}`;
       const res = await apiFetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ correctedOutcome, reason })
+        body: JSON.stringify({ correctedOutcome, reason, idempotencyKey })
       });
 
       notify(res.message || `Match corrected and resettled successfully (v${res.data?.version || 2})!`, 'success');

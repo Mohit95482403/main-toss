@@ -40,7 +40,7 @@ router.get('/transactions', async (req, res, next) => {
     if (typeFilter === 'credit') {
       whereClauses.push("ct.action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'BET_RESETTLEMENT_PAYOUT')");
     } else if (typeFilter === 'debit') {
-      whereClauses.push("ct.action_type IN ('ADMIN_DEBIT', 'SETTLEMENT_REVERSAL_DEBIT')");
+      whereClauses.push("ct.action_type IN ('ADMIN_DEBIT', 'SETTLEMENT_REVERSAL_DEBIT', 'BET_STAKE_DEBIT')");
     }
 
     if (search.length > 0) {
@@ -73,7 +73,7 @@ router.get('/transactions', async (req, res, next) => {
     const [[totalsRow]] = await pool.query(
       `SELECT
         COALESCE(SUM(CASE WHEN action_type IN ('ADMIN_CREDIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'BET_RESETTLEMENT_PAYOUT') THEN amount ELSE 0 END), 0) AS totalCredits,
-        COALESCE(SUM(CASE WHEN action_type IN ('ADMIN_DEBIT', 'SETTLEMENT_REVERSAL_DEBIT') THEN amount ELSE 0 END), 0) AS totalDebits
+        COALESCE(SUM(CASE WHEN action_type IN ('ADMIN_DEBIT', 'SETTLEMENT_REVERSAL_DEBIT', 'BET_STAKE_DEBIT') THEN amount ELSE 0 END), 0) AS totalDebits
        FROM coin_transactions
        WHERE user_id = ?`,
       [userId]
@@ -106,6 +106,10 @@ router.get('/transactions', async (req, res, next) => {
         title = 'Settlement Reversal';
         subtitle = r.reason || 'Payout Reversed (Result Correction)';
         category = 'Settlement Reversal';
+      } else if (r.action_type === 'BET_STAKE_DEBIT') {
+        title = 'Bet Placement';
+        subtitle = r.reason || 'Wager Stake Deduction';
+        category = 'Wager Stake';
       }
 
       return {

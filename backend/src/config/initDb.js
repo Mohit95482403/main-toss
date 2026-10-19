@@ -165,7 +165,7 @@ const TABLES_DDL = [
     username VARCHAR(30) NOT NULL,
     admin_id INT NULL,
     admin_username VARCHAR(50) NULL,
-    action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT', 'BET_CANCEL_REFUND') NOT NULL,
+    action_type VARCHAR(50) NOT NULL,
     amount DECIMAL(12, 2) NOT NULL,
     balance_before DECIMAL(12, 2) NOT NULL,
     balance_after DECIMAL(12, 2) NOT NULL,
@@ -294,7 +294,7 @@ async function initializeDatabase() {
 
       await pool.query('ALTER TABLE coin_transactions MODIFY COLUMN admin_id INT NULL');
       await pool.query('ALTER TABLE coin_transactions MODIFY COLUMN admin_username VARCHAR(50) NULL');
-      await pool.query("ALTER TABLE coin_transactions MODIFY COLUMN action_type ENUM('ADMIN_CREDIT', 'ADMIN_DEBIT', 'BET_CANCEL_REFUND', 'BET_WON_PAYOUT', 'SETTLEMENT_REVERSAL_DEBIT', 'BET_RESETTLEMENT_PAYOUT') NOT NULL");
+      await pool.query("ALTER TABLE coin_transactions MODIFY COLUMN action_type VARCHAR(50) NOT NULL");
 
       const [startCol] = await pool.query(
         "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matches' AND COLUMN_NAME = 'match_start_time'"

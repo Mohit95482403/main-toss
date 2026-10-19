@@ -10,6 +10,8 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/crypto');
 const { createUserAccount } = require('../services/userService');
 const { uploadTeamLogos, deleteUploadedFile } = require('../middleware/uploadLogo');
+const { reserveIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey, executeWithRetry } = require('../utils/idempotency');
+const { reconcileUserWallet, reconcileAllWallets } = require('../services/reconciliation');
 
 const router = express.Router();
 
@@ -2353,12 +2355,13 @@ router.post('/settlement/preview', async (req, res, next) => {
 // =============================================================================
 router.post('/settlement/process', async (req, res, next) => {
   const pool = getPool();
-  let connection = null;
+  let idemp = null;
 
   try {
     const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
     const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome;
     const notes = req.body.notes;
+    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
 
     if (!rawMatchId) {
       return res.status(400).json({
@@ -2378,241 +2381,297 @@ router.post('/settlement/process', async (req, res, next) => {
     const cleanOutcome = rawOutcome.trim();
     const cleanNotes = notes ? String(notes).trim() : null;
 
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    // 1. Row-lock match to prevent concurrent settlements
-    const [matchRows] = await connection.query(
-      'SELECT id, match_title, team_one, team_two, status, settled, settled_at FROM matches WHERE id = ? FOR UPDATE',
-      [cleanMatchId]
-    );
-
-    if (matchRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({
-        success: false,
-        error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" does not exist.` }
+    // Idempotency check
+    if (rawIdempotencyKey) {
+      idemp = await reserveIdempotencyKey(pool, {
+        key: rawIdempotencyKey,
+        userId: req.user.id,
+        scope: 'MATCH_SETTLE',
+        payload: { matchId: cleanMatchId, outcome: cleanOutcome }
       });
-    }
 
-    const match = matchRows[0];
-    if (match.settled) {
-      await connection.rollback();
-      return res.status(409).json({
-        success: false,
-        error: { code: 'ALREADY_SETTLED', message: `Match "${match.match_title}" was already settled on ${match.settled_at}. Duplicate settlement prevented.` }
-      });
-    }
-
-    const validOutcomes = [match.team_one, match.team_two, 'NO_RESULT'];
-    if (!validOutcomes.includes(cleanOutcome)) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { 
-          code: 'OUTCOME_MISMATCH', 
-          message: `Outcome must be "${match.team_one}", "${match.team_two}", or "NO_RESULT". Received: "${cleanOutcome}".` 
-        }
-      });
-    }
-
-    // 2. Row-lock eligible pending bets
-    const [bets] = await connection.query(
-      `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.odds, b.potential_return
-       FROM bets b
-       JOIN users u ON u.id = b.user_id
-       WHERE b.match_id = ? AND b.settlement_status = 'pending'
-       FOR UPDATE`,
-      [match.id]
-    );
-
-    let wonCount = 0;
-    let lostCount = 0;
-    let noResultCount = 0;
-    let totalStake = 0;
-    let totalPayout = 0;
-
-    // 3. Process each bet atomically
-    for (const b of bets) {
-      const stakeNum = parseFloat(b.stake);
-      const potentialRetNum = parseFloat(b.potential_return);
-      totalStake += stakeNum;
-
-      let resultStatus = 'lost';
-      let payoutAmount = 0.00;
-
-      if (cleanOutcome === 'NO_RESULT') {
-        resultStatus = 'no_result';
-        payoutAmount = stakeNum; // refund stake
-        noResultCount++;
-      } else if (b.selection === cleanOutcome) {
-        resultStatus = 'won';
-        payoutAmount = potentialRetNum;
-        wonCount++;
-      } else {
-        resultStatus = 'lost';
-        payoutAmount = 0.00;
-        lostCount++;
+      if (idemp.isRetry && idemp.cachedResponse) {
+        return res.status(idemp.cachedResponse.status).json(idemp.cachedResponse.body);
       }
+      if (idemp.mismatch) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'IDEMPOTENCY_CONFLICT', message: idemp.message }
+        });
+      }
+      if (idemp.isProcessing) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'REQUEST_IN_PROGRESS', message: idemp.message }
+        });
+      }
+    }
 
-      totalPayout += payoutAmount;
+    const result = await executeWithRetry(async () => {
+      let connection = null;
+      try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
 
-      // Update bet ticket with version
-      await connection.query(
-        `UPDATE bets 
-         SET status = ?, settlement_status = 'settled', settlement_version = 1, payout = ?, settled_at = NOW(), settled_by = ? 
-         WHERE id = ? AND settlement_status = 'pending'`,
-        [resultStatus, payoutAmount, req.user.id, b.id]
-      );
+        // 1. Row-lock match to prevent concurrent settlements
+        const [matchRows] = await connection.query(
+          'SELECT id, match_title, team_one, team_two, status, settled, settled_at FROM matches WHERE id = ? FOR UPDATE',
+          [cleanMatchId]
+        );
 
-      // Fetch wallet balance before
-      const [[wRow]] = await connection.query(
-        'SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE',
-        [b.user_id]
-      );
-      const balBefore = parseFloat((wRow && wRow.available_balance) || 0);
-      const balAfter = parseFloat((balBefore + payoutAmount).toFixed(2));
+        if (matchRows.length === 0) {
+          await connection.rollback();
+          return {
+            statusCode: 404,
+            body: { success: false, error: { code: 'MATCH_NOT_FOUND', message: `Match "${cleanMatchId}" does not exist.` } }
+          };
+        }
 
-      // Update player wallet: release exposure and credit payout if won/refunded
-      await connection.query(
-        `UPDATE wallets 
-         SET available_balance = available_balance + ?,
-             exposure_balance = GREATEST(0.00, exposure_balance - ?),
-             version = version + 1
-         WHERE user_id = ?`,
-        [payoutAmount, stakeNum, b.user_id]
-      );
+        const match = matchRows[0];
+        if (match.settled) {
+          await connection.rollback();
+          return {
+            statusCode: 409,
+            body: { success: false, error: { code: 'ALREADY_SETTLED', message: `Match "${match.match_title}" was already settled on ${match.settled_at}. Duplicate settlement prevented.` } }
+          };
+        }
 
-      if (payoutAmount > 0) {
+        const validOutcomes = [match.team_one, match.team_two, 'NO_RESULT'];
+        if (!validOutcomes.includes(cleanOutcome)) {
+          await connection.rollback();
+          return {
+            statusCode: 400,
+            body: { 
+              success: false, 
+              error: { 
+                code: 'OUTCOME_MISMATCH', 
+                message: `Outcome must be "${match.team_one}", "${match.team_two}", or "NO_RESULT". Received: "${cleanOutcome}".` 
+              }
+            }
+          };
+        }
+
+        // 2. Row-lock eligible pending bets
+        const [bets] = await connection.query(
+          `SELECT b.id, b.user_id, u.username, b.selection, b.stake, b.odds, b.potential_return
+           FROM bets b
+           JOIN users u ON u.id = b.user_id
+           WHERE b.match_id = ? AND b.settlement_status = 'pending'
+           FOR UPDATE`,
+          [match.id]
+        );
+
+        let wonCount = 0;
+        let lostCount = 0;
+        let noResultCount = 0;
+        let totalStake = 0;
+        let totalPayout = 0;
+
         const crypto = require('crypto');
-        const payoutTxUuid = crypto.randomUUID();
-        const actionType = cleanOutcome === 'NO_RESULT' ? 'BET_CANCEL_REFUND' : 'BET_WON_PAYOUT';
-        const reasonText = cleanOutcome === 'NO_RESULT'
-          ? `Stake Refund (No Result): Bet ${b.id} on ${match.match_title}`
-          : `Win Payout: Bet ${b.id} on ${match.match_title} (${b.selection} @ ₹${payoutAmount.toFixed(2)})`;
+        const settlementUuid = crypto.randomUUID();
 
+        // 3. Process each bet atomically
+        for (const b of bets) {
+          const stakeNum = parseFloat(b.stake);
+          const potentialRetNum = parseFloat(b.potential_return);
+          totalStake += stakeNum;
+
+          let resultStatus = 'lost';
+          let payoutAmount = 0.00;
+
+          if (cleanOutcome === 'NO_RESULT') {
+            resultStatus = 'no_result';
+            payoutAmount = stakeNum; // refund stake
+            noResultCount++;
+          } else if (b.selection === cleanOutcome) {
+            resultStatus = 'won';
+            payoutAmount = potentialRetNum;
+            wonCount++;
+          } else {
+            resultStatus = 'lost';
+            payoutAmount = 0.00;
+            lostCount++;
+          }
+
+          totalPayout += payoutAmount;
+
+          // Update bet ticket with version
+          await connection.query(
+            `UPDATE bets 
+             SET status = ?, settlement_status = 'settled', settlement_version = 1, payout = ?, settled_at = NOW(), settled_by = ? 
+             WHERE id = ? AND settlement_status = 'pending'`,
+            [resultStatus, payoutAmount, req.user.id, b.id]
+          );
+
+          // Fetch wallet balance before
+          const [[wRow]] = await connection.query(
+            'SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE',
+            [b.user_id]
+          );
+          const balBefore = parseFloat((wRow && wRow.available_balance) || 0);
+          const balAfter = parseFloat((balBefore + payoutAmount).toFixed(2));
+
+          // Update player wallet: release exposure and credit payout if won/refunded
+          await connection.query(
+            `UPDATE wallets 
+             SET available_balance = available_balance + ?,
+                 exposure_balance = GREATEST(0.00, exposure_balance - ?),
+                 version = version + 1
+             WHERE user_id = ?`,
+            [payoutAmount, stakeNum, b.user_id]
+          );
+
+          if (payoutAmount > 0) {
+            const payoutTxUuid = crypto.randomUUID();
+            const actionType = cleanOutcome === 'NO_RESULT' ? 'BET_CANCEL_REFUND' : 'BET_WON_PAYOUT';
+            const reasonText = cleanOutcome === 'NO_RESULT'
+              ? `Stake Refund (No Result): Bet ${b.id} on ${match.match_title}`
+              : `Win Payout: Bet ${b.id} on ${match.match_title} (${b.selection} @ ₹${payoutAmount.toFixed(2)})`;
+
+            await connection.query(
+              `INSERT INTO coin_transactions (
+                transaction_uuid, user_id, username, admin_id, admin_username,
+                action_type, amount, balance_before, balance_after,
+                reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
+              [
+                payoutTxUuid,
+                b.user_id,
+                b.username,
+                req.user.id,
+                req.user.username,
+                actionType,
+                payoutAmount,
+                balBefore,
+                balAfter,
+                reasonText,
+                `PAYOUT-${b.id}-v1`,
+                b.id,
+                match.id,
+                settlementUuid
+              ]
+            );
+          }
+        }
+
+        // 4. Update match to settled
         await connection.query(
-          `INSERT INTO coin_transactions (
-            transaction_uuid, user_id, username, admin_id, admin_username,
-            action_type, amount, balance_before, balance_after,
-            reason, idempotency_key, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+          `UPDATE matches 
+           SET status = 'completed', toss_winner = ?, settled = TRUE, settlement_version = 1, settlement_status = 'settled', settled_at = NOW(), settled_by = ? 
+           WHERE id = ?`,
+          [cleanOutcome, req.user.id, match.id]
+        );
+
+        // 5. Generate settlement audit record in settlements table
+        await connection.query(
+          `INSERT INTO settlements 
+           (settlement_uuid, version, status, match_id, declared_outcome, admin_id, admin_username, total_bets, won_bets, lost_bets, no_result_bets, total_stake, total_payout, notes, created_at)
+           VALUES (?, 1, 'current', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
-            payoutTxUuid,
-            b.user_id,
-            b.username,
+            settlementUuid,
+            match.id,
+            cleanOutcome,
             req.user.id,
             req.user.username,
-            actionType,
-            payoutAmount,
-            balBefore,
-            balAfter,
-            reasonText,
-            `PAYOUT-${b.id}-v1`
+            bets.length,
+            wonCount,
+            lostCount,
+            noResultCount,
+            totalStake,
+            totalPayout,
+            cleanNotes
           ]
         );
-      }
-    }
 
-    // 4. Update match to settled
-    await connection.query(
-      `UPDATE matches 
-       SET status = 'completed', toss_winner = ?, settled = TRUE, settlement_version = 1, settlement_status = 'settled', settled_at = NOW(), settled_by = ? 
-       WHERE id = ?`,
-      [cleanOutcome, req.user.id, match.id]
-    );
+        // 6. Record administrative audit log
+        await connection.query(
+          `INSERT INTO admin_audit_logs 
+           (admin_id, admin_username, action_type, target_type, target_id, target_identifier, details, ip_address)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            req.user.id,
+            req.user.username,
+            'BET_SETTLEMENT',
+            'MATCH',
+            null,
+            match.id,
+            JSON.stringify({
+              settlementUuid,
+              matchId: match.id,
+              matchTitle: match.match_title,
+              declaredOutcome: cleanOutcome,
+              totalBets: bets.length,
+              wonCount,
+              lostCount,
+              noResultCount,
+              totalStake,
+              totalPayout,
+              notes: cleanNotes
+            }),
+            req.ip || '127.0.0.1'
+          ]
+        );
 
-    // 5. Generate settlement audit record in settlements table
-    const crypto = require('crypto');
-    const settlementUuid = crypto.randomUUID();
+        await connection.commit();
 
-    await connection.query(
-      `INSERT INTO settlements 
-       (settlement_uuid, version, status, match_id, declared_outcome, admin_id, admin_username, total_bets, won_bets, lost_bets, no_result_bets, total_stake, total_payout, notes, created_at)
-       VALUES (?, 1, 'current', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        settlementUuid,
-        match.id,
-        cleanOutcome,
-        req.user.id,
-        req.user.username,
-        bets.length,
-        wonCount,
-        lostCount,
-        noResultCount,
-        totalStake,
-        totalPayout,
-        cleanNotes
-      ]
-    );
-
-    // 6. Record administrative audit log
-    await connection.query(
-      `INSERT INTO admin_audit_logs 
-       (admin_id, admin_username, action_type, target_type, target_id, target_identifier, details, ip_address)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.user.id,
-        req.user.username,
-        'BET_SETTLEMENT',
-        'MATCH',
-        null,
-        match.id,
-        JSON.stringify({
-          settlementUuid,
-          matchId: match.id,
-          matchTitle: match.match_title,
-          declaredOutcome: cleanOutcome,
-          totalBets: bets.length,
-          wonCount,
-          lostCount,
-          noResultCount,
-          totalStake,
-          totalPayout,
-          notes: cleanNotes
-        }),
-        req.ip || '127.0.0.1'
-      ]
-    );
-
-    await connection.commit();
-
-    return res.status(200).json({
-      success: true,
-      message: `Match "${match.match_title}" successfully settled with outcome: ${cleanOutcome}.`,
-      data: {
-        settlementUuid,
-        settlement_uuid: settlementUuid,
-        matchId: match.id,
-        match_id: match.id,
-        matchTitle: match.match_title,
-        match_title: match.match_title,
-        declaredOutcome: cleanOutcome,
-        declared_outcome: cleanOutcome,
-        status: 'completed',
-        settled: true,
-        totalBetsSettled: bets.length,
-        bets_settled: bets.length,
-        wonCount,
-        lostCount,
-        noResultCount,
-        totalStake: parseFloat(totalStake.toFixed(2)),
-        totalPayoutCredited: parseFloat(totalPayout.toFixed(2)),
-        settledBy: req.user.username,
-        timestamp: new Date().toISOString()
+        return {
+          statusCode: 200,
+          body: {
+            success: true,
+            message: `Match "${match.match_title}" successfully settled with outcome: ${cleanOutcome}.`,
+            data: {
+              settlementUuid,
+              settlement_uuid: settlementUuid,
+              matchId: match.id,
+              match_id: match.id,
+              matchTitle: match.match_title,
+              match_title: match.match_title,
+              declaredOutcome: cleanOutcome,
+              declared_outcome: cleanOutcome,
+              status: 'completed',
+              settled: true,
+              totalBetsSettled: bets.length,
+              bets_settled: bets.length,
+              wonCount,
+              lostCount,
+              noResultCount,
+              totalStake: parseFloat(totalStake.toFixed(2)),
+              totalPayoutCredited: parseFloat(totalPayout.toFixed(2)),
+              settledBy: req.user.username,
+              timestamp: new Date().toISOString()
+            }
+          }
+        };
+      } catch (innerErr) {
+        if (connection) {
+          try { await connection.rollback(); } catch (rbErr) {}
+        }
+        throw innerErr;
+      } finally {
+        if (connection) {
+          connection.release();
+        }
       }
     });
+
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      if (result.statusCode >= 200 && result.statusCode < 300) {
+        await completeIdempotencyKey(pool, {
+          key: idemp.cleanKey,
+          responseStatus: result.statusCode,
+          responseBody: result.body
+        });
+      } else {
+        await releaseIdempotencyKey(pool, idemp.cleanKey);
+      }
+    }
+
+    return res.status(result.statusCode).json(result.body);
   } catch (err) {
-    if (connection) {
-      try {
-        await connection.rollback();
-      } catch (rbErr) {}
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      await releaseIdempotencyKey(pool, idemp.cleanKey);
     }
     next(err);
-  } finally {
-    if (connection) {
-      connection.release();
-    }
   }
 });
 
@@ -2882,10 +2941,13 @@ async function handleReverseSettlement(req, res, next) {
   const pool = getPool();
   let connection = null;
 
+  let idemp = null;
+
   try {
     const rawMatchId = req.params.matchId || req.body.matchId || req.body.match_id;
     const reason = (req.body.reason || '').trim();
-    const idempotencyKey = (req.body.idempotencyKey || req.body.idempotency_key || `REV-${Date.now()}`).trim();
+    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+    const idempotencyKey = (rawIdempotencyKey || `REV-${Date.now()}`).trim();
     const expectedSettlementVersion = req.body.expectedSettlementVersion !== undefined 
       ? parseInt(req.body.expectedSettlementVersion, 10) 
       : null;
@@ -2905,6 +2967,32 @@ async function handleReverseSettlement(req, res, next) {
     }
 
     const cleanMatchId = String(rawMatchId).trim();
+
+    // Idempotency reservation
+    if (rawIdempotencyKey) {
+      idemp = await reserveIdempotencyKey(pool, {
+        key: rawIdempotencyKey,
+        userId: req.user.id,
+        scope: 'SETTLEMENT_REVERSE',
+        payload: { matchId: cleanMatchId, reason }
+      });
+
+      if (idemp.isRetry && idemp.cachedResponse) {
+        return res.status(idemp.cachedResponse.status).json(idemp.cachedResponse.body);
+      }
+      if (idemp.mismatch) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'IDEMPOTENCY_CONFLICT', message: idemp.message }
+        });
+      }
+      if (idemp.isProcessing) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'REQUEST_IN_PROGRESS', message: idemp.message }
+        });
+      }
+    }
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -3073,8 +3161,8 @@ async function handleReverseSettlement(req, res, next) {
         `INSERT INTO coin_transactions (
           transaction_uuid, user_id, username, admin_id, admin_username,
           action_type, amount, balance_before, balance_after,
-          reason, idempotency_key, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, 'SETTLEMENT_REVERSAL_DEBIT', ?, ?, ?, ?, ?, 'completed', NOW())`,
+          reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
+        ) VALUES (?, ?, ?, ?, ?, 'SETTLEMENT_REVERSAL_DEBIT', ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
         [
           txnUuid,
           b.user_id,
@@ -3085,7 +3173,10 @@ async function handleReverseSettlement(req, res, next) {
           balBefore,
           balAfter,
           `Settlement Reversal Debit: Bet ${b.id} on ${match.match_title} (Reason: ${reason})`,
-          itemKey
+          itemKey,
+          b.id,
+          match.id,
+          currentSettlement.settlement_uuid
         ]
       );
     }
@@ -3158,7 +3249,7 @@ async function handleReverseSettlement(req, res, next) {
 
     await connection.commit();
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       message: `Settlement for match "${match.match_title}" has been successfully reversed. All financial payouts have been reconciled.`,
       data: {
@@ -3178,8 +3269,21 @@ async function handleReverseSettlement(req, res, next) {
           winningBetsReversed: winningBets.length
         }
       }
-    });
+    };
+
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      await completeIdempotencyKey(pool, {
+        key: idemp.cleanKey,
+        responseStatus: 200,
+        responseBody: responsePayload
+      });
+    }
+
+    return res.status(200).json(responsePayload);
   } catch (err) {
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      await releaseIdempotencyKey(pool, idemp.cleanKey);
+    }
     if (connection) {
       try { await connection.rollback(); } catch (rbErr) {}
     }
@@ -3199,12 +3303,14 @@ async function handleReverseSettlement(req, res, next) {
 async function handleResettleMatch(req, res, next) {
   const pool = getPool();
   let connection = null;
+  let idemp = null;
 
   try {
     const rawMatchId = req.params.matchId || req.body.matchId || req.body.match_id;
     const rawOutcome = req.body.outcome || req.body.declaredOutcome || req.body.declared_outcome || req.body.correctedOutcome;
     const reason = (req.body.reason || '').trim();
     const notes = req.body.notes;
+    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
 
     if (!rawMatchId) {
       return res.status(400).json({
@@ -3230,6 +3336,32 @@ async function handleResettleMatch(req, res, next) {
     const cleanMatchId = String(rawMatchId).trim();
     const cleanOutcome = String(rawOutcome).trim();
     const cleanNotes = notes ? String(notes).trim() : null;
+
+    // Idempotency reservation
+    if (rawIdempotencyKey) {
+      idemp = await reserveIdempotencyKey(pool, {
+        key: rawIdempotencyKey,
+        userId: req.user.id,
+        scope: 'SETTLEMENT_RESETTLE',
+        payload: { matchId: cleanMatchId, outcome: cleanOutcome, reason }
+      });
+
+      if (idemp.isRetry && idemp.cachedResponse) {
+        return res.status(idemp.cachedResponse.status).json(idemp.cachedResponse.body);
+      }
+      if (idemp.mismatch) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'IDEMPOTENCY_CONFLICT', message: idemp.message }
+        });
+      }
+      if (idemp.isProcessing) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'REQUEST_IN_PROGRESS', message: idemp.message }
+        });
+      }
+    }
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -3365,8 +3497,8 @@ async function handleResettleMatch(req, res, next) {
           `INSERT INTO coin_transactions (
             transaction_uuid, user_id, username, admin_id, admin_username,
             action_type, amount, balance_before, balance_after,
-            reason, idempotency_key, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+            reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
           [
             txnUuid,
             b.user_id,
@@ -3378,7 +3510,10 @@ async function handleResettleMatch(req, res, next) {
             balBefore,
             balAfter,
             reasonText,
-            `RESETTL-${newSettlementUuid}-${b.id}`
+            `RESETTL-${newSettlementUuid}-${b.id}`,
+            b.id,
+            match.id,
+            newSettlementUuid
           ]
         );
       }
@@ -3456,7 +3591,7 @@ async function handleResettleMatch(req, res, next) {
 
     await connection.commit();
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       message: `Match "${match.match_title}" successfully resettled with corrected outcome: ${cleanOutcome} (Settlement Version ${newVersion}).`,
       data: {
@@ -3477,8 +3612,21 @@ async function handleResettleMatch(req, res, next) {
         settledBy: req.user.username,
         timestamp: new Date().toISOString()
       }
-    });
+    };
+
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      await completeIdempotencyKey(pool, {
+        key: idemp.cleanKey,
+        responseStatus: 200,
+        responseBody: responsePayload
+      });
+    }
+
+    return res.status(200).json(responsePayload);
   } catch (err) {
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      await releaseIdempotencyKey(pool, idemp.cleanKey);
+    }
     if (connection) {
       try { await connection.rollback(); } catch (rbErr) {}
     }
@@ -3666,8 +3814,8 @@ async function handleCorrectAndResettle(req, res, next) {
             `INSERT INTO coin_transactions (
               transaction_uuid, user_id, username, admin_id, admin_username,
               action_type, amount, balance_before, balance_after,
-              reason, idempotency_key, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, 'SETTLEMENT_REVERSAL_DEBIT', ?, ?, ?, ?, ?, 'completed', NOW())`,
+              reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
+            ) VALUES (?, ?, ?, ?, ?, 'SETTLEMENT_REVERSAL_DEBIT', ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
             [
               txnUuid,
               b.user_id,
@@ -3678,7 +3826,10 @@ async function handleCorrectAndResettle(req, res, next) {
               balBefore,
               balAfter,
               `Settlement Reversal Debit: Bet ${b.id} on ${match.match_title} (Reason: ${reason})`,
-              `REV-${currentSettlement.settlement_uuid}-${b.id}`
+              `REV-${currentSettlement.settlement_uuid}-${b.id}`,
+              b.id,
+              match.id,
+              currentSettlement.settlement_uuid
             ]
           );
         }
@@ -3767,8 +3918,8 @@ async function handleCorrectAndResettle(req, res, next) {
           `INSERT INTO coin_transactions (
             transaction_uuid, user_id, username, admin_id, admin_username,
             action_type, amount, balance_before, balance_after,
-            reason, idempotency_key, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+            reason, idempotency_key, status, bet_id, match_id, settlement_uuid, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?, NOW())`,
           [
             txnUuid,
             b.user_id,
@@ -3780,7 +3931,10 @@ async function handleCorrectAndResettle(req, res, next) {
             balBefore,
             balAfter,
             reasonText,
-            `RESETTL-${newSettlementUuid}-${b.id}`
+            `RESETTL-${newSettlementUuid}-${b.id}`,
+            b.id,
+            match.id,
+            newSettlementUuid
           ]
         );
       }
@@ -4330,30 +4484,42 @@ router.post('/coins/adjust', async (req, res, next) => {
       });
     }
 
-    const cleanIdempotencyKey = idempotencyKey ? String(idempotencyKey).trim() : null;
+    const rawIdempotencyKey = req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+    const cleanIdempotencyKey = rawIdempotencyKey ? String(rawIdempotencyKey).trim() : null;
+    let idemp = null;
 
-    // 2. Check for duplicate idempotent submission
+    // 2. Check for idempotent submission
     if (cleanIdempotencyKey) {
-      const [existing] = await pool.query(
-        `SELECT * FROM coin_transactions WHERE idempotency_key = ? LIMIT 1`,
-        [cleanIdempotencyKey]
-      );
-      if (existing.length > 0) {
-        const tx = existing[0];
+      idemp = await reserveIdempotencyKey(pool, {
+        key: cleanIdempotencyKey,
+        userId: req.user.id,
+        scope: 'ADMIN_COIN_ADJUST',
+        payload: { userId: parsedUserId, actionType, amount: cleanAmount, reason: cleanReason }
+      });
+
+      if (idemp.isRetry && idemp.cachedResponse) {
+        if (!req.headers['x-idempotency-key'] && req.body && req.body.idempotencyKey) {
+          return res.status(409).json({
+            success: false,
+            error: {
+              code: 'DUPLICATE_REQUEST',
+              message: 'Duplicate adjustment prevented. This transaction was already processed.',
+              data: idemp.cachedResponse.body.data
+            }
+          });
+        }
+        return res.status(idemp.cachedResponse.status).json(idemp.cachedResponse.body);
+      }
+      if (idemp.mismatch) {
         return res.status(409).json({
           success: false,
-          error: {
-            code: 'DUPLICATE_REQUEST',
-            message: 'Duplicate adjustment prevented. This transaction was already processed.',
-            data: {
-              transactionUuid: tx.transaction_uuid,
-              actionType: tx.action_type,
-              amount: parseFloat(tx.amount),
-              balanceBefore: parseFloat(tx.balance_before),
-              balanceAfter: parseFloat(tx.balance_after),
-              createdAt: tx.created_at
-            }
-          }
+          error: { code: 'IDEMPOTENCY_CONFLICT', message: idemp.message }
+        });
+      }
+      if (idemp.isProcessing) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'REQUEST_IN_PROGRESS', message: idemp.message }
         });
       }
     }
@@ -4376,6 +4542,9 @@ router.post('/coins/adjust', async (req, res, next) => {
       await connection.rollback();
       connection.release();
       connection = null;
+      if (idemp && idemp.isNew && !idemp.skipped) {
+        await releaseIdempotencyKey(pool, idemp.cleanKey);
+      }
       return res.status(404).json({
         success: false,
         error: {
@@ -4394,6 +4563,9 @@ router.post('/coins/adjust', async (req, res, next) => {
         await connection.rollback();
         connection.release();
         connection = null;
+        if (idemp && idemp.isNew && !idemp.skipped) {
+          await releaseIdempotencyKey(pool, idemp.cleanKey);
+        }
         return res.status(400).json({
           success: false,
           error: {
@@ -4463,7 +4635,7 @@ router.post('/coins/adjust', async (req, res, next) => {
 
     const message = `Coins ${actionType === 'ADMIN_CREDIT' ? 'added' : 'deducted'} successfully. Updated balance: ${newBalance.toFixed(2)}`;
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       message,
       data: {
@@ -4476,11 +4648,24 @@ router.post('/coins/adjust', async (req, res, next) => {
         balanceAfter: newBalance,
         reason: cleanReason,
         adminUsername: req.user.username,
-        createdAt: new Date()
+        createdAt: new Date().toISOString()
       }
-    });
+    };
+
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      await completeIdempotencyKey(pool, {
+        key: idemp.cleanKey,
+        responseStatus: 200,
+        responseBody: responsePayload
+      });
+    }
+
+    return res.status(200).json(responsePayload);
 
   } catch (err) {
+    if (idemp && idemp.isNew && !idemp.skipped) {
+      await releaseIdempotencyKey(pool, idemp.cleanKey);
+    }
     if (connection) {
       try {
         await connection.rollback();
@@ -4600,6 +4785,64 @@ router.get('/coins/history', async (req, res, next) => {
           totalPages: Math.ceil(total / limit) || 1
         }
       }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// =============================================================================
+// 14. FINANCIAL INTEGRITY: WALLET & LEDGER RECONCILIATION
+// =============================================================================
+
+/**
+ * GET /api/admin/reconciliation
+ * Platform-wide read-only reconciliation scanning player balances against ledger history.
+ */
+router.get('/reconciliation', async (req, res, next) => {
+  try {
+    const pool = getPool();
+    const result = await reconcileAllWallets(pool, {
+      page: req.query.page,
+      limit: req.query.limit,
+      onlyDiscrepancies: req.query.discrepancies === 'true'
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/admin/reconciliation/user/:userId
+ * Detailed forensic audit report for an individual player account.
+ */
+router.get('/reconciliation/user/:userId', async (req, res, next) => {
+  try {
+    const pool = getPool();
+    const userId = parseInt(req.params.userId, 10);
+    if (!userId || isNaN(userId) || userId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_USER_ID', message: 'A valid numeric player ID is required.' }
+      });
+    }
+
+    const report = await reconcileUserWallet(pool, userId);
+    if (!report.found && report.error) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: `Player #${userId} was not found.` }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: report
     });
   } catch (err) {
     next(err);

@@ -1118,10 +1118,12 @@
       if (confirmSpinner) confirmSpinner.style.display = 'inline-block';
 
       try {
+        const idempotencyKey = 'BET-UI-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
         const payload = {
           matchId: activeMatch.id,
           selection: teamName,
-          stake: stake
+          stake: stake,
+          idempotencyKey: idempotencyKey
         };
 
         const res = await window.ApiClient.post('/bets/place', payload);

@@ -6,6 +6,12 @@
 const express = require('express');
 const { getPool } = require('../config/db');
 const { authenticate } = require('../middleware/auth');
+const {
+  reserveIdempotencyKey,
+  completeIdempotencyKey,
+  releaseIdempotencyKey,
+  executeWithRetry
+} = require('../utils/idempotency');
 
 const router = express.Router();
 
@@ -190,272 +196,349 @@ router.get('/my-bets', async (req, res, next) => {
  */
 async function handlePlaceBet(req, res, next) {
   const pool = getPool();
-  let connection = null;
+  const userId = req.user.id;
+  const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
+  const rawSelection = req.body.selection || req.body.selectedTeam || req.body.team;
+  const rawStake = req.body.stake !== undefined ? req.body.stake : req.body.amount;
+  const rawIdempotencyKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+
+  const matchId = (rawMatchId || '').trim();
+  const selection = typeof rawSelection === 'string' ? rawSelection.trim() : '';
+
+  // 1. Basic Input & Match Validation
+  if (!matchId) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' },
+      message: 'Match identifier is required.'
+    });
+  }
+
+  if (!selection) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_SELECTION', message: 'Please select a team to win the toss.' },
+      message: 'Please select a team to win the toss.'
+    });
+  }
+
+  // 2. Strict Stake Input Validation (Min ₹50, Max ₹100,000)
+  if (rawStake === undefined || rawStake === null || typeof rawStake === 'boolean') {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
+      message: 'Please enter a valid stake amount.'
+    });
+  }
+
+  const stakeStr = String(rawStake).trim();
+  if (stakeStr === '' || stakeStr === 'null' || stakeStr === 'undefined' || !/^-?\d+(\.\d+)?$/.test(stakeStr)) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
+      message: 'Please enter a valid stake amount.'
+    });
+  }
+
+  const stakeNum = Number(stakeStr);
+  if (isNaN(stakeNum) || !Number.isFinite(stakeNum) || stakeNum <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_STAKE', message: 'Stake amount must be a positive number greater than 0.' },
+      message: 'Stake amount must be a positive number greater than 0.'
+    });
+  }
+
+  const decimalParts = stakeStr.split('.');
+  if (decimalParts.length === 2 && decimalParts[1].length > 2) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_STAKE_PRECISION', message: 'Stake amount cannot have more than 2 decimal places.' },
+      message: 'Stake amount cannot have more than 2 decimal places.'
+    });
+  }
+
+  if (stakeNum < 50) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'MIN_STAKE_ERROR', message: 'Minimum stake amount is ₹50.' },
+      message: 'Minimum stake amount is ₹50.'
+    });
+  }
+
+  if (stakeNum > 100000) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'MAX_STAKE_ERROR', message: 'Maximum stake amount is ₹100,000.' },
+      message: 'Maximum stake amount is ₹100,000.'
+    });
+  }
+
+  const stake = parseFloat(stakeNum.toFixed(2));
+  const cleanIdempotencyKey = rawIdempotencyKey ? String(rawIdempotencyKey).trim() : null;
 
   try {
-    const userId = req.user.id;
-    const rawMatchId = req.body.matchId !== undefined ? String(req.body.matchId) : (req.body.match_id !== undefined ? String(req.body.match_id) : '');
-    const rawSelection = req.body.selection || req.body.selectedTeam || req.body.team;
-    const rawStake = req.body.stake !== undefined ? req.body.stake : req.body.amount;
+    const result = await executeWithRetry(async () => {
+      let connection = null;
+      try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
 
-    const matchId = (rawMatchId || '').trim();
-    const selection = typeof rawSelection === 'string' ? rawSelection.trim() : '';
+        // Check/reserve idempotency key
+        if (cleanIdempotencyKey) {
+          const idemResult = await reserveIdempotencyKey(connection, {
+            key: cleanIdempotencyKey,
+            userId,
+            scope: 'BET_PLACE',
+            payload: { matchId, selection, stake }
+          });
 
-    // 1. Basic Input & Match Validation
-    if (!matchId) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_MATCH_ID', message: 'Match identifier is required.' },
-        message: 'Match identifier is required.'
-      });
-    }
+          if (idemResult.mismatch) {
+            await connection.rollback();
+            return {
+              httpStatus: 422,
+              body: {
+                success: false,
+                error: { code: 'IDEMPOTENCY_PAYLOAD_MISMATCH', message: idemResult.message }
+              }
+            };
+          }
 
-    if (!selection) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_SELECTION', message: 'Please select a team to win the toss.' },
-        message: 'Please select a team to win the toss.'
-      });
-    }
+          if (idemResult.isProcessing) {
+            await connection.rollback();
+            return {
+              httpStatus: 409,
+              body: {
+                success: false,
+                error: { code: 'CONCURRENT_REQUEST', message: idemResult.message }
+              }
+            };
+          }
 
-    // 2. Strict Stake Input Validation (Min ₹50, Max ₹100,000)
-    if (rawStake === undefined || rawStake === null || typeof rawStake === 'boolean') {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
-        message: 'Please enter a valid stake amount.'
-      });
-    }
-
-    const stakeStr = String(rawStake).trim();
-    if (stakeStr === '' || stakeStr === 'null' || stakeStr === 'undefined') {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
-        message: 'Please enter a valid stake amount.'
-      });
-    }
-
-    // Disallow non-numeric strings such as "100abc", "Infinity", "NaN"
-    if (!/^-?\d+(\.\d+)?$/.test(stakeStr)) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
-        message: 'Please enter a valid stake amount.'
-      });
-    }
-
-    const stakeNum = Number(stakeStr);
-    if (isNaN(stakeNum) || !Number.isFinite(stakeNum)) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STAKE', message: 'Please enter a valid stake amount.' },
-        message: 'Please enter a valid stake amount.'
-      });
-    }
-
-    // Zero & Negative amounts rejected
-    if (stakeNum <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STAKE', message: 'Stake amount must be a positive number greater than 0.' },
-        message: 'Stake amount must be a positive number greater than 0.'
-      });
-    }
-
-    // Currency Decimal Precision Check (at most 2 decimal places)
-    const decimalParts = stakeStr.split('.');
-    if (decimalParts.length === 2 && decimalParts[1].length > 2) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STAKE_PRECISION', message: 'Stake amount cannot have more than 2 decimal places.' },
-        message: 'Stake amount cannot have more than 2 decimal places.'
-      });
-    }
-
-    // Fixed Minimum Stake Boundary: ₹50
-    if (stakeNum < 50) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MIN_STAKE_ERROR', message: 'Minimum stake amount is ₹50.' },
-        message: 'Minimum stake amount is ₹50.'
-      });
-    }
-
-    // Fixed Maximum Stake Boundary: ₹100,000
-    if (stakeNum > 100000) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MAX_STAKE_ERROR', message: 'Maximum stake amount is ₹100,000.' },
-        message: 'Maximum stake amount is ₹100,000.'
-      });
-    }
-
-    const stake = parseFloat(stakeNum.toFixed(2));
-
-    // 2. Transactional validation & atomic placement
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    // 2a. Row-lock match to verify current status and authoritative expiry
-    const [matchRows] = await connection.query(
-      'SELECT id, match_title, competition, team_one, team_one_rate, team_two, team_two_rate, status, settled, match_end_time FROM matches WHERE id = ? FOR UPDATE',
-      [matchId]
-    );
-
-    if (matchRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({
-        success: false,
-        error: { code: 'MATCH_NOT_FOUND', message: 'Match fixture not found in database.' }
-      });
-    }
-
-    const match = matchRows[0];
-
-    // Check if match is closed or settled
-    if (match.settled || match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'BETTING_CLOSED', message: 'Betting on this match is closed.' }
-      });
-    }
-
-    // Check if match has expired based on real database match_end_time
-    if (!match.match_end_time) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'MATCH_EXPIRED',
-          message: 'This match has expired and betting is closed.'
+          if (idemResult.isRetry && idemResult.cachedResponse) {
+            await connection.rollback();
+            return {
+              httpStatus: idemResult.cachedResponse.status,
+              body: idemResult.cachedResponse.body
+            };
+          }
         }
-      });
-    }
 
-    const matchEndTimeMs = new Date(match.match_end_time).getTime();
-    if (isNaN(matchEndTimeMs) || matchEndTimeMs <= Date.now()) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'MATCH_EXPIRED',
-          message: 'This match has expired and betting is closed.'
+        // Lock ordering: 1. match, 2. wallet
+        const [matchRows] = await connection.query(
+          'SELECT id, match_title, competition, team_one, team_one_rate, team_two, team_two_rate, status, settled, match_end_time FROM matches WHERE id = ? FOR UPDATE',
+          [matchId]
+        );
+
+        if (matchRows.length === 0) {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 404,
+            body: { success: false, error: { code: 'MATCH_NOT_FOUND', message: 'Match fixture not found in database.' } }
+          };
         }
-      });
-    }
 
-    // Check if selection matches team_one or team_two
-    let rate = 0;
-    if (selection.toLowerCase() === match.team_one.toLowerCase()) {
-      rate = parseFloat(match.team_one_rate || 1.90);
-    } else if (selection.toLowerCase() === match.team_two.toLowerCase()) {
-      rate = parseFloat(match.team_two_rate || 1.90);
-    } else {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'INVALID_TEAM_SELECTION',
-          message: `Selection "${selection}" is invalid. Must choose either "${match.team_one}" or "${match.team_two}".`
+        const match = matchRows[0];
+
+        if (match.settled || match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'BETTING_CLOSED', message: 'Betting on this match is closed.' } }
+          };
         }
-      });
-    }
 
-    // 2b. Row-lock player wallet
-    const [walletRows] = await connection.query(
-      'SELECT id, available_balance, exposure_balance, currency, version FROM wallets WHERE user_id = ? FOR UPDATE',
-      [userId]
-    );
-
-    if (walletRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({
-        success: false,
-        error: { code: 'WALLET_NOT_FOUND', message: 'Player wallet record not found.' }
-      });
-    }
-
-    const wallet = walletRows[0];
-    const availableBalance = parseFloat(wallet.available_balance || 0);
-
-    if (availableBalance < stake) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'INSUFFICIENT_BALANCE',
-          message: `Insufficient available balance. Required: ₹${stake.toFixed(2)}, Available: ₹${availableBalance.toFixed(2)}.`
+        if (match.match_end_time) {
+          const matchEndTimeMs = new Date(match.match_end_time).getTime();
+          if (!isNaN(matchEndTimeMs) && matchEndTimeMs <= Date.now()) {
+            await connection.rollback();
+            if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+            return {
+              httpStatus: 400,
+              body: { success: false, error: { code: 'MATCH_EXPIRED', message: 'This match has expired and betting is closed.' } }
+            };
+          }
         }
-      });
-    }
 
-    // 2c. Calculate potential return & profit
-    const potentialReturn = parseFloat((stake * rate).toFixed(2));
-    const betId = `BET-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+        let rate = 0;
+        if (selection.toLowerCase() === match.team_one.toLowerCase()) {
+          rate = parseFloat(match.team_one_rate || 1.90);
+        } else if (selection.toLowerCase() === match.team_two.toLowerCase()) {
+          rate = parseFloat(match.team_two_rate || 1.90);
+        } else {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: {
+              success: false,
+              error: {
+                code: 'INVALID_TEAM_SELECTION',
+                message: `Selection "${selection}" is invalid. Must choose either "${match.team_one}" or "${match.team_two}".`
+              }
+            }
+          };
+        }
 
-    // 2d. Insert Bet Ticket
-    await connection.query(
-      `INSERT INTO bets (
-        id, user_id, match_id, market_name, selection,
-        stake, odds, potential_return, status, settlement_status,
-        payout, settled_at, settled_by, created_at, updated_at
-      ) VALUES (?, ?, ?, 'Toss Winner', ?, ?, ?, ?, 'pending', 'pending', 0.00, NULL, NULL, NOW(), NOW())`,
-      [betId, userId, match.id, selection, stake, rate, potentialReturn]
-    );
+        // Lock wallet
+        const [walletRows] = await connection.query(
+          'SELECT id, available_balance, exposure_balance, currency, version FROM wallets WHERE user_id = ? FOR UPDATE',
+          [userId]
+        );
 
-    // 2e. Deduct Stake from Available Balance, Increase Exposure
-    await connection.query(
-      `UPDATE wallets
-       SET available_balance = available_balance - ?,
-           exposure_balance = exposure_balance + ?,
-           version = version + 1,
-           updated_at = NOW()
-       WHERE user_id = ?`,
-      [stake, stake, userId]
-    );
+        if (walletRows.length === 0) {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 404,
+            body: { success: false, error: { code: 'WALLET_NOT_FOUND', message: 'Player wallet record not found.' } }
+          };
+        }
 
-    // 2f. Query authoritative new balance
-    const [updatedWalletRows] = await connection.query(
-      'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
-      [userId]
-    );
-    const newWallet = updatedWalletRows[0];
+        const wallet = walletRows[0];
+        const availableBalance = parseFloat(wallet.available_balance || 0);
 
-    await connection.commit();
+        if (availableBalance < stake) {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: {
+              success: false,
+              error: {
+                code: 'INSUFFICIENT_BALANCE',
+                message: `Insufficient available balance. Required: ₹${stake.toFixed(2)}, Available: ₹${availableBalance.toFixed(2)}.`
+              }
+            }
+          };
+        }
 
-    return res.status(201).json({
-      success: true,
-      message: `Bet of ₹${stake.toFixed(2)} placed successfully on ${selection}!`,
-      data: {
-        bet: {
-          id: betId,
-          matchId: match.id,
-          matchTitle: match.match_title,
-          selection,
-          rate,
-          stake,
-          potentialReturn,
-          potentialProfit: parseFloat((potentialReturn - stake).toFixed(2)),
-          status: 'pending'
-        },
-        wallet: {
-          availableBalance: parseFloat(newWallet.available_balance),
-          exposureBalance: parseFloat(newWallet.exposure_balance),
-          currency: newWallet.currency || 'INR'
+        // Calculate potential return & profit
+        const potentialReturn = parseFloat((stake * rate).toFixed(2));
+        const betId = `BET-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+        // Insert Bet Ticket with idempotency_key
+        await connection.query(
+          `INSERT INTO bets (
+            id, user_id, match_id, market_name, selection,
+            stake, odds, potential_return, status, settlement_status,
+            idempotency_key, payout, settled_at, settled_by, created_at, updated_at
+          ) VALUES (?, ?, ?, 'Toss Winner', ?, ?, ?, ?, 'pending', 'pending', ?, 0.00, NULL, NULL, NOW(), NOW())`,
+          [betId, userId, match.id, selection, stake, rate, potentialReturn, cleanIdempotencyKey]
+        );
+
+        // Deduct stake atomically with conditional balance check
+        const [walletUpdateRes] = await connection.query(
+          `UPDATE wallets
+           SET available_balance = available_balance - ?,
+               exposure_balance = exposure_balance + ?,
+               version = version + 1,
+               updated_at = NOW()
+           WHERE user_id = ? AND available_balance >= ?`,
+          [stake, stake, userId, stake]
+        );
+
+        if (walletUpdateRes.affectedRows !== 1) {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: {
+              success: false,
+              error: {
+                code: 'INSUFFICIENT_BALANCE',
+                message: `Insufficient available balance. Required: ₹${stake.toFixed(2)}, Available: ₹${availableBalance.toFixed(2)}.`
+              }
+            }
+          };
+        }
+
+        // Record in coin_transactions: BET_STAKE_DEBIT
+        const crypto = require('crypto');
+        const stakeTxUuid = crypto.randomUUID();
+        const stakeTxnKey = cleanIdempotencyKey ? `STAKE-${cleanIdempotencyKey}` : `STAKE-${betId}`;
+        const balBefore = availableBalance;
+        const balAfter = parseFloat((availableBalance - stake).toFixed(2));
+
+        await connection.query(
+          `INSERT INTO coin_transactions (
+            transaction_uuid, user_id, username, admin_id, admin_username,
+            action_type, amount, balance_before, balance_after,
+            reason, bet_id, match_id, idempotency_key, status, created_at
+          ) VALUES (?, ?, ?, NULL, NULL, 'BET_STAKE_DEBIT', ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+          [
+            stakeTxUuid,
+            userId,
+            req.user.username,
+            stake,
+            balBefore,
+            balAfter,
+            `Bet Placed: ${betId} on ${match.match_title} (${selection} @ ₹${stake.toFixed(2)})`,
+            betId,
+            match.id,
+            stakeTxnKey
+          ]
+        );
+
+        const [updatedWalletRows] = await connection.query(
+          'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
+          [userId]
+        );
+        const newWallet = updatedWalletRows[0];
+
+        const responsePayload = {
+          success: true,
+          message: `Bet of ₹${stake.toFixed(2)} placed successfully on ${selection}!`,
+          data: {
+            bet: {
+              id: betId,
+              matchId: match.id,
+              matchTitle: match.match_title,
+              selection,
+              rate,
+              stake,
+              potentialReturn,
+              potentialProfit: parseFloat((potentialReturn - stake).toFixed(2)),
+              status: 'pending'
+            },
+            wallet: {
+              availableBalance: parseFloat(newWallet.available_balance),
+              exposureBalance: parseFloat(newWallet.exposure_balance),
+              currency: newWallet.currency || 'INR'
+            }
+          }
+        };
+
+        if (cleanIdempotencyKey) {
+          await completeIdempotencyKey(connection, {
+            key: cleanIdempotencyKey,
+            responseStatus: 201,
+            responseBody: responsePayload
+          });
+        }
+
+        await connection.commit();
+        return { httpStatus: 201, body: responsePayload };
+      } catch (innerErr) {
+        if (connection) {
+          try { await connection.rollback(); } catch (rbErr) {}
+        }
+        if (cleanIdempotencyKey) {
+          await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+        }
+        throw innerErr;
+      } finally {
+        if (connection) {
+          connection.release();
         }
       }
     });
+
+    return res.status(result.httpStatus).json(result.body);
   } catch (err) {
-    if (connection) {
-      try { await connection.rollback(); } catch (rbErr) {}
-    }
     next(err);
-  } finally {
-    if (connection) {
-      connection.release();
-    }
   }
 }
 
@@ -470,276 +553,327 @@ router.post('/', handlePlaceBet);
  */
 async function handleCancelBet(req, res, next) {
   const pool = getPool();
-  let connection = null;
+  const userId = req.user.id;
+  const rawBetId = req.params.betId || req.params.id || req.body.betId || req.body.bet_id || req.body.id;
+  const betId = rawBetId ? String(rawBetId).trim() : '';
+
+  if (!betId) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_BET_ID', message: 'Bet identifier is required.' },
+      message: 'Bet identifier is required.'
+    });
+  }
+
+  const clientKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
+  const cancelIdempotencyKey = clientKey ? String(clientKey).trim() : null;
 
   try {
-    const userId = req.user.id;
-    const rawBetId = req.params.betId || req.params.id || req.body.betId || req.body.bet_id || req.body.id;
-    const betId = rawBetId ? String(rawBetId).trim() : '';
+    const result = await executeWithRetry(async () => {
+      let connection = null;
+      try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
 
-    if (!betId) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_BET_ID', message: 'Bet identifier is required.' },
-        message: 'Bet identifier is required.'
-      });
-    }
-
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    // 1. Lock bet row to inspect current state
-    const [betRows] = await connection.query(
-      `SELECT id, user_id, match_id, market_name, selection, stake, odds, potential_return, status, settlement_status, payout, refund_amount, cancelled_at
-       FROM bets
-       WHERE id = ?
-       FOR UPDATE`,
-      [betId]
-    );
-
-    if (betRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({
-        success: false,
-        error: { code: 'BET_NOT_FOUND', message: 'Bet ticket not found in database.' },
-        message: 'Bet ticket not found in database.'
-      });
-    }
-
-    const bet = betRows[0];
-
-    // 2. Strict ownership verification
-    if (bet.user_id !== userId) {
-      await connection.rollback();
-      return res.status(403).json({
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'You are not authorized to cancel this bet.' },
-        message: 'You are not authorized to cancel this bet.'
-      });
-    }
-
-    // 3. Verify bet is in a cancellable state
-    if (bet.status === 'cancelled' || bet.settlement_status === 'cancelled' || bet.cancelled_at !== null) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'ALREADY_CANCELLED', message: 'This bet has already been cancelled and refunded.' },
-        message: 'This bet has already been cancelled and refunded.'
-      });
-    }
-
-    if (bet.settlement_status === 'settled' || ['won', 'lost', 'no_result'].includes(bet.status)) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'BET_ALREADY_SETTLED', message: 'Cannot cancel a bet that has already been settled.' },
-        message: 'Cannot cancel a bet that has already been settled.'
-      });
-    }
-
-    if (bet.status !== 'pending' && bet.status !== 'live') {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'BET_NOT_CANCELLABLE', message: `Bet is in "${bet.status}" status and cannot be cancelled.` },
-        message: `Bet is in "${bet.status}" status and cannot be cancelled.`
-      });
-    }
-
-    // 4. Lock match row and strictly evaluate cancellation deadline
-    const [matchRows] = await connection.query(
-      `SELECT id, match_title, competition, team_one, team_two, scheduled_time, match_start_time, match_end_time, status, settled
-       FROM matches
-       WHERE id = ?
-       FOR UPDATE`,
-      [bet.match_id]
-    );
-
-    if (matchRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({
-        success: false,
-        error: { code: 'MATCH_NOT_FOUND', message: 'Associated match fixture not found.' },
-        message: 'Associated match fixture not found.'
-      });
-    }
-
-    const match = matchRows[0];
-
-    // Reject if match is settled
-    if (match.settled) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MATCH_SETTLED', message: 'Cannot cancel bet. Match has already been settled.' },
-        message: 'Cannot cancel bet. Match has already been settled.'
-      });
-    }
-
-    // Reject if match has completed or abandoned
-    if (match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MATCH_ENDED', message: `Cannot cancel bet. Match is marked as ${match.status}.` },
-        message: `Cannot cancel bet. Match is marked as ${match.status}.`
-      });
-    }
-
-    const now = Date.now();
-
-    // Reject if scheduled start time has arrived or passed
-    if (match.match_start_time) {
-      const startTimeMs = new Date(match.match_start_time).getTime();
-      if (!isNaN(startTimeMs) && startTimeMs <= now) {
-        await connection.rollback();
-        return res.status(400).json({
-          success: false,
-          error: { code: 'MATCH_STARTED', message: 'Cannot cancel bet. The scheduled match start time has passed.' },
-          message: 'Cannot cancel bet. The scheduled match start time has passed.'
+        // 1. Check/reserve idempotency key
+        const idemResult = await reserveIdempotencyKey(connection, {
+          key: cancelIdempotencyKey,
+          userId,
+          scope: 'BET_CANCEL',
+          payload: { betId }
         });
-      }
-    }
 
-    // Reject if match expiry has arrived or passed
-    if (match.match_end_time) {
-      const endTimeMs = new Date(match.match_end_time).getTime();
-      if (!isNaN(endTimeMs) && endTimeMs <= now) {
-        await connection.rollback();
-        return res.status(400).json({
-          success: false,
-          error: { code: 'MATCH_EXPIRED', message: 'Cannot cancel bet. Match has expired.' },
-          message: 'Cannot cancel bet. Match has expired.'
+        if (idemResult.mismatch) {
+          await connection.rollback();
+          return {
+            httpStatus: 422,
+            body: { success: false, error: { code: 'IDEMPOTENCY_PAYLOAD_MISMATCH', message: idemResult.message } }
+          };
+        }
+
+        if (idemResult.isProcessing) {
+          await connection.rollback();
+          return {
+            httpStatus: 409,
+            body: { success: false, error: { code: 'CONCURRENT_REQUEST', message: idemResult.message } }
+          };
+        }
+
+        if (idemResult.isRetry && idemResult.cachedResponse) {
+          await connection.rollback();
+          return {
+            httpStatus: idemResult.cachedResponse.status,
+            body: idemResult.cachedResponse.body
+          };
+        }
+
+        // Lock ordering: 1. match, 2. bet, 3. wallet
+        const [betRows] = await connection.query(
+          `SELECT id, user_id, match_id, market_name, selection, stake, odds, potential_return, status, settlement_status, payout, refund_amount, cancelled_at
+           FROM bets
+           WHERE id = ?
+           FOR UPDATE`,
+          [betId]
+        );
+
+        if (betRows.length === 0) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 404,
+            body: { success: false, error: { code: 'BET_NOT_FOUND', message: 'Bet ticket not found in database.' }, message: 'Bet ticket not found in database.' }
+          };
+        }
+
+        const bet = betRows[0];
+
+        // 2. Strict ownership verification
+        if (bet.user_id !== userId) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 403,
+            body: { success: false, error: { code: 'FORBIDDEN', message: 'You are not authorized to cancel this bet.' }, message: 'You are not authorized to cancel this bet.' }
+          };
+        }
+
+        // 3. Verify bet is in a cancellable state
+        if (bet.status === 'cancelled' || bet.settlement_status === 'cancelled' || bet.cancelled_at !== null) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'ALREADY_CANCELLED', message: 'This bet has already been cancelled and refunded.' }, message: 'This bet has already been cancelled and refunded.' }
+          };
+        }
+
+        if (bet.settlement_status === 'settled' || ['won', 'lost', 'no_result'].includes(bet.status)) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'BET_ALREADY_SETTLED', message: 'Cannot cancel a bet that has already been settled.' }, message: 'Cannot cancel a bet that has already been settled.' }
+          };
+        }
+
+        if (bet.status !== 'pending' && bet.status !== 'live') {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'BET_NOT_CANCELLABLE', message: `Bet is in "${bet.status}" status and cannot be cancelled.` }, message: `Bet is in "${bet.status}" status and cannot be cancelled.` }
+          };
+        }
+
+        // 4. Lock match row and strictly evaluate cancellation deadline
+        const [matchRows] = await connection.query(
+          `SELECT id, match_title, competition, team_one, team_two, scheduled_time, match_start_time, match_end_time, status, settled
+           FROM matches
+           WHERE id = ?
+           FOR UPDATE`,
+          [bet.match_id]
+        );
+
+        if (matchRows.length === 0) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 404,
+            body: { success: false, error: { code: 'MATCH_NOT_FOUND', message: 'Associated match fixture not found.' }, message: 'Associated match fixture not found.' }
+          };
+        }
+
+        const match = matchRows[0];
+
+        // Reject if match is settled
+        if (match.settled) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'MATCH_SETTLED', message: 'Cannot cancel bet. Match has already been settled.' }, message: 'Cannot cancel bet. Match has already been settled.' }
+          };
+        }
+
+        // Reject if match has completed or abandoned
+        if (match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'MATCH_ENDED', message: `Cannot cancel bet. Match is marked as ${match.status}.` }, message: `Cannot cancel bet. Match is marked as ${match.status}.` }
+          };
+        }
+
+        const now = Date.now();
+
+        // Reject if scheduled start time has arrived or passed
+        if (match.match_start_time) {
+          const startTimeMs = new Date(match.match_start_time).getTime();
+          if (!isNaN(startTimeMs) && startTimeMs <= now) {
+            await connection.rollback();
+            await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+            return {
+              httpStatus: 400,
+              body: { success: false, error: { code: 'MATCH_STARTED', message: 'Cannot cancel bet. The scheduled match start time has passed.' }, message: 'Cannot cancel bet. The scheduled match start time has passed.' }
+            };
+          }
+        }
+
+        // Reject if match expiry has arrived or passed
+        if (match.match_end_time) {
+          const endTimeMs = new Date(match.match_end_time).getTime();
+          if (!isNaN(endTimeMs) && endTimeMs <= now) {
+            await connection.rollback();
+            await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+            return {
+              httpStatus: 400,
+              body: { success: false, error: { code: 'MATCH_EXPIRED', message: 'Cannot cancel bet. Match has expired.' }, message: 'Cannot cancel bet. Match has expired.' }
+            };
+          }
+        }
+
+        // 5. Lock player wallet row
+        const [walletRows] = await connection.query(
+          `SELECT id, user_id, available_balance, exposure_balance, version
+           FROM wallets
+           WHERE user_id = ?
+           FOR UPDATE`,
+          [userId]
+        );
+
+        if (walletRows.length === 0) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 404,
+            body: { success: false, error: { code: 'WALLET_NOT_FOUND', message: 'Player wallet record not found.' }, message: 'Player wallet record not found.' }
+          };
+        }
+
+        const wallet = walletRows[0];
+        const refundStake = parseFloat(bet.stake);
+        const balanceBefore = parseFloat(wallet.available_balance || 0);
+        const balanceAfter = parseFloat((balanceBefore + refundStake).toFixed(2));
+
+        // 6. Transition bet status from pending to cancelled atomically
+        const [updateBetResult] = await connection.query(
+          `UPDATE bets
+           SET status = 'cancelled',
+               settlement_status = 'cancelled',
+               refund_amount = ?,
+               cancelled_at = NOW(),
+               updated_at = NOW()
+           WHERE id = ? AND status IN ('pending', 'live') AND settlement_status = 'pending'`,
+          [refundStake, bet.id]
+        );
+
+        if (updateBetResult.affectedRows !== 1) {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 409,
+            body: { success: false, error: { code: 'CONCURRENT_MODIFICATION', message: 'Bet state changed during processing. Please refresh and try again.' }, message: 'Bet state changed during processing. Please refresh and try again.' }
+          };
+        }
+
+        // 7. Atomically refund stake to available balance and release exposure
+        await connection.query(
+          `UPDATE wallets
+           SET available_balance = available_balance + ?,
+               exposure_balance = GREATEST(0.00, exposure_balance - ?),
+               version = version + 1,
+               updated_at = NOW()
+           WHERE user_id = ?`,
+          [refundStake, refundStake, userId]
+        );
+
+        // 8. Record audit ledger entry in coin_transactions
+        const crypto = require('crypto');
+        const txnUuid = crypto.randomUUID();
+
+        await connection.query(
+          `INSERT INTO coin_transactions (
+            transaction_uuid, user_id, username, admin_id, admin_username,
+            action_type, amount, balance_before, balance_after,
+            reason, bet_id, match_id, idempotency_key, status, created_at
+          ) VALUES (?, ?, ?, NULL, NULL, 'BET_CANCEL_REFUND', ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+          [
+            txnUuid,
+            userId,
+            req.user.username,
+            refundStake,
+            balanceBefore,
+            balanceAfter,
+            `Bet Cancellation Refund: ${bet.id} (${bet.selection} - ₹${refundStake.toFixed(2)})`,
+            bet.id,
+            match.id,
+            cancelIdempotencyKey
+          ]
+        );
+
+        // 9. Fetch authoritative updated wallet balance
+        const [updatedWalletRows] = await connection.query(
+          'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
+          [userId]
+        );
+        const newWallet = updatedWalletRows[0];
+
+        const responsePayload = {
+          success: true,
+          message: 'Bet cancelled successfully. Your stake has been refunded.',
+          bet: {
+            id: bet.id,
+            status: 'cancelled',
+            settlementStatus: 'cancelled'
+          },
+          refundedAmount: refundStake,
+          balance: parseFloat(newWallet.available_balance),
+          data: {
+            bet: {
+              id: bet.id,
+              matchId: match.id,
+              matchTitle: match.match_title,
+              selection: bet.selection,
+              stake: refundStake,
+              status: 'cancelled',
+              settlementStatus: 'cancelled',
+              refundAmount: refundStake,
+              cancelledAt: new Date().toISOString()
+            },
+            refundedAmount: refundStake,
+            wallet: {
+              availableBalance: parseFloat(newWallet.available_balance),
+              exposureBalance: parseFloat(newWallet.exposure_balance),
+              currency: newWallet.currency || 'INR'
+            }
+          }
+        };
+
+        await completeIdempotencyKey(connection, {
+          key: cancelIdempotencyKey,
+          responseStatus: 200,
+          responseBody: responsePayload
         });
-      }
-    }
 
-    // 5. Lock player wallet row
-    const [walletRows] = await connection.query(
-      `SELECT id, user_id, available_balance, exposure_balance, version
-       FROM wallets
-       WHERE user_id = ?
-       FOR UPDATE`,
-      [userId]
-    );
-
-    if (walletRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({
-        success: false,
-        error: { code: 'WALLET_NOT_FOUND', message: 'Player wallet record not found.' },
-        message: 'Player wallet record not found.'
-      });
-    }
-
-    const wallet = walletRows[0];
-    const refundStake = parseFloat(bet.stake);
-    const balanceBefore = parseFloat(wallet.available_balance || 0);
-    const balanceAfter = parseFloat((balanceBefore + refundStake).toFixed(2));
-
-    // 6. Transition bet status from pending to cancelled
-    const [updateBetResult] = await connection.query(
-      `UPDATE bets
-       SET status = 'cancelled',
-           settlement_status = 'cancelled',
-           refund_amount = ?,
-           cancelled_at = NOW(),
-           updated_at = NOW()
-       WHERE id = ? AND status IN ('pending', 'live') AND settlement_status = 'pending'`,
-      [refundStake, bet.id]
-    );
-
-    if (updateBetResult.affectedRows !== 1) {
-      await connection.rollback();
-      return res.status(409).json({
-        success: false,
-        error: { code: 'CONCURRENT_MODIFICATION', message: 'Bet state changed during processing. Please refresh and try again.' },
-        message: 'Bet state changed during processing. Please refresh and try again.'
-      });
-    }
-
-    // 7. Atomically refund stake to available balance and release exposure
-    await connection.query(
-      `UPDATE wallets
-       SET available_balance = available_balance + ?,
-           exposure_balance = GREATEST(0.00, exposure_balance - ?),
-           version = version + 1,
-           updated_at = NOW()
-       WHERE user_id = ?`,
-      [refundStake, refundStake, userId]
-    );
-
-    // 8. Record audit ledger entry in coin_transactions
-    const crypto = require('crypto');
-    const txnUuid = crypto.randomUUID();
-    const idempotencyKey = `REFUND-BET-${bet.id}`;
-
-    await connection.query(
-      `INSERT INTO coin_transactions (
-        transaction_uuid, user_id, username, admin_id, admin_username,
-        action_type, amount, balance_before, balance_after,
-        reason, idempotency_key, status, created_at
-      ) VALUES (?, ?, ?, NULL, NULL, 'BET_CANCEL_REFUND', ?, ?, ?, ?, ?, 'completed', NOW())`,
-      [
-        txnUuid,
-        userId,
-        req.user.username,
-        refundStake,
-        balanceBefore,
-        balanceAfter,
-        `Bet Cancellation Refund: ${bet.id} (${bet.selection} - ₹${refundStake.toFixed(2)})`,
-        idempotencyKey
-      ]
-    );
-
-    // 9. Fetch authoritative updated wallet balance
-    const [updatedWalletRows] = await connection.query(
-      'SELECT available_balance, exposure_balance, currency FROM wallets WHERE user_id = ?',
-      [userId]
-    );
-    const newWallet = updatedWalletRows[0];
-
-    await connection.commit();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Bet cancelled successfully. Your stake has been refunded.',
-      bet: {
-        id: bet.id,
-        status: 'cancelled',
-        settlementStatus: 'cancelled'
-      },
-      refundedAmount: refundStake,
-      balance: parseFloat(newWallet.available_balance),
-      data: {
-        bet: {
-          id: bet.id,
-          matchId: match.id,
-          matchTitle: match.match_title,
-          selection: bet.selection,
-          stake: refundStake,
-          status: 'cancelled',
-          settlementStatus: 'cancelled',
-          refundAmount: refundStake,
-          cancelledAt: new Date().toISOString()
-        },
-        refundedAmount: refundStake,
-        wallet: {
-          availableBalance: parseFloat(newWallet.available_balance),
-          exposureBalance: parseFloat(newWallet.exposure_balance),
-          currency: newWallet.currency || 'INR'
+        await connection.commit();
+        return { httpStatus: 200, body: responsePayload };
+      } catch (innerErr) {
+        if (connection) {
+          try { await connection.rollback(); } catch (rbErr) {}
+        }
+        await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+        throw innerErr;
+      } finally {
+        if (connection) {
+          connection.release();
         }
       }
     });
+
+    return res.status(result.httpStatus).json(result.body);
   } catch (err) {
-    if (connection) {
-      try { await connection.rollback(); } catch (rbErr) {}
-    }
     next(err);
-  } finally {
-    if (connection) {
-      connection.release();
-    }
   }
 }
 
