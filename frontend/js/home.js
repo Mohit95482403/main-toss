@@ -277,74 +277,13 @@
   }
 
   /**
-   * Update Featured Match Card Dynamically
+   * Update Featured Match Card Dynamically (Featured card removed from Home page)
    */
   function updateFeaturedMatch(matches) {
     const featuredCard = document.getElementById('featured-match');
-    if (!featuredCard) return;
-
-    // Pick top live match, or top upcoming match
-    const featured = matches.find(m => m.status === 'live') || matches.find(m => m.status === 'upcoming') || matches[0];
-
-    if (!featured) {
+    if (featuredCard) {
       featuredCard.style.display = 'none';
-      return;
     }
-
-    featuredCard.style.display = 'flex';
-    featuredCard.removeAttribute('href');
-    featuredCard.setAttribute('data-match-id', featured.id);
-    featuredCard.setAttribute('role', 'button');
-    featuredCard.setAttribute('tabindex', '0');
-    featuredCard.setAttribute('aria-label', `Featured Match: ${featured.matchTitle}, Status: ${featured.status}`);
-
-    const tourneyEl = featuredCard.querySelector('.featured-tournament');
-    const livePill = featuredCard.querySelector('.featured-live-pill');
-    const teamOneCrest = featuredCard.querySelectorAll('.featured-crest')[0];
-    const teamOneName = featuredCard.querySelectorAll('.featured-team-name')[0];
-    const teamOneRate = featuredCard.querySelectorAll('.featured-team-rate')[0];
-    const teamTwoCrest = featuredCard.querySelectorAll('.featured-crest')[1];
-    const teamTwoName = featuredCard.querySelectorAll('.featured-team-name')[1];
-    const teamTwoRate = featuredCard.querySelectorAll('.featured-team-rate')[1];
-    const lockNotice = featuredCard.querySelector('.featured-lock-notice span');
-    const venueEl = featuredCard.querySelector('.featured-footer > span:last-child');
-
-    const displayEndTime = formatExpiryDisplay(featured.matchEndTime || featured.match_end_time, featured.scheduledTime);
-
-    if (tourneyEl) tourneyEl.textContent = `🏆 ${featured.competition}`;
-    if (livePill) {
-      livePill.innerHTML = featured.status === 'live'
-        ? `<span class="live-pulse-dot" aria-hidden="true"></span> Live Toss`
-        : escapeHtml(featured.status.toUpperCase());
-      livePill.className = `featured-live-pill ${featured.status === 'live' ? '' : 'status-upcoming'}`;
-    }
-
-    if (teamOneCrest) {
-      const logo1 = featured.teamOneLogo || featured.team_one_logo;
-      const abbr1 = featured.teamOneAbbr || featured.teamOne.substring(0, 3).toUpperCase();
-      if (logo1) {
-        teamOneCrest.innerHTML = `<img src="${escapeHtml(formatLogoUrl(logo1))}" alt="${escapeHtml(featured.teamOne)}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">${escapeHtml(abbr1)}</span>`;
-      } else {
-        teamOneCrest.textContent = abbr1;
-      }
-    }
-    if (teamOneName) teamOneName.textContent = featured.teamOne;
-    if (teamOneRate) teamOneRate.textContent = `Rate ${parseFloat(featured.teamOneRate || 1.90).toFixed(2)}`;
-
-    if (teamTwoCrest) {
-      const logo2 = featured.teamTwoLogo || featured.team_two_logo;
-      const abbr2 = featured.teamTwoAbbr || featured.teamTwo.substring(0, 3).toUpperCase();
-      if (logo2) {
-        teamTwoCrest.innerHTML = `<img src="${escapeHtml(formatLogoUrl(logo2))}" alt="${escapeHtml(featured.teamTwo)}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">${escapeHtml(abbr2)}</span>`;
-      } else {
-        teamTwoCrest.textContent = abbr2;
-      }
-    }
-    if (teamTwoName) teamTwoName.textContent = featured.teamTwo;
-    if (teamTwoRate) teamTwoRate.textContent = `Rate ${parseFloat(featured.teamTwoRate || 1.90).toFixed(2)}`;
-
-    if (lockNotice) lockNotice.textContent = `Ends: ${displayEndTime} • ${featured.stage || 'Toss'}`;
-    if (venueEl) venueEl.textContent = featured.venue || 'Cricket Stadium';
   }
 
   /**

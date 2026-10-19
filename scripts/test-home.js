@@ -42,8 +42,7 @@ assert(htmlContent.includes('id="shared-bottom-nav"'), 'Shared bottom navigation
 
 // Home Dashboard Structure
 assert(htmlContent.includes('id="home-heading"'), 'Home title heading present');
-assert(htmlContent.includes('id="featured-match"'), 'Featured live match card present');
-assert(htmlContent.includes('India') && htmlContent.includes('Australia'), 'Featured match displays India vs Australia');
+assert(!htmlContent.includes('id="featured-match"'), 'Featured live match card removed from Home page');
 assert(htmlContent.includes('data-category="all"'), 'Category filter "All" present');
 assert(htmlContent.includes('data-category="live"'), 'Category filter "Live" present');
 assert(htmlContent.includes('data-category="upcoming"'), 'Category filter "Upcoming" present');

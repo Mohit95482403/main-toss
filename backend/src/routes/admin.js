@@ -4353,6 +4353,7 @@ router.get('/coins/players/:id', async (req, res, next) => {
 router.post('/coins/adjust', async (req, res, next) => {
   const pool = getPool();
   let connection = null;
+  let idemp = null;
 
   try {
     const { userId, actionType, amount, reason, idempotencyKey } = req.body || {};
@@ -4415,7 +4416,7 @@ router.post('/coins/adjust', async (req, res, next) => {
 
     const rawIdempotencyKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'] || req.body.idempotencyKey || req.body.idempotency_key;
     const cleanIdempotencyKey = rawIdempotencyKey ? String(rawIdempotencyKey).trim() : null;
-    let idemp = null;
+    idemp = null;
 
     // 2. Check for idempotent submission
     if (cleanIdempotencyKey) {

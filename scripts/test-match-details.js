@@ -124,7 +124,7 @@ assert(invalidMatch === null, 'Invalid match ID returns null safely');
 const homeHtml = fs.readFileSync(homeHtmlPath, 'utf8');
 const homeJs = fs.readFileSync(homeJsPath, 'utf8');
 
-assert(homeHtml.includes('id="featured-match"'), 'Featured match card is present on Home page');
+assert(!homeHtml.includes('id="featured-match"'), 'Featured match card is removed from Home page');
 assert(homeHtml.includes('script src="js/matches-data.js"'), 'index.html includes matches-data.js script');
 assert(!homeHtml.includes('href="pages/match-details.html'), 'Featured match card no longer navigates to match-details.html');
 

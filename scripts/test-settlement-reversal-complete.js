@@ -515,6 +515,7 @@ async function runTests() {
   console.log('\n================================================================');
   console.log('ALL SETTLEMENT REVERSAL & RESETTLEMENT TESTS PASSED WITH 100% SUCCESS!');
   console.log('================================================================\n');
+  process.exit(0);
 }
 
 runTests().catch(err => {
