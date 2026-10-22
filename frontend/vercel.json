@@ -3,15 +3,16 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/admin", "destination": "/pages/admin.html" },
-    { "source": "/login", "destination": "/pages/login.html" },
-    { "source": "/register", "destination": "/pages/register.html" },
-    { "source": "/bets", "destination": "/pages/bets.html" },
-    { "source": "/passbook", "destination": "/pages/passbook.html" },
-    { "source": "/profile", "destination": "/pages/profile.html" },
-    { "source": "/match-details", "destination": "/pages/match-details.html" },
-    { "source": "/forgot-password", "destination": "/pages/forgot-password.html" },
-    { "source": "/reset-password", "destination": "/pages/reset-password.html" }
+    { "source": "/api/:path*", "destination": "https://daddy-toss-book-backend.onrender.com/api/:path*" },
+    { "source": "/admin", "destination": "/pages/admin" },
+    { "source": "/login", "destination": "/pages/login" },
+    { "source": "/register", "destination": "/pages/register" },
+    { "source": "/bets", "destination": "/pages/bets" },
+    { "source": "/passbook", "destination": "/pages/passbook" },
+    { "source": "/profile", "destination": "/pages/profile" },
+    { "source": "/match-details", "destination": "/pages/match-details" },
+    { "source": "/forgot-password", "destination": "/pages/forgot-password" },
+    { "source": "/reset-password", "destination": "/pages/reset-password" }
   ],
   "headers": [
     {
