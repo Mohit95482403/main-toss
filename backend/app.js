@@ -42,25 +42,65 @@ app.use(securityHeaders);
 app.use(requestLogger);
 
 // 4. CORS Configuration
-const allowedOrigins = [
-  process.env.FRONTEND_ORIGIN || 'http://localhost:5500',
-  'http://127.0.0.1:5500',
-  'http://localhost:3000',
-  'http://localhost:5173'
-];
+function buildAllowedOrigins() {
+  const defaults = [
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ];
+  const list = [...defaults];
+  const addOrigin = (raw) => {
+    if (!raw) return;
+    const trimmed = raw.trim().replace(/\/+$/, '');
+    if (trimmed && !list.includes(trimmed)) {
+      list.push(trimmed);
+    }
+  };
+
+  addOrigin(process.env.FRONTEND_ORIGIN);
+  addOrigin(process.env.FRONTEND_URL);
+
+  if (process.env.ALLOWED_ORIGINS) {
+    process.env.ALLOWED_ORIGINS.split(',').forEach(addOrigin);
+  }
+
+  return list;
+}
+
+const allowedOrigins = buildAllowedOrigins();
+const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === 'true';
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow non-browser requests (e.g. curl, server-to-server, health checks)
     if (!origin) return callback(null, true);
-    if (NODE_ENV === 'production') {
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('CORS policy: Access denied for this origin.'));
+
+    const normalized = origin.replace(/\/+$/, '');
+
+    // Check explicit whitelist
+    if (allowedOrigins.includes(normalized)) {
+      return callback(null, true);
     }
+
+    // Optional: allow *.vercel.app preview deployments if configured
+    if (allowVercelPreviews && /^https:\/\/[a-z0-9\-]+(\-[a-z0-9]+)?\.vercel\.app$/i.test(normalized)) {
+      return callback(null, true);
+    }
+
+    if (NODE_ENV === 'production') {
+      // In production, reject unauthorized origins cleanly without throwing a 500 error
+      return callback(null, false);
+    }
+
+    // In development, allow origin
     return callback(null, true);
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
 
 // 5. Body Parsing & Compression Middleware
@@ -74,17 +114,19 @@ const frontendDir = path.resolve(__dirname, '../frontend');
 if (SERVE_STATIC_FRONTEND) {
   app.use(express.static(frontendDir, {
     index: false,
-    maxAge: '1d',
+    maxAge: 0,
     setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache');
-      }
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     }
   }));
 }
 
 // 6.5 Persistent Static Uploads Serving (Team Logos & Media)
-const uploadsDir = path.resolve(__dirname, 'uploads');
+const uploadsDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.resolve(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(path.join(uploadsDir, 'team-logos'), { recursive: true });
 }
@@ -97,13 +139,20 @@ app.use('/uploads', express.static(uploadsDir, {
 }));
 
 // 7. API Routes Mounting
-app.use('/api/health', healthRoutes);
+// Mount health checks at both /health and /api/health for Render/cloud load balancer compatibility
+app.use(['/health', '/api/health'], healthRoutes);
+app.get(['/healthz', '/live'], (req, res) => res.status(200).json({ status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString() }));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/bets', betRoutes);
 app.use('/api/passbook', passbookRoutes);
 app.use('/api/wallet', walletRoutes);
+
+// Direct admin page route alias
+app.get(['/admin', '/admin.html', '/admin/'], (req, res) => {
+  res.redirect('/pages/admin.html');
+});
 
 // Root informational endpoint
 app.get('/', (req, res) => {
@@ -165,15 +214,17 @@ if (require.main === module) {
       console.warn('[STARTUP] Database auto-initialization note:', err.message);
     });
 
-  const server = app.listen(PORT, () => {
+  const HOST = process.env.HOST || '0.0.0.0';
+  const server = app.listen(PORT, HOST, () => {
     console.log(`====================================================`);
-    console.log(`  IRONMAN TOSS BOOK API Server`);
+    console.log(`  DADDY TOSS BOOK API Server`);
     console.log(`  Status      : Online`);
     console.log(`  Environment : ${NODE_ENV}`);
+    console.log(`  Host        : ${HOST}`);
     console.log(`  Port        : ${PORT}`);
-    console.log(`  Health URL  : http://localhost:${PORT}/api/health`);
-    console.log(`  Liveness    : http://localhost:${PORT}/api/health/live`);
-    console.log(`  Readiness   : http://localhost:${PORT}/api/health/ready`);
+    console.log(`  Health URL  : http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/health`);
+    console.log(`  Liveness    : http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api/health/live`);
+    console.log(`  Readiness   : http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api/health/ready`);
     console.log(`====================================================`);
   });
 

@@ -25,6 +25,8 @@ async function createUserAccount({
   initialBalance,
   accountStatus,
   status = 'active',
+  mustChangePassword = undefined,
+  must_change_password = undefined,
   role = 'user',
   ip = '127.0.0.1'
 }) {
@@ -158,6 +160,16 @@ async function createUserAccount({
     }
   }
 
+  // If created by an admin, defaults to TRUE unless explicitly set false
+  let finalMustChange = false;
+  if (mustChangePassword !== undefined) {
+    finalMustChange = Boolean(mustChangePassword);
+  } else if (must_change_password !== undefined) {
+    finalMustChange = Boolean(must_change_password);
+  } else if (admin) {
+    finalMustChange = true;
+  }
+
   // 3. Hash password using secure scrypt
   const passwordHash = hashPassword(rawPassword);
   const userUuid = crypto.randomUUID();
@@ -169,9 +181,9 @@ async function createUserAccount({
 
     // Insert user record (email and phone are null when omitted)
     const [userResult] = await connection.query(
-      `INSERT INTO users (uuid, full_name, username, email, phone, password_hash, role, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userUuid, trimmedName, trimmedUsername, trimmedEmail, trimmedPhone, passwordHash, finalRole, finalStatus]
+      `INSERT INTO users (uuid, full_name, username, email, phone, password_hash, role, status, must_change_password)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userUuid, trimmedName, trimmedUsername, trimmedEmail, trimmedPhone, passwordHash, finalRole, finalStatus, finalMustChange ? 1 : 0]
     );
 
     const newUserId = userResult.insertId;
@@ -252,6 +264,8 @@ async function createUserAccount({
       status: finalStatus,
       account_status: finalStatus,
       accountStatus: finalStatus,
+      must_change_password: Boolean(finalMustChange),
+      mustChangePassword: Boolean(finalMustChange),
       wallet: {
         available_balance: cleanBalance,
         exposure_balance: 0.00,

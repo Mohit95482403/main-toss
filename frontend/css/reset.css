@@ -27,8 +27,8 @@ body {
   margin: 0;
   line-height: var(--line-height-normal, 1.5);
   font-family: var(--font-family-base, sans-serif);
-  background-color: var(--pink-bg, #FFF7FA);
-  color: var(--text-primary, #352631);
+  background-color: var(--pink-bg, #F7FAF5);
+  color: var(--text-primary, #263328);
 }
 
 img,

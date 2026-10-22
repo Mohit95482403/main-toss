@@ -1,4 +1,4 @@
-﻿const { getPool, closePool } = require('../backend/src/config/db');
+const { getPool, closePool } = require('../backend/src/config/db');
 
 async function deleteAllTestUsers() {
   const pool = getPool();
@@ -19,7 +19,7 @@ async function deleteAllTestUsers() {
       if (protectedUsernames.includes(u.username.toLowerCase())) {
         return false;
       }
-      return /^(user_|player_|player6_|val_user|priv_target_|player_susp_|ghost_user_|del_)/i.test(u.username);
+      return true;
     });
 
     console.log(`[CLEANUP] Found ${testUsers.length} test user account(s) to remove.`);

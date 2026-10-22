@@ -80,6 +80,7 @@ async function runWalletLedgerTests() {
     });
     assert.strictEqual(res.status, 201, `Failed to create player ${username}: ${JSON.stringify(res.data)}`);
     const createdUser = res.data.data.user;
+    await pool.execute('UPDATE users SET must_change_password = 0 WHERE id = ?', [createdUser.id]);
     const token = generateToken({
       userId: createdUser.id,
       username: createdUser.username,

@@ -1,6 +1,6 @@
 /**
  * DADDY TOSS BOOK - Shared Website Header Styles
- * Refined white surface, delicate pink border, rose brand crest, and clear balance pills.
+ * Luxury frosted white surface, delicate rose border, brand badge, and high-contrast balance chips.
  */
 
 .app-header {
@@ -10,23 +10,25 @@
   right: 0;
   z-index: var(--z-header, 100);
   background: var(--glass-bg, rgba(255, 255, 255, 0.92));
-  border-bottom: 1px solid var(--pink-border, #F2D3DF);
-  box-shadow: 0 4px 20px rgba(180, 70, 115, 0.05);
-  height: var(--header-height, 60px);
+  border-bottom: 1px solid var(--border-primary, #DCE7D6);
+  box-shadow: 0 4px 20px rgba(71, 107, 64, 0.05);
+  height: var(--header-height, 62px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-md, 14px);
+  padding: 0 var(--space-4, 16px);
   user-select: none;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  backdrop-filter: var(--glass-blur, blur(16px));
+  -webkit-backdrop-filter: var(--glass-blur, blur(16px));
+  transition: all var(--transition-fast);
 }
 
 @media (min-width: 768px) {
   .app-header {
-    border-top-left-radius: var(--radius-xl, 20px);
-    border-top-right-radius: var(--radius-xl, 20px);
+    border-top-left-radius: var(--radius-xl, 22px);
+    border-top-right-radius: var(--radius-xl, 22px);
+    border-left: 1px solid var(--border-primary, #DCE7D6);
+    border-right: 1px solid var(--border-primary, #DCE7D6);
   }
 }
 
@@ -37,7 +39,7 @@
 .header-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-sm, 8px);
+  gap: var(--space-2, 8px);
   text-decoration: none;
   color: inherit;
   flex-shrink: 0;
@@ -60,30 +62,31 @@
 .brand-logo-fallback {
   display: flex;
   align-items: center;
-  gap: var(--space-sm, 8px);
+  gap: 10px;
 }
 
 .brand-icon-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm, 10px);
-  background: linear-gradient(135deg, var(--pink-rose, #E879A5) 0%, var(--pink-primary, #E75480) 60%, var(--pink-primary-dark, #C93768) 100%);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--gradient-primary, linear-gradient(135deg, #789B69 0%, #476B40 100%));
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 10px rgba(231, 84, 128, 0.28);
+  box-shadow: 0 4px 14px rgba(120, 155, 105, 0.32);
   flex-shrink: 0;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .header-brand:hover .brand-icon-badge {
-  box-shadow: 0 4px 14px rgba(231, 84, 128, 0.38);
+  transform: scale(1.04);
+  box-shadow: 0 6px 18px rgba(120, 155, 105, 0.42);
 }
 
 .brand-icon-badge svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   fill: currentColor;
 }
 
@@ -95,18 +98,18 @@
 
 .brand-title {
   font-family: var(--font-family-display);
-  font-size: 0.9375rem; /* 15px */
+  font-size: 1.05rem; /* 16.8px */
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--text-primary, #352631);
+  color: var(--text-primary, #263328);
   text-transform: uppercase;
 }
 
 .brand-subtitle {
-  font-size: 0.625rem; /* 10px */
-  font-weight: 700;
-  color: var(--pink-primary, #E75480);
-  letter-spacing: 0.08em;
+  font-size: 0.65rem; /* 10.4px */
+  font-weight: 800;
+  color: var(--pink-primary, #789B69);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -117,7 +120,7 @@
 .header-balances {
   display: flex;
   align-items: center;
-  gap: var(--space-sm, 8px);
+  gap: var(--space-2, 8px);
   flex-shrink: 0;
 }
 
@@ -130,48 +133,52 @@
 }
 
 .balance-card-pill {
-  background-color: var(--pink-bg-secondary, #FFF0F5);
-  border: 1px solid var(--pink-border, #F2D3DF);
+  background-color: var(--surface-primary, #FFFFFF);
+  border: 1.5px solid var(--border-primary, #DCE7D6);
   padding: 5px 12px;
   border-radius: var(--radius-sm, 10px);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
 }
 
 .balance-card-pill:hover {
-  border-color: var(--pink-border-strong, #EABCCF);
-  background-color: var(--pink-soft, #FCE4EC);
+  border-color: var(--pink-border-strong, #B7D7A8);
+  background-color: var(--pink-soft, #EAF3E4);
+  transform: translateY(-1px);
 }
 
 .balance-label {
   font-size: 0.625rem; /* 10px */
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted, #9A8994);
-  display: flex;
-  align-items: center;
-  gap: 3px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #889688);
 }
 
 .balance-amount {
   font-family: var(--font-family-mono, monospace);
-  font-size: 0.8125rem; /* 13px */
-  font-weight: 700;
+  font-size: 0.875rem; /* 14px */
+  font-weight: 800;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
 /* Available Balance Pill */
 .balance-available .balance-amount {
-  color: var(--pink-primary, #E75480);
+  color: var(--pink-primary, #789B69);
 }
 
 /* Red Exposure Indicator Pill */
 .balance-exposure .balance-amount {
-  color: var(--danger, #D64550);
+  color: var(--danger, #D93649);
+}
+
+.balance-exposure .balance-label {
+  color: var(--danger, #D93649);
+  opacity: 0.85;
 }
 
 /* Balance loading & error states */
@@ -186,7 +193,7 @@
 }
 
 .balance-error {
-  color: var(--danger, #D64550) !important;
+  color: var(--danger, #D93649) !important;
   text-decoration: underline dotted;
 }
 
@@ -203,16 +210,16 @@
   }
 
   .brand-icon-badge svg {
-    width: 17px;
-    height: 17px;
+    width: 18px;
+    height: 18px;
   }
 
   .brand-title {
-    font-size: 0.8125rem; /* 13px */
+    font-size: 0.875rem;
   }
 
   .brand-subtitle {
-    font-size: 0.5625rem; /* 9px */
+    font-size: 0.5625rem;
   }
 
   .balance-card-pill {
@@ -220,10 +227,10 @@
   }
 
   .balance-amount {
-    font-size: 0.75rem; /* 12px */
+    font-size: 0.75rem;
   }
 
   .balance-label {
-    font-size: 0.5625rem; /* 9px */
+    font-size: 0.5rem;
   }
 }

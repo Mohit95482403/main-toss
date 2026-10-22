@@ -8,8 +8,8 @@
 html {
   font-family: var(--font-family-base);
   font-size: 16px;
-  background-color: var(--pink-bg, #FFF7FA);
-  color: var(--text-primary, #352631);
+  background-color: var(--pink-bg, #F7FAF5);
+  color: var(--text-primary, #263328);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -23,8 +23,8 @@ html {
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--pink-bg, #FFF7FA);
-  color: var(--text-primary, #352631);
+  background-color: var(--pink-bg, #F7FAF5);
+  color: var(--text-primary, #263328);
   font-family: var(--font-family-base);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
@@ -171,4 +171,13 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+.hover-pistachio,
+.hover-pink {
+  transition: color var(--transition-fast);
+}
+.hover-pistachio:hover,
+.hover-pink:hover {
+  color: var(--pink-primary, #789B69) !important;
 }

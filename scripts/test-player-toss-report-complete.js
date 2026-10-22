@@ -49,32 +49,102 @@ async function runTests() {
     role: admin.role
   });
 
-  // 2. Acquire Normal User Token for Security IDOR test
-  const [normalUserRows] = await pool.query(
-    "SELECT id, uuid, username, email, role FROM users WHERE role = 'user' LIMIT 1"
+  // 2. Ensure dtb1 exists and has mohit sonawane name
+  let [dtb1Rows] = await pool.query("SELECT id, uuid, username, email, role, full_name, status FROM users WHERE username = 'dtb1' LIMIT 1");
+  let dtb1;
+  if (dtb1Rows.length === 0) {
+    const [res] = await pool.query(
+      "INSERT INTO users (username, full_name, email, password_hash, role, status) VALUES ('dtb1', 'mohit sonawane', 'dtb1@test.com', 'hash', 'user', 'active')"
+    );
+    dtb1 = { id: res.insertId, username: 'dtb1', full_name: 'mohit sonawane', status: 'active' };
+  } else {
+    dtb1 = dtb1Rows[0];
+    await pool.query("UPDATE users SET full_name = 'mohit sonawane', status = 'active' WHERE id = ?", [dtb1.id]);
+    dtb1.full_name = 'mohit sonawane';
+  }
+
+  // Ensure test match exists
+  let [matchRows] = await pool.query("SELECT id FROM matches LIMIT 1");
+  let matchId;
+  if (matchRows.length === 0) {
+    const [mRes] = await pool.query(
+      "INSERT INTO matches (competition, match_title, team_one, team_two, status) VALUES ('IPL 2026', 'CSK vs MI', 'Chennai Super Kings', 'Mumbai Indians', 'upcoming')"
+    );
+    matchId = mRes.insertId;
+  } else {
+    matchId = matchRows[0].id;
+  }
+
+  // Ensure dtb1 has the exact 7 test bets required for the toss report math verification
+  const [existingBets] = await pool.query("SELECT count(*) as count FROM bets WHERE user_id = ?", [dtb1.id]);
+  if (existingBets[0].count !== 7) {
+    await pool.query("DELETE FROM bets WHERE user_id = ?", [dtb1.id]);
+    const now = new Date();
+    // 4 bets on 'Mumbai Indians' (no_result, stake 50, payout 50)
+    for (let i = 0; i < 4; i++) {
+      const betId = `BET-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 8)}`;
+      await pool.query(
+        "INSERT INTO bets (id, user_id, match_id, market_name, selection, stake, odds, potential_return, status, settlement_status, payout, refund_amount, created_at) VALUES (?, ?, ?, 'Match Toss', 'Mumbai Indians', 50, 1.95, 97.5, 'no_result', 'settled', 50, 50, ?)",
+        [betId, dtb1.id, matchId, now]
+      );
+    }
+    // 1 won bet on 'INDIA' (stake 500, payout 975)
+    const betIdWonInd = `BET-${Date.now()}-ind-won-${Math.random().toString(36).substring(2, 8)}`;
+    await pool.query(
+      "INSERT INTO bets (id, user_id, match_id, market_name, selection, stake, odds, potential_return, status, settlement_status, payout, refund_amount, created_at) VALUES (?, ?, ?, 'Match Toss', 'INDIA', 500, 1.95, 975, 'won', 'settled', 975, 0, ?)",
+      [betIdWonInd, dtb1.id, matchId, now]
+    );
+    // 1 lost bet on 'INDIA' (stake 100, payout 0)
+    const betIdLostInd = `BET-${Date.now()}-ind-lost-${Math.random().toString(36).substring(2, 8)}`;
+    await pool.query(
+      "INSERT INTO bets (id, user_id, match_id, market_name, selection, stake, odds, potential_return, status, settlement_status, payout, refund_amount, created_at) VALUES (?, ?, ?, 'Match Toss', 'INDIA', 100, 1.95, 195, 'lost', 'settled', 0, 0, ?)",
+      [betIdLostInd, dtb1.id, matchId, now]
+    );
+    // 1 won bet on 'pakistan' (stake 500, payout 975)
+    const betIdWonPak = `BET-${Date.now()}-pak-won-${Math.random().toString(36).substring(2, 8)}`;
+    await pool.query(
+      "INSERT INTO bets (id, user_id, match_id, market_name, selection, stake, odds, potential_return, status, settlement_status, payout, refund_amount, created_at) VALUES (?, ?, ?, 'Match Toss', 'pakistan', 500, 1.95, 975, 'won', 'settled', 975, 0, ?)",
+      [betIdWonPak, dtb1.id, matchId, now]
+    );
+  }
+
+  // Ensure zero-bets user exists for Test 5
+  let [zeroUserRows] = await pool.query(
+    "SELECT u.id, u.username FROM users u LEFT JOIN bets b ON u.id = b.user_id WHERE u.role = 'user' AND b.id IS NULL LIMIT 1"
   );
-  assert(normalUserRows.length > 0, 'Normal user exists in database');
-  const normalUser = normalUserRows[0];
+  let zeroUserId;
+  if (zeroUserRows.length === 0) {
+    const [zRes] = await pool.query(
+      "INSERT INTO users (username, full_name, email, password_hash, role, status) VALUES (?, 'Zero Bets Player', 'zero@test.com', 'hash', 'user', 'active')",
+      [`zero_user_${Date.now()}`]
+    );
+    zeroUserId = zRes.insertId;
+  } else {
+    zeroUserId = zeroUserRows[0].id;
+  }
+
   const normalUserToken = generateToken({
-    userId: normalUser.id,
-    uuid: normalUser.uuid || 'user-test-uuid',
-    username: normalUser.username,
-    email: normalUser.email,
-    role: normalUser.role
+    userId: dtb1.id,
+    uuid: dtb1.uuid || 'user-test-uuid',
+    username: dtb1.username,
+    email: dtb1.email,
+    role: 'user'
   });
 
   const authHeaders = {
     'Authorization': `Bearer ${adminToken}`
   };
 
+  const dtb1Id = dtb1.id;
+
   // ============================================================================
   // TEST SUITE 1: 7 DAYS FILTER ACCURACY (DEFAULT)
   // ============================================================================
-  console.log('>>> [TEST 1] Testing 7 Days Report for player 279 (dtb1)...');
+  console.log(`>>> [TEST 1] Testing 7 Days Report for player ${dtb1Id} (${dtb1.username})...`);
   const res7d = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=7d',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=7d`,
     method: 'GET',
     headers: authHeaders
   });
@@ -104,7 +174,7 @@ async function runTests() {
   const res15d = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=15d',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=15d`,
     method: 'GET',
     headers: authHeaders
   });
@@ -114,7 +184,7 @@ async function runTests() {
   const res30d = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=30d',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=30d`,
     method: 'GET',
     headers: authHeaders
   });
@@ -124,7 +194,7 @@ async function runTests() {
   const resLife = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=lifetime',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=lifetime`,
     method: 'GET',
     headers: authHeaders
   });
@@ -136,7 +206,7 @@ async function runTests() {
   // ============================================================================
   // TEST SUITE 3: TOSS-WISE BREAKDOWN ACCURACY
   // ============================================================================
-  console.log('\n>>> [TEST 3] Testing Toss-Wise Breakdown for player 279...');
+  console.log(`\n>>> [TEST 3] Testing Toss-Wise Breakdown for player ${dtb1Id}...`);
   const breakdown = res7d.body.data.breakdown;
   assert(Array.isArray(breakdown) && breakdown.length > 0, 'Breakdown is a non-empty array');
   console.log('   Breakdown groups:', breakdown.map(b => `${b.selection}: ${b.totalBets} bets (Net: ${b.netProfitLoss})`));
@@ -178,7 +248,7 @@ async function runTests() {
   const resPage1 = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=7d&page=1&limit=3',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=7d&page=1&limit=3`,
     method: 'GET',
     headers: authHeaders
   });
@@ -192,7 +262,7 @@ async function runTests() {
   const resPage2 = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=7d&page=2&limit=3',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=7d&page=2&limit=3`,
     method: 'GET',
     headers: authHeaders
   });
@@ -206,11 +276,11 @@ async function runTests() {
   // ============================================================================
   // TEST SUITE 5: PLAYER WITH ZERO BETS (EMPTY STATE VERIFICATION)
   // ============================================================================
-  console.log('\n>>> [TEST 5] Testing Player with Zero Bets (User 326)...');
+  console.log(`\n>>> [TEST 5] Testing Player with Zero Bets (User ${zeroUserId})...`);
   const resEmpty = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/326/toss-report?period=7d',
+    path: `/api/admin/users/${zeroUserId}/toss-report?period=7d`,
     method: 'GET',
     headers: authHeaders
   });
@@ -231,7 +301,7 @@ async function runTests() {
   const resUnauth = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=7d',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=7d`,
     method: 'GET'
   });
   assert.strictEqual(resUnauth.status, 401, 'Unauthenticated request rejected with 401');
@@ -240,7 +310,7 @@ async function runTests() {
   const resForbidden = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=7d',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=7d`,
     method: 'GET',
     headers: { 'Authorization': `Bearer ${normalUserToken}` }
   });
@@ -272,7 +342,7 @@ async function runTests() {
   const resBadPeriod = await request({
     hostname: '127.0.0.1',
     port: 5000,
-    path: '/api/admin/users/279/toss-report?period=999years',
+    path: `/api/admin/users/${dtb1Id}/toss-report?period=999years`,
     method: 'GET',
     headers: authHeaders
   });

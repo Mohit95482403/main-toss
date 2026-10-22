@@ -4,6 +4,8 @@
   "description": "DADDY TOSS BOOK - Responsive Sports Toss Wagering & Ledger Platform",
   "private": true,
   "scripts": {
+    "start": "node backend/app.js",
+    "build": "npm --prefix backend install",
     "start:backend": "cd backend && npm start",
     "dev:backend": "cd backend && npm run dev",
     "serve:frontend": "node ./scripts/serve-frontend.js",

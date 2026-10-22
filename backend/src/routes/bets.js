@@ -5,7 +5,7 @@
 
 const express = require('express');
 const { getPool } = require('../config/db');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, enforcePasswordChange } = require('../middleware/auth');
 const {
   reserveIdempotencyKey,
   completeIdempotencyKey,
@@ -17,8 +17,9 @@ const walletService = require('../services/walletService');
 
 const router = express.Router();
 
-// Enforce authentication on player betting endpoints
+// Enforce authentication & mandatory password change guard on player betting endpoints
 router.use(authenticate);
+router.use(enforcePasswordChange);
 
 /**
  * GET /api/bets/my-bets
@@ -448,9 +449,40 @@ async function handlePlaceBet(req, res, next) {
           }
         }
 
+        // 1. Verify user account status
+        const [userRows] = await connection.query(
+          'SELECT id, username, status, role FROM users WHERE id = ? FOR UPDATE',
+          [userId]
+        );
+
+        if (userRows.length === 0) {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 404,
+            body: { success: false, error: { code: 'USER_NOT_FOUND', message: 'User account not found.' } }
+          };
+        }
+
+        const userRec = userRows[0];
+        if (userRec.status !== 'active') {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 403,
+            body: {
+              success: false,
+              error: {
+                code: userRec.status === 'banned' ? 'USER_BANNED' : 'USER_SUSPENDED',
+                message: `Your account is ${userRec.status}. Betting operations are disabled.`
+              }
+            }
+          };
+        }
+
         // Lock ordering: 1. match, 2. wallet
         const [matchRows] = await connection.query(
-          'SELECT id, match_title, competition, team_one, team_one_rate, team_two, team_two_rate, status, settled, match_end_time FROM matches WHERE id = ? FOR UPDATE',
+          'SELECT id, match_title, competition, team_one, team_one_rate, team_two, team_two_rate, status, settled, match_start_time, match_end_time FROM matches WHERE id = ? FOR UPDATE',
           [matchId]
         );
 
@@ -465,13 +497,34 @@ async function handlePlaceBet(req, res, next) {
 
         const match = matchRows[0];
 
-        if (match.settled || match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
+        if (match.settled || ['completed', 'abandoned', 'closed', 'settlement_reversed'].includes(match.status)) {
           await connection.rollback();
           if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
           return {
             httpStatus: 400,
             body: { success: false, error: { code: 'BETTING_CLOSED', message: 'Betting on this match is closed.' } }
           };
+        }
+
+        if (match.status === 'live') {
+          await connection.rollback();
+          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'MATCH_STARTED', message: 'Match is already in progress. Toss betting is closed.' } }
+          };
+        }
+
+        if (match.match_start_time) {
+          const matchStartTimeMs = new Date(match.match_start_time).getTime();
+          if (!isNaN(matchStartTimeMs) && matchStartTimeMs <= Date.now()) {
+            await connection.rollback();
+            if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+            return {
+              httpStatus: 400,
+              body: { success: false, error: { code: 'MATCH_STARTED', message: 'The match has already started. Betting cutoff has passed.' } }
+            };
+          }
         }
 
         if (match.match_end_time) {
@@ -687,6 +740,37 @@ async function handleCancelBet(req, res, next) {
           return {
             httpStatus: idemResult.cachedResponse.status,
             body: idemResult.cachedResponse.body
+          };
+        }
+
+        // 0. Verify user account status
+        const [userRows] = await connection.query(
+          'SELECT id, username, status, role FROM users WHERE id = ? FOR UPDATE',
+          [userId]
+        );
+
+        if (userRows.length === 0) {
+          await connection.rollback();
+          if (cancelIdempotencyKey) await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 404,
+            body: { success: false, error: { code: 'USER_NOT_FOUND', message: 'User account not found.' } }
+          };
+        }
+
+        const userRec = userRows[0];
+        if (userRec.status !== 'active') {
+          await connection.rollback();
+          if (cancelIdempotencyKey) await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 403,
+            body: {
+              success: false,
+              error: {
+                code: userRec.status === 'banned' ? 'USER_BANNED' : 'USER_SUSPENDED',
+                message: `Your account is ${userRec.status}. Betting operations are disabled.`
+              }
+            }
           };
         }
 
@@ -938,6 +1022,120 @@ async function handleCancelBet(req, res, next) {
 
 router.post('/:betId/cancel', handleCancelBet);
 router.post('/cancel', handleCancelBet);
+
+/**
+ * GET /api/bets/:betId
+ * Returns details of an individual bet ticket with strict ownership enforcement.
+ */
+router.get('/:betId', async (req, res, next) => {
+  try {
+    const pool = getPool();
+    const userId = req.user.id;
+    const betId = (req.params.betId || '').trim();
+
+    if (!betId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_BET_ID', message: 'Bet identifier is required.' }
+      });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT
+        b.id,
+        b.user_id,
+        b.match_id,
+        b.market_name,
+        b.selection,
+        b.stake,
+        b.odds,
+        b.potential_return,
+        b.status,
+        b.settlement_status,
+        b.payout,
+        b.refund_amount,
+        b.cancelled_at,
+        b.settled_at,
+        b.created_at,
+        m.match_title,
+        m.competition,
+        m.team_one,
+        m.team_one_logo,
+        m.team_two,
+        m.team_two_logo,
+        m.status AS match_status,
+        m.settled AS match_settled,
+        m.match_start_time,
+        m.match_end_time,
+        m.toss_winner
+       FROM bets b
+       LEFT JOIN matches m ON m.id = b.match_id
+       WHERE b.id = ? LIMIT 1`,
+      [betId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'BET_NOT_FOUND', message: 'Bet ticket not found in database.' }
+      });
+    }
+
+    const bet = rows[0];
+
+    // Strict ownership verification: only the owner or an admin may view this ticket
+    if (bet.user_id !== userId && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'You are not authorized to view this bet ticket.' }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: bet.id,
+        matchId: bet.match_id,
+        matchTitle: bet.match_title,
+        competition: bet.competition,
+        selection: bet.selection,
+        stake: parseFloat(bet.stake),
+        odds: parseFloat(bet.odds),
+        rate: parseFloat(bet.odds),
+        potentialReturn: parseFloat(bet.potential_return),
+        status: bet.status,
+        settlementStatus: bet.settlement_status,
+        payout: parseFloat(bet.payout || 0),
+        refundAmount: parseFloat(bet.refund_amount || 0),
+        placedAt: bet.created_at,
+        settledAt: bet.settled_at,
+        cancelledAt: bet.cancelled_at
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Phase 3.1: Immutable Bet Selection and Stake
+ * Explicitly reject any attempts to update, modify, or tamper with bets post-placement.
+ */
+function rejectBetModification(req, res) {
+  return res.status(405).json({
+    success: false,
+    error: {
+      code: 'BET_IMMUTABLE',
+      message: 'Bet wagers cannot be altered or modified once placed. Stake, selection, and odds are permanently immutable.'
+    }
+  });
+}
+
+router.put('/:betId', rejectBetModification);
+router.patch('/:betId', rejectBetModification);
+router.delete('/:betId', rejectBetModification);
+router.put('/', rejectBetModification);
+router.patch('/', rejectBetModification);
 
 module.exports = router;
 

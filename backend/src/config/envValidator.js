@@ -25,25 +25,37 @@ function validateEnvironment(env = process.env) {
   }
 
   // 2. Validate Database Configuration
-  const dbHost = env.DB_HOST || 'localhost';
-  const dbPortStr = env.DB_PORT || '3306';
-  const dbPort = parseInt(dbPortStr, 10);
-  const dbName = env.DB_NAME || 'ironman_toss_book';
-  const dbUser = env.DB_USER || 'root';
+  const connectionUri = env.DATABASE_URL || env.MYSQL_URL;
+  let dbHost = env.DB_HOST || 'localhost';
+  let dbPort = parseInt(env.DB_PORT || '3306', 10);
+  let dbName = env.DB_NAME || 'ironman_toss_book';
+  let dbUser = env.DB_USER || 'root';
+  let hasPassword = Boolean(env.DB_PASSWORD);
+
+  if (connectionUri) {
+    try {
+      const parsed = new URL(connectionUri);
+      dbHost = parsed.hostname;
+      dbPort = parseInt(parsed.port || '3306', 10);
+      dbName = (parsed.pathname || '').replace(/^\//, '');
+      dbUser = decodeURIComponent(parsed.username || 'root');
+      hasPassword = Boolean(parsed.password);
+    } catch (_) {}
+  }
 
   if (isNaN(dbPort) || dbPort < 1 || dbPort > 65535) {
-    errors.push(`Invalid DB_PORT "${dbPortStr}". Must be an integer between 1 and 65535.`);
+    errors.push(`Invalid database port "${dbPort}". Must be an integer between 1 and 65535.`);
   }
 
   if (isProduction) {
-    if (dbHost === 'localhost' || dbHost === '127.0.0.1') {
+    if (!connectionUri && (dbHost === 'localhost' || dbHost === '127.0.0.1')) {
       warnings.push('DB_HOST is set to localhost in production. Ensure MySQL runs locally on host or update to remote managed cluster.');
     }
     if (dbUser === 'root') {
       warnings.push('DB_USER is using "root" in production. Recommended practice is a dedicated least-privilege service account.');
     }
-    if (!env.DB_PASSWORD) {
-      errors.push('DB_PASSWORD is required in production environment.');
+    if (!hasPassword) {
+      errors.push('Database password (DB_PASSWORD or in DATABASE_URL) is required in production environment.');
     }
   }
 
@@ -64,13 +76,14 @@ function validateEnvironment(env = process.env) {
     }
   }
 
-  // 4. Validate Administrative Provisioning Credentials in Production
+  // 4. Validate Administrative Provisioning Credentials & Frontend Origin
   if (isProduction) {
     if (env.ADMIN_PASSWORD && env.ADMIN_PASSWORD === 'Admin@Ironman2026') {
       warnings.push('ADMIN_PASSWORD matches default development value. Set a strong unique password before provisioning.');
     }
-    if (!env.FRONTEND_ORIGIN) {
-      warnings.push('FRONTEND_ORIGIN not explicitly set. Defaulting to http://localhost:5500 which may block production clients.');
+    const hasFrontendConfig = Boolean(env.FRONTEND_ORIGIN || env.FRONTEND_URL || env.ALLOWED_ORIGINS);
+    if (!hasFrontendConfig) {
+      warnings.push('FRONTEND_ORIGIN / FRONTEND_URL not explicitly set. Defaulting to localhost:5500 which may block production clients.');
     }
   }
 

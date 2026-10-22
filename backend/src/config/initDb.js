@@ -16,11 +16,13 @@ const TABLES_DDL = [
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('user', 'admin', 'super_admin') DEFAULT 'user',
     status ENUM('active', 'suspended', 'banned') DEFAULT 'active',
+    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_users_username (username),
     INDEX idx_users_email (email),
     INDEX idx_users_status (status),
+    INDEX idx_users_must_change_pass (must_change_password),
     INDEX idx_users_role (role),
     INDEX idx_users_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
@@ -190,6 +192,24 @@ const TABLES_DDL = [
     INDEX idx_coin_tx_related_tx (related_transaction_id),
     INDEX idx_coin_tx_created (created_at),
     INDEX idx_coin_tx_idempotency (idempotency_key)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+
+  `CREATE TABLE IF NOT EXISTS idempotency_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
+    user_id INT DEFAULT NULL,
+    scope VARCHAR(50) NOT NULL,
+    request_hash VARCHAR(64) NOT NULL,
+    status ENUM('processing', 'completed', 'failed') NOT NULL DEFAULT 'processing',
+    response_status INT DEFAULT NULL,
+    response_body LONGTEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_idemp_key (idempotency_key),
+    INDEX idx_idemp_user (user_id),
+    INDEX idx_idemp_scope (scope),
+    INDEX idx_idemp_status (status),
+    INDEX idx_idemp_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
 ];
 
@@ -242,6 +262,20 @@ async function initializeDatabase() {
       }
     } catch (colErr) {
       console.warn('[DB INIT] users.email nullability check notice:', colErr.message);
+    }
+
+    // Ensure must_change_password column exists on users table
+    try {
+      const [mcpCol] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'must_change_password'"
+      );
+      if (mcpCol.length === 0) {
+        await pool.query('ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE AFTER status');
+        await pool.query('ALTER TABLE users ADD INDEX idx_users_must_change_pass (must_change_password)');
+        console.log('[DB INIT] Successfully added must_change_password column and index to users table.');
+      }
+    } catch (mcpErr) {
+      console.warn('[DB INIT] users.must_change_password column verification notice:', mcpErr.message);
     }
 
     // Ensure match_end_time column exists in matches table

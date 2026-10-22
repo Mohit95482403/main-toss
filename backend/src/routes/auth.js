@@ -9,7 +9,7 @@ const router = express.Router();
 
 const { getPool } = require('../config/db');
 const { hashPassword, verifyPassword, generateToken, verifyToken, sanitizeUser } = require('../utils/crypto');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, enforcePasswordChange } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 const { createUserAccount } = require('../services/userService');
 
@@ -169,7 +169,7 @@ router.post('/login', authRateLimiter, async (req, res, next) => {
 
     // Query user by username or email with parameterized query
     const [rows] = await pool.query(
-      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.password_hash, u.role, u.status, u.created_at,
+      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.password_hash, u.role, u.status, u.must_change_password, u.created_at,
               w.available_balance, w.exposure_balance
        FROM users u
        LEFT JOIN wallets w ON u.id = w.user_id
@@ -237,6 +237,9 @@ router.post('/login', authRateLimiter, async (req, res, next) => {
     }
 
     const sanitized = sanitizeUser(user);
+    const mustChange = Boolean(user.must_change_password);
+    sanitized.must_change_password = mustChange;
+    sanitized.mustChangePassword = mustChange;
     sanitized.wallet = {
       available_balance: parseFloat(user.available_balance || 0),
       exposure_balance: parseFloat(user.exposure_balance || 0),
@@ -247,10 +250,14 @@ router.post('/login', authRateLimiter, async (req, res, next) => {
       success: true,
       message: 'Signed in successfully.',
       token,
+      mustChangePassword: mustChange,
+      must_change_password: mustChange,
       user: sanitized,
       data: {
         token,
-        user: sanitized
+        user: sanitized,
+        mustChangePassword: mustChange,
+        must_change_password: mustChange
       }
     });
   } catch (err) {
@@ -267,7 +274,7 @@ router.get('/me', authenticate, async (req, res, next) => {
     const pool = getPool();
 
     const [rows] = await pool.query(
-      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.created_at,
+      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.must_change_password, u.created_at,
               w.available_balance, w.exposure_balance,
               p.dark_mode_enabled, p.toss_alerts, p.match_reminders, p.wallet_notices, p.promo_updates
        FROM users u
@@ -290,6 +297,9 @@ router.get('/me', authenticate, async (req, res, next) => {
 
     const userRow = rows[0];
     const sanitized = sanitizeUser(userRow);
+    const mustChange = Boolean(userRow.must_change_password);
+    sanitized.must_change_password = mustChange;
+    sanitized.mustChangePassword = mustChange;
     sanitized.wallet = {
       available_balance: parseFloat(userRow.available_balance || 0),
       exposure_balance: parseFloat(userRow.exposure_balance || 0),
@@ -305,9 +315,13 @@ router.get('/me', authenticate, async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
+      mustChangePassword: mustChange,
+      must_change_password: mustChange,
       user: sanitized,
       data: {
-        user: sanitized
+        user: sanitized,
+        mustChangePassword: mustChange,
+        must_change_password: mustChange
       }
     });
   } catch (err) {
@@ -319,7 +333,7 @@ router.get('/me', authenticate, async (req, res, next) => {
  * PUT /api/auth/profile
  * Updates user profile details with strict field validation and mass-assignment protection
  */
-router.put('/profile', authenticate, async (req, res, next) => {
+router.put('/profile', authenticate, enforcePasswordChange, async (req, res, next) => {
   try {
     const { fullName, phone, username } = req.body || {};
 
@@ -381,7 +395,7 @@ router.put('/profile', authenticate, async (req, res, next) => {
 
     // Fetch and return updated profile with wallet
     const [rows] = await pool.query(
-      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.updated_at,
+      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.must_change_password, u.updated_at,
               w.available_balance, w.exposure_balance
        FROM users u
        LEFT JOIN wallets w ON u.id = w.user_id
@@ -392,6 +406,8 @@ router.put('/profile', authenticate, async (req, res, next) => {
 
     const userRow = rows[0];
     const sanitized = sanitizeUser(userRow);
+    sanitized.must_change_password = Boolean(userRow.must_change_password);
+    sanitized.mustChangePassword = Boolean(userRow.must_change_password);
     sanitized.wallet = {
       available_balance: parseFloat(userRow.available_balance || 0),
       exposure_balance: parseFloat(userRow.exposure_balance || 0),
@@ -414,11 +430,11 @@ router.put('/profile', authenticate, async (req, res, next) => {
 
 /**
  * POST /api/auth/change-password
- * Verifies current password and securely updates to new hashed password
+ * Verifies current/temporary password, updates to new hashed password, and clears must_change_password flag
  */
 router.post('/change-password', authenticate, async (req, res, next) => {
   try {
-    const { currentPassword, newPassword } = req.body || {};
+    const { currentPassword, newPassword, confirmPassword } = req.body || {};
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
@@ -440,6 +456,18 @@ router.post('/change-password', authenticate, async (req, res, next) => {
       });
     }
 
+    if (confirmPassword !== undefined && confirmPassword !== null && confirmPassword !== '') {
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'PASSWORD_MISMATCH',
+            message: 'New password and confirmation password do not match.'
+          }
+        });
+      }
+    }
+
     if (currentPassword === newPassword) {
       return res.status(400).json({
         success: false,
@@ -452,9 +480,9 @@ router.post('/change-password', authenticate, async (req, res, next) => {
 
     const pool = getPool();
 
-    // Fetch current user's password hash
+    // Fetch current user's password hash and account details
     const [rows] = await pool.query(
-      'SELECT password_hash FROM users WHERE id = ? LIMIT 1',
+      'SELECT id, uuid, full_name, username, email, phone, role, status, password_hash, must_change_password FROM users WHERE id = ? LIMIT 1',
       [req.user.id]
     );
 
@@ -468,28 +496,66 @@ router.post('/change-password', authenticate, async (req, res, next) => {
       });
     }
 
-    // Verify current password
+    // Verify current / temporary password
     const isCurrentValid = verifyPassword(currentPassword, rows[0].password_hash);
     if (!isCurrentValid) {
       return res.status(400).json({
         success: false,
         error: {
           code: 'INVALID_CURRENT_PASSWORD',
-          message: 'Current password does not match.'
+          message: 'Current / temporary password does not match.'
         }
       });
     }
 
-    // Hash new password and update
+    // Hash new password and clear must_change_password flag
     const newHash = hashPassword(newPassword);
     await pool.query(
-      'UPDATE users SET password_hash = ? WHERE id = ?',
+      'UPDATE users SET password_hash = ?, must_change_password = FALSE WHERE id = ?',
       [newHash, req.user.id]
     );
 
+    // Fetch updated user with wallet
+    const [updatedRows] = await pool.query(
+      `SELECT u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.must_change_password,
+              w.available_balance, w.exposure_balance
+       FROM users u
+       LEFT JOIN wallets w ON u.id = w.user_id
+       WHERE u.id = ? LIMIT 1`,
+      [req.user.id]
+    );
+
+    const updatedUser = sanitizeUser(updatedRows[0]);
+    updatedUser.must_change_password = false;
+    updatedUser.mustChangePassword = false;
+    updatedUser.wallet = {
+      available_balance: parseFloat(updatedRows[0].available_balance || 0),
+      exposure_balance: parseFloat(updatedRows[0].exposure_balance || 0),
+      currency: 'INR'
+    };
+
+    // Generate refreshed token with verified claims
+    const newToken = generateToken({
+      userId: updatedUser.id,
+      uuid: updatedUser.uuid,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      role: updatedUser.role
+    });
+
     return res.status(200).json({
       success: true,
-      message: 'Password changed successfully.'
+      message: 'Password changed successfully. Your account is now fully secured.',
+      token: newToken,
+      mustChangePassword: false,
+      must_change_password: false,
+      user: updatedUser,
+      data: {
+        token: newToken,
+        user: updatedUser,
+        mustChangePassword: false,
+        must_change_password: false
+      }
     });
   } catch (err) {
     next(err);

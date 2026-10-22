@@ -200,7 +200,7 @@
           <div class="selection-row">
             <span>Market: <strong>${escapeHtml(bet.marketName)}</strong></span>
             <span style="display: inline-flex; align-items: center; gap: 6px;">
-              ${bet.selectedTeamLogo ? `<img src="${escapeHtml(formatLogoUrl(bet.selectedTeamLogo))}" alt="${escapeHtml(bet.selectedTeam)}" style="width: 18px; height: 18px; object-fit: contain; border-radius: 4px; background: #fff; border: 1px solid #F3D5E0; vertical-align: middle;" onerror="this.style.display='none';" />` : ''}
+              ${bet.selectedTeamLogo ? `<img src="${escapeHtml(formatLogoUrl(bet.selectedTeamLogo))}" alt="${escapeHtml(bet.selectedTeam)}" style="width: 18px; height: 18px; object-fit: contain; border-radius: 4px; background: #fff; border: 1px solid #DCE7D6; vertical-align: middle;" onerror="this.style.display='none';" />` : ''}
               <span>Selection: <strong class="selection-choice">${escapeHtml(bet.selectedTeam)}</strong></span>
             </span>
           </div>

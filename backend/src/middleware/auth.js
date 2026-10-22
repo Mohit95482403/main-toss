@@ -1,14 +1,10 @@
-/**
- * IRONMAN TOSS BOOK - Authentication & Authorization Middleware
- * Enforces token verification and role-based access control.
- */
-
+const { getPool } = require('../config/db');
 const { verifyToken } = require('../utils/crypto');
 
 /**
- * Middleware: Verify Bearer authentication token
+ * Middleware: Verify Bearer authentication token and attach authoritative user state from MySQL
  */
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   let token = null;
 
   const authHeader = req.headers.authorization;
@@ -30,12 +26,47 @@ function authenticate(req, res, next) {
 
   try {
     const payload = verifyToken(token);
+    const userId = payload.userId !== undefined ? payload.userId : payload.id;
+
+    // Authoritative real-time check from MySQL users table
+    const pool = getPool();
+    const [rows] = await pool.query(
+      'SELECT id, uuid, username, email, role, status, must_change_password FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User account not found.'
+        }
+      });
+    }
+
+    const dbUser = rows[0];
+
+    // If account is suspended or banned, reject immediately
+    if (dbUser.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: dbUser.status === 'banned' ? 'USER_BANNED' : 'USER_SUSPENDED',
+          message: `Your account is ${dbUser.status}. Access denied.`
+        }
+      });
+    }
+
     req.user = {
-      id: payload.userId !== undefined ? payload.userId : payload.id,
-      uuid: payload.uuid,
-      username: payload.username || (payload.id ? `admin_${payload.id}` : 'admin'),
-      email: payload.email,
-      role: payload.role || 'user'
+      id: dbUser.id,
+      uuid: dbUser.uuid,
+      username: dbUser.username,
+      email: dbUser.email,
+      role: dbUser.role || 'user',
+      status: dbUser.status || 'active',
+      mustChangePassword: Boolean(dbUser.must_change_password),
+      must_change_password: Boolean(dbUser.must_change_password)
     };
     next();
   } catch (err) {
@@ -80,7 +111,26 @@ function requireRole(allowedRoles = []) {
   };
 }
 
+/**
+ * Middleware: Enforce that user has changed temporary password before accessing platform features
+ */
+function enforcePasswordChange(req, res, next) {
+  if (req.user && req.user.mustChangePassword) {
+    return res.status(403).json({
+      success: false,
+      code: 'PASSWORD_CHANGE_REQUIRED',
+      mustChangePassword: true,
+      error: {
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'You must change your temporary password before accessing platform features.'
+      }
+    });
+  }
+  next();
+}
+
 module.exports = {
   authenticate,
-  requireRole
+  requireRole,
+  enforcePasswordChange
 };

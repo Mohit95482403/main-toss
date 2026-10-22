@@ -6,12 +6,13 @@
 
 const express = require('express');
 const { getPool } = require('../config/db');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, enforcePasswordChange } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Enforce authentication on all wallet endpoints
+// Enforce authentication & mandatory password change guard on all wallet endpoints
 router.use(authenticate);
+router.use(enforcePasswordChange);
 
 /**
  * GET /api/wallet/balance

@@ -207,9 +207,12 @@
       };
 
       const apiClient = window.ApiClient;
+      const defaultApiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:5000/api'
+        : '/api';
       const apiPromise = apiClient
         ? apiClient.post('/auth/register', registerPayload)
-        : fetch(`${(window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 'http://localhost:5000/api'}/auth/register`, {
+        : fetch(`${(window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || defaultApiBase}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(registerPayload)

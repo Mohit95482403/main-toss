@@ -165,14 +165,14 @@ html, body {
 @media (min-width: 768px) {
   .app-wrapper {
     padding: var(--space-6, 24px) var(--space-4, 16px);
-    background-color: var(--pink-bg-secondary, #FFF0F5);
+    background-color: var(--pink-bg-secondary, #EEF3EA);
     align-items: center;
   }
 
   .app-container {
     border-radius: var(--radius-xl, 20px);
-    border: 1px solid var(--pink-border, #F2D3DF);
-    box-shadow: 0 12px 36px rgba(180, 70, 115, 0.10);
+    border: 1px solid var(--pink-border, #DCE7D6);
+    box-shadow: 0 12px 36px rgba(71, 107, 64, 0.10);
     min-height: calc(100vh - 48px);
     overflow: hidden;
   }
@@ -183,8 +183,8 @@ html, body {
   }
 
   .bottom-nav {
-    border-left: 1px solid var(--pink-border, #F3D5E0);
-    border-right: 1px solid var(--pink-border, #F3D5E0);
+    border-left: 1px solid var(--pink-border, #DCE7D6);
+    border-right: 1px solid var(--pink-border, #DCE7D6);
     border-top-left-radius: var(--radius-md, 12px);
     border-top-right-radius: var(--radius-md, 12px);
   }

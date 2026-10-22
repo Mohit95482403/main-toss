@@ -8,7 +8,8 @@
   'use strict';
 
   // API Base URL
-  const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 'http://localhost:5000/api';
+  const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 
+    ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5000/api' : '/api');
 
   // Current authenticated admin user state
   let currentAdmin = null;
@@ -94,17 +95,27 @@
       delete headers['Content-Type'];
     }
 
-    if (window.ApiClient && typeof window.ApiClient.request === 'function') {
-      return window.ApiClient.request(endpoint, {
-        ...options,
-        headers
-      });
+    // Ensure object body is strictly JSON-stringified
+    let body = options.body;
+    if (body !== undefined && body !== null && !isFormData && typeof body === 'object') {
+      try {
+        body = JSON.stringify(body);
+      } catch (e) {
+        console.error('[API FETCH] Failed to stringify request body:', e);
+      }
     }
 
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const mergedOptions = {
       ...options,
+      body,
       headers
-    });
+    };
+
+    if (window.ApiClient && typeof window.ApiClient.request === 'function') {
+      return window.ApiClient.request(endpoint, mergedOptions);
+    }
+
+    const res = await fetch(`${API_BASE}${endpoint}`, mergedOptions);
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -359,27 +370,113 @@
     if (!main) return;
 
     main.innerHTML = `
-      <div style="max-width: 520px; margin: 60px auto; text-align: center; background: var(--color-surface); padding: 36px 24px; border-radius: var(--border-radius-lg); border: 1px solid var(--color-border); box-shadow: var(--shadow-md);">
-        <div style="font-size: 48px; margin-bottom: 16px;">🛡️</div>
-        <h2 style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); margin-bottom: 12px; color: var(--color-danger);">
-          Administrative Access Restricted
+      <div style="max-width: 480px; margin: 60px auto; text-align: center; background: var(--surface-primary, #FFFFFF); padding: 36px 28px; border-radius: var(--radius-xl, 22px); border: 1px solid var(--border-primary, #DCE7D6); box-shadow: 0 10px 30px rgba(71, 107, 64, 0.08);">
+        <div style="width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 16px; background: linear-gradient(135deg, var(--pink-primary, #789B69) 0%, var(--pink-primary-dark, #3A5734) 100%); display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 26px; box-shadow: 0 4px 14px rgba(120, 155, 105, 0.35);">
+          🛡️
+        </div>
+        <h2 style="font-family: var(--font-family-display); font-size: 1.35rem; font-weight: 800; margin-bottom: 8px; color: var(--text-primary, #263328);">
+          Administrator Sign In
         </h2>
-        <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 24px;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary, #687568); margin-bottom: 24px; line-height: 1.45;">
           ${escapeHtml(message)}
         </p>
-        <div style="display: flex; gap: 12px; justify-content: center;">
-          <a href="../pages/login.html" class="btn btn-primary btn-sm">
-            Sign In as Admin
-          </a>
-          <a href="../index.html" class="btn btn-secondary btn-sm">
-            Go to Player View
-          </a>
-        </div>
+
+        <form id="admin-inline-login-form" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+          <div class="form-group">
+            <label class="form-label" for="inline-admin-username" style="font-size: 12px; font-weight: 600;">Username or Email</label>
+            <input type="text" id="inline-admin-username" class="form-control" placeholder="admin" value="admin" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inline-admin-password" style="font-size: 12px; font-weight: 600;">Password</label>
+            <input type="password" id="inline-admin-password" class="form-control" placeholder="••••••••••••" required autocomplete="current-password">
+          </div>
+          <div id="inline-admin-error" style="display: none; padding: 8px 12px; border-radius: 8px; background: var(--danger-bg, #FDF0F2); color: var(--danger-text, #931F2D); border: 1px solid var(--danger-border, #F8B4BD); font-size: 12px;"></div>
+          
+          <button type="submit" class="btn btn-primary" id="btn-inline-admin-login" style="width: 100%; justify-content: center; padding: 12px; font-weight: 700; margin-top: 4px;">
+            <span class="btn-text">Sign In to Admin Portal</span>
+            <span class="btn-spinner" id="inline-admin-spinner" style="display: none;" aria-hidden="true"></span>
+          </button>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px;">
+            <a href="login.html" class="text-secondary hover-pistachio" style="text-decoration: none;">Full Login Page</a>
+            <a href="../index.html" class="text-secondary hover-pistachio" style="text-decoration: none;">&larr; Player View</a>
+          </div>
+        </form>
       </div>
     `;
 
-    // Disable tab buttons
+    // Disable tab buttons while unauthenticated
     document.querySelectorAll('.admin-tab-btn').forEach((b) => (b.disabled = true));
+
+    // Attach inline login handler
+    const loginForm = document.getElementById('admin-inline-login-form');
+    if (loginForm) {
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const usernameInput = document.getElementById('inline-admin-username');
+        const passwordInput = document.getElementById('inline-admin-password');
+        const errorEl = document.getElementById('inline-admin-error');
+        const submitBtn = document.getElementById('btn-inline-admin-login');
+        const spinner = document.getElementById('inline-admin-spinner');
+
+        const identifier = usernameInput ? usernameInput.value.trim() : '';
+        const password = passwordInput ? passwordInput.value : '';
+
+        if (!identifier || !password) return;
+
+        if (errorEl) {
+          errorEl.style.display = 'none';
+          errorEl.textContent = '';
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        if (spinner) spinner.style.display = 'inline-block';
+
+        try {
+          const res = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier, password })
+          });
+          const data = await res.json().catch(() => ({}));
+
+          if (!res.ok) {
+            const msg = (data.error && data.error.message) || data.message || 'Authentication failed. Please verify credentials.';
+            throw new Error(msg);
+          }
+
+          const token = data.token || (data.data && data.data.token);
+          const user = data.user || (data.data && data.data.user);
+
+          if (!token || !user) {
+            throw new Error('Login succeeded but token was not returned.');
+          }
+
+          if (!['admin', 'super_admin'].includes(user.role)) {
+            throw new Error('This account does not have administrator privileges.');
+          }
+
+          // Persist token in both localStorage and sessionStorage
+          localStorage.setItem('itb_auth_token', token);
+          sessionStorage.setItem('itb_auth_token', token);
+          localStorage.setItem('itb_auth_user', JSON.stringify(user));
+
+          if (window.ApiClient && typeof window.ApiClient.setToken === 'function') {
+            window.ApiClient.setToken(token, true);
+            window.ApiClient.setUser(user);
+          }
+
+          // Reload page to initialize entire admin portal with active authentication
+          window.location.reload();
+        } catch (err) {
+          if (submitBtn) submitBtn.disabled = false;
+          if (spinner) spinner.style.display = 'none';
+          if (errorEl) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+          }
+        }
+      });
+    }
   }
 
   // ===========================================================================
@@ -608,16 +705,12 @@
                       ${u.status === 'active' ? 'Suspend/Ban' : 'Restore'}
                     </button>
                     ${
-                      currentAdmin?.role === 'super_admin'
+                      currentAdmin && currentAdmin.role === 'super_admin'
                         ? `<button type="button" class="btn-action-icon btn-role" data-id="${u.id}" data-username="${escapeHtml(u.username)}" data-role="${escapeHtml(u.role)}" title="Assign user role">
                             Role
                           </button>`
                         : ''
-                    }
-                    <button type="button" class="btn-action-icon btn-danger-action btn-delete-user" data-id="${u.id}" data-username="${escapeHtml(u.username)}" data-balance="${u.wallet?.available_balance || 0}" data-status="${escapeHtml(u.status)}" data-created="${escapeHtml(u.created_at || '')}" title="Permanently delete user account">
-                      Delete User
-                    </button>
-                  `
+                    }`
                       : `<span class="text-xs text-muted" style="padding: 4px 8px;">(Current Admin)</span>`
                   }
                 </div>
@@ -700,7 +793,7 @@
       <!-- Top Profile Summary Card -->
       <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border);">
         <div style="display: flex; align-items: center; gap: 14px;">
-          <div class="user-cell-avatar" style="width: 52px; height: 52px; font-size: var(--font-size-md); font-weight: 800; background: linear-gradient(135deg, var(--pink-primary, #E75480), var(--pink-dark, #D03B68)); color: #fff;">
+          <div class="user-cell-avatar" style="width: 52px; height: 52px; font-size: var(--font-size-md); font-weight: 800; background: linear-gradient(135deg, var(--pink-primary, #789B69), var(--pink-dark, #476B40)); color: #fff;">
             ${escapeHtml((u.username || 'U').substring(0, 2).toUpperCase())}
           </div>
           <div>
@@ -717,7 +810,7 @@
       </div>
 
       <!-- Account Core Info Grid -->
-      <div class="system-metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; font-size: var(--font-size-sm); background: var(--pink-bg-subtle, #FFF7FA); padding: 12px 16px; border-radius: var(--border-radius-md); border: 1px solid var(--pink-border, #F3D5E0);">
+      <div class="system-metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; font-size: var(--font-size-sm); background: var(--pink-bg-subtle, #F4F8F0); padding: 12px 16px; border-radius: var(--border-radius-md); border: 1px solid var(--pink-border, #DCE7D6);">
         <div>
           <span class="text-muted text-xs font-bold" style="letter-spacing: 0.04em;">EMAIL</span>
           <div class="font-bold text-truncate" title="${escapeHtml(u.email || '—')}">${escapeHtml(u.email || '—')}</div>
@@ -841,20 +934,7 @@
         const btnPageDelete = document.getElementById('btn-page-delete-user');
         if (btnPageDelete) {
           const isSelf = currentAdmin && currentAdmin.id === u.id;
-          if (!isSelf) {
-            btnPageDelete.style.display = 'inline-flex';
-            btnPageDelete.onclick = () => {
-              promptDeleteUserModal({
-                id: u.id,
-                username: u.username,
-                balance: u.wallet?.available_balance || 0,
-                status: u.status,
-                created_at: u.created_at
-              });
-            };
-          } else {
-            btnPageDelete.style.display = 'none';
-          }
+          btnPageDelete.style.display = 'none';
         }
       }
 
@@ -863,21 +943,7 @@
         modalBodyEl.innerHTML = html;
         const btnInspectDelete = document.getElementById('btn-inspect-delete-user');
         if (btnInspectDelete) {
-          const isSelf = currentAdmin && currentAdmin.id === u.id;
-          if (!isSelf) {
-            btnInspectDelete.style.display = 'inline-flex';
-            btnInspectDelete.onclick = () => {
-              promptDeleteUserModal({
-                id: u.id,
-                username: u.username,
-                balance: u.wallet?.available_balance || 0,
-                status: u.status,
-                created_at: u.created_at
-              });
-            };
-          } else {
-            btnInspectDelete.style.display = 'none';
-          }
+          btnInspectDelete.style.display = 'none';
         }
       }
 
@@ -2008,7 +2074,7 @@
             <div class="font-bold text-sm" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               ${renderAdminTeamBadge(m.team_one_logo || m.teamOneLogo, m.team_one, m.team_one_abbr)}
               <span>${escapeHtml(m.team_one)}</span>
-              <span style="color: var(--pink-primary, #E75480); font-size: 11px; font-weight: 800;">VS</span>
+              <span style="color: var(--pink-primary, #789B69); font-size: 11px; font-weight: 800;">VS</span>
               <span>${escapeHtml(m.team_two)}</span>
               ${renderAdminTeamBadge(m.team_two_logo || m.teamTwoLogo, m.team_two, m.team_two_abbr)}
             </div>
@@ -2697,10 +2763,11 @@
       // 1. Update schedule and end time
       const res = await apiFetch(`/admin/matches/${encodeURIComponent(matchId)}/schedule`, {
         method: 'PUT',
-        body: {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           match_end_time: endTime,
           scheduled_time: schedule
-        }
+        })
       });
 
       if (!res.success) {
@@ -2796,7 +2863,7 @@
             <span class="meta-strip-value" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               ${renderAdminTeamBadge(match.team_one_logo || match.teamOneLogo, match.team_one || match.teamOne, match.team_one_abbr || match.teamOneAbbr)}
               <span>${escapeHtml(match.team_one || match.teamOne || 'Team 1')}</span>
-              <span style="color: var(--pink-primary, #E75480); font-weight: 800; font-size: 11px;">VS</span>
+              <span style="color: var(--pink-primary, #789B69); font-weight: 800; font-size: 11px;">VS</span>
               <span>${escapeHtml(match.team_two || match.teamTwo || 'Team 2')}</span>
               ${renderAdminTeamBadge(match.team_two_logo || match.teamTwoLogo, match.team_two || match.teamTwo, match.team_two_abbr || match.teamTwoAbbr)}
             </span>
@@ -3419,8 +3486,8 @@
               c.style.borderColor = 'var(--color-border)';
               c.style.background = 'var(--color-surface)';
             });
-            card.style.borderColor = 'var(--pink-primary, #E75480)';
-            card.style.background = 'var(--pink-bg-subtle, #FFF7FA)';
+            card.style.borderColor = 'var(--pink-primary, #789B69)';
+            card.style.background = 'var(--pink-bg-subtle, #F4F8F0)';
             const radio = card.querySelector('input[type="radio"]');
             if (radio) {
               radio.checked = true;
@@ -4170,13 +4237,14 @@
     try {
       const res = await apiFetch('/admin/coins/adjust', {
         method: 'POST',
-        body: {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           userId: player.id,
           actionType,
           amount,
           reason,
           idempotencyKey
-        }
+        })
       });
 
       closeModal('modal-coin-adjust');

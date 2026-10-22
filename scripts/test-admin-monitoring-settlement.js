@@ -201,6 +201,8 @@ async function runTests() {
     } else {
       await pool.query("UPDATE matches SET status = 'live', settled = 0, toss_winner = NULL, settled_at = NULL, settled_by = NULL WHERE id = 'MATCH-2026-001'");
     }
+    await pool.query("DELETE FROM coin_transactions WHERE idempotency_key LIKE 'PAYOUT-TEST-BET-SETTLE-001%' OR bet_id = 'TEST-BET-SETTLE-001'");
+    await pool.query("DELETE FROM settlements WHERE match_id = 'MATCH-2026-001'");
     const [existingBets] = await pool.query("SELECT id FROM bets WHERE match_id = 'MATCH-2026-001'");
     if (existingBets.length === 0) {
       await pool.query(
@@ -209,8 +211,6 @@ async function runTests() {
       );
     } else {
       await pool.query("UPDATE bets SET status = 'live', settlement_status = 'pending', payout = 0.00, settled_at = NULL, settled_by = NULL WHERE match_id = 'MATCH-2026-001'");
-      await pool.query("DELETE FROM coin_transactions WHERE idempotency_key LIKE 'PAYOUT-TEST-BET-SETTLE-001%'");
-      await pool.query("DELETE FROM settlements WHERE match_id = 'MATCH-2026-001'");
     }
     await pool.query(`
       UPDATE wallets w

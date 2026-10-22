@@ -366,7 +366,7 @@ const handleAdminCreateUser = async (req, res, next) => {
     }
 
     const rawStatus = (accountStatus !== undefined ? accountStatus : (status !== undefined ? status : '')).toString().trim().toLowerCase();
-    const allowedStatuses = ['active', 'suspended'];
+    const allowedStatuses = ['active', 'suspended', 'banned'];
     if (!rawStatus || !allowedStatuses.includes(rawStatus)) {
       return res.status(400).json({
         success: false,
@@ -397,9 +397,10 @@ const handleAdminCreateUser = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      message: `Player account "${registeredUser.username}" created successfully.`,
+      message: `Player account "${registeredUser.username}" created successfully. User must change temporary password on first login.`,
       data: {
-        user: registeredUser
+        user: registeredUser,
+        mustChangePassword: true
       }
     });
   } catch (err) {
@@ -421,6 +422,82 @@ router.post('/users/create', handleAdminCreateUser);
 router.post('/users', handleAdminCreateUser);
 
 // =============================================================================
+// 2C. ADMIN RESET USER PASSWORD
+// =============================================================================
+const handleAdminResetPassword = async (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId) || userId < 1) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Valid user identifier is required.' }
+      });
+    }
+
+    const { newPassword, temporaryPassword, requirePasswordChange = true } = req.body || {};
+    const rawPass = newPassword || temporaryPassword || '';
+
+    if (!rawPass || rawPass.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          field: 'newPassword',
+          message: 'Temporary password must be at least 8 characters long.'
+        }
+      });
+    }
+
+    const pool = getPool();
+    const [userRows] = await pool.query('SELECT id, username, role FROM users WHERE id = ? LIMIT 1', [userId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'User account not found.' }
+      });
+    }
+
+    const targetUser = userRows[0];
+    const { hashPassword } = require('../utils/crypto');
+    const newHash = hashPassword(rawPass);
+    const mustChangeFlag = requirePasswordChange ? 1 : 0;
+
+    await pool.query(
+      'UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?',
+      [newHash, mustChangeFlag, userId]
+    );
+
+    // Invalidate target user active sessions to force fresh login with temporary password
+    await pool.query('DELETE FROM sessions WHERE user_id = ?', [userId]);
+
+    await logAdminAction(
+      req.user,
+      'RESET_USER_PASSWORD',
+      'USER',
+      userId,
+      targetUser.username,
+      { mustChangePassword: Boolean(mustChangeFlag) },
+      req.ip
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Password for "${targetUser.username}" reset successfully. ${mustChangeFlag ? 'User must change password upon next login.' : ''}`,
+      data: {
+        userId,
+        username: targetUser.username,
+        mustChangePassword: Boolean(mustChangeFlag)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+router.post('/users/:id/reset-password', handleAdminResetPassword);
+router.put('/users/:id/reset-password', handleAdminResetPassword);
+
+// =============================================================================
 // 3. GET SINGLE USER DETAILS
 // =============================================================================
 router.get('/users/:id', async (req, res, next) => {
@@ -436,7 +513,7 @@ router.get('/users/:id', async (req, res, next) => {
     const pool = getPool();
     const [rows] = await pool.query(
       `SELECT 
-        u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.created_at, u.updated_at,
+        u.id, u.uuid, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.must_change_password, u.created_at, u.updated_at,
         w.available_balance, w.exposure_balance, w.currency,
         p.dark_mode_enabled, p.toss_alerts, p.match_reminders, p.wallet_notices
        FROM users u
@@ -472,6 +549,8 @@ router.get('/users/:id', async (req, res, next) => {
         phone: user.phone,
         role: user.role,
         status: user.status,
+        mustChangePassword: Boolean(user.must_change_password),
+        must_change_password: Boolean(user.must_change_password),
         created_at: user.created_at,
         updated_at: user.updated_at,
         wallet: {
@@ -1995,6 +2074,13 @@ router.put('/matches/:id/schedule', async (req, res, next) => {
       });
     }
 
+    if (matches[0].settled) {
+      return res.status(409).json({
+        success: false,
+        error: { code: 'MATCH_ALREADY_SETTLED', message: 'Cannot modify schedule or cutoff time for an already settled match.' }
+      });
+    }
+
     const rawEndTime = req.body.match_end_time || req.body.matchEndTime || req.body.end_time;
     const scheduledTime = req.body.scheduled_time || req.body.scheduledTime;
 
@@ -2069,6 +2155,14 @@ router.delete('/matches/:id', async (req, res, next) => {
       });
     }
 
+    const [settlements] = await pool.query('SELECT COUNT(*) as count FROM settlements WHERE match_id = ?', [matchId]);
+    if (settlements[0].count > 0 || matches[0].settled) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_SETTLED', message: 'Cannot delete a settled match with historical settlement audit records.' }
+      });
+    }
+
     await pool.query('DELETE FROM matches WHERE id = ?', [matchId]);
     await logAdminAction(req.user, 'delete_match', 'match', null, matchId, { matchId }, req.ip);
 
@@ -2103,7 +2197,30 @@ router.put('/matches/:id/status', async (req, res, next) => {
       });
     }
 
-    const isCompleted = status === 'completed' || status === 'abandoned';
+    const match = matches[0];
+
+    // CRITICAL SECURITY RULE: A settled match cannot be reopened to upcoming or live via simple status update
+    if (match.settled && (status === 'upcoming' || status === 'live')) {
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'MATCH_ALREADY_SETTLED',
+          message: 'Cannot reopen a settled match. Reopening or correcting a settled match must proceed through authorized settlement reversal.'
+        }
+      });
+    }
+
+    // Check for pending player wagers on this match
+    const [pendingBets] = await pool.query(
+      "SELECT COUNT(*) AS count FROM bets WHERE match_id = ? AND settlement_status = 'pending'",
+      [matchId]
+    );
+    const hasPendingBets = (pendingBets[0]?.count || 0) > 0;
+
+    // Settle flag is ONLY set automatically on completion if there are zero pending wagers.
+    // If pending wagers exist, match settlement must proceed through /api/admin/settlement/process.
+    const canMarkSettled = (status === 'completed' || status === 'abandoned') && !hasPendingBets;
+
     await pool.query(
       `UPDATE matches 
        SET status = ?, 
@@ -2112,19 +2229,28 @@ router.put('/matches/:id/status', async (req, res, next) => {
            settled_at = CASE WHEN ? AND settled_at IS NULL THEN NOW() ELSE settled_at END,
            settled_by = CASE WHEN ? AND settled_by IS NULL THEN ? ELSE settled_by END
        WHERE id = ?`,
-      [status, tossWinner, isCompleted, isCompleted, isCompleted, req.user.id, matchId]
+      [status, tossWinner, canMarkSettled, canMarkSettled, canMarkSettled, req.user.id, matchId]
     );
 
-    await logAdminAction(req.user, 'update_match_status', 'match', null, matchId, { status, tossWinner, isCompleted }, req.ip);
+    await logAdminAction(
+      req.user,
+      'update_match_status',
+      'match',
+      null,
+      matchId,
+      { status, tossWinner, isCompleted: status === 'completed' || status === 'abandoned', hasPendingBets, settled: canMarkSettled },
+      req.ip
+    );
 
     return res.status(200).json({
       success: true,
-      message: `Match status updated to ${status}.`,
+      message: `Match status updated to ${status}.` + (hasPendingBets && (status === 'completed' || status === 'abandoned') ? ' Please proceed to Bet Settlement to finalize player payouts.' : ''),
       data: {
         match_id: matchId,
         status,
-        settled: isCompleted,
-        toss_winner: tossWinner || matches[0].toss_winner
+        settled: canMarkSettled ? true : Boolean(match.settled),
+        toss_winner: tossWinner || match.toss_winner,
+        hasPendingBets
       }
     });
   } catch (err) {
@@ -2614,6 +2740,7 @@ router.post('/settlement/process', async (req, res, next) => {
               noResultCount,
               totalStake: parseFloat(totalStake.toFixed(2)),
               totalPayoutCredited: parseFloat(totalPayout.toFixed(2)),
+              totalPayout: parseFloat(totalPayout.toFixed(2)),
               settledBy: req.user.username,
               timestamp: new Date().toISOString()
             }

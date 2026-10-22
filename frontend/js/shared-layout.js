@@ -431,6 +431,313 @@
     });
 
     setupGlobalModalAccessibility();
+
+    // Check mandatory password change on page initialization
+    checkMandatoryPasswordRequirement();
+    window.addEventListener('itb:password-change-required', () => {
+      showMandatoryChangePasswordModal();
+    });
+  }
+
+  /**
+   * Mandatory First-Login Password Change Modal System
+   */
+  let isMandatoryPasswordModalActive = false;
+
+  function ensureMandatoryChangePasswordModal() {
+    let overlay = document.getElementById('mandatory-change-password-modal');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'mandatory-change-password-modal';
+    overlay.className = 'mandatory-pwd-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'mandatory-pwd-title');
+    overlay.setAttribute('aria-describedby', 'mandatory-pwd-desc');
+    overlay.setAttribute('aria-hidden', 'true');
+
+    overlay.innerHTML = `
+      <div class="mandatory-pwd-card" role="document">
+        <header class="mandatory-pwd-header">
+          <div class="mandatory-pwd-icon-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <h2 id="mandatory-pwd-title" class="mandatory-pwd-title">Welcome! Change Your Password</h2>
+          <p id="mandatory-pwd-desc" class="mandatory-pwd-desc">
+            For your account's security, you must create a new password before continuing.
+          </p>
+        </header>
+
+        <form id="mandatory-pwd-form" class="mandatory-pwd-body" novalidate autocomplete="off">
+          <div id="mandatory-pwd-error" class="mandatory-pwd-error-banner" role="alert"></div>
+          <div id="mandatory-pwd-success" class="mandatory-pwd-success-banner" role="status"></div>
+
+          <div class="mandatory-pwd-group">
+            <label class="mandatory-pwd-label" for="mandatory-curr-pass">
+              <span>Current / Temporary Password</span>
+            </label>
+            <div class="mandatory-pwd-input-wrap">
+              <input type="password" id="mandatory-curr-pass" name="currentPassword" class="mandatory-pwd-input" placeholder="Enter temporary password" required autocomplete="current-password" />
+              <button type="button" class="mandatory-pwd-toggle-btn" data-target="mandatory-curr-pass" aria-label="Toggle password visibility">
+                <svg viewBox="0 0 24 24" class="eye-open"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="mandatory-pwd-group">
+            <label class="mandatory-pwd-label" for="mandatory-new-pass">
+              <span>New Password</span>
+            </label>
+            <div class="mandatory-pwd-input-wrap">
+              <input type="password" id="mandatory-new-pass" name="newPassword" class="mandatory-pwd-input" placeholder="Min. 8 characters" minlength="8" required autocomplete="new-password" />
+              <button type="button" class="mandatory-pwd-toggle-btn" data-target="mandatory-new-pass" aria-label="Toggle password visibility">
+                <svg viewBox="0 0 24 24" class="eye-open"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="mandatory-pwd-group">
+            <label class="mandatory-pwd-label" for="mandatory-confirm-pass">
+              <span>Confirm New Password</span>
+            </label>
+            <div class="mandatory-pwd-input-wrap">
+              <input type="password" id="mandatory-confirm-pass" name="confirmPassword" class="mandatory-pwd-input" placeholder="Re-enter new password" minlength="8" required autocomplete="new-password" />
+              <button type="button" class="mandatory-pwd-toggle-btn" data-target="mandatory-confirm-pass" aria-label="Toggle password visibility">
+                <svg viewBox="0 0 24 24" class="eye-open"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="mandatory-pwd-policy">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Must be at least 8 characters long and different from temporary password.</span>
+          </div>
+
+          <button type="submit" id="mandatory-pwd-submit" class="mandatory-pwd-submit-btn">
+            <span class="btn-text">Change Password &amp; Continue &rarr;</span>
+            <span class="mandatory-pwd-spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Eye toggle controls
+    overlay.querySelectorAll('.mandatory-pwd-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const inputId = btn.getAttribute('data-target');
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const isPass = input.type === 'password';
+        input.type = isPass ? 'text' : 'password';
+        btn.innerHTML = isPass
+          ? `<svg viewBox="0 0 24 24" style="stroke: var(--pink-primary, #789B69);"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`
+          : `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+      });
+    });
+
+    // Form submit listener
+    const form = overlay.querySelector('#mandatory-pwd-form');
+    form.addEventListener('submit', handleMandatoryPasswordSubmit);
+
+    // STRICT GUARD: Block backdrop dismissal
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    return overlay;
+  }
+
+  function showMandatoryChangePasswordModal() {
+    isMandatoryPasswordModalActive = true;
+    const overlay = ensureMandatoryChangePasswordModal();
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.style.display = 'flex';
+
+    // Trap focus inside modal
+    const firstInput = overlay.querySelector('#mandatory-curr-pass');
+    if (firstInput) {
+      setTimeout(() => firstInput.focus(), 100);
+    }
+
+    // STRICT ESCAPE KEY INTERCEPTION
+    document.addEventListener('keydown', handleMandatoryKeydown, true);
+  }
+
+  function handleMandatoryKeydown(e) {
+    if (!isMandatoryPasswordModalActive) return;
+    if (e.key === 'Escape' || e.keyCode === 27) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    // Trap focus
+    if (e.key === 'Tab') {
+      const overlay = document.getElementById('mandatory-change-password-modal');
+      if (!overlay) return;
+      const focusables = overlay.querySelectorAll('input:not([disabled]), button:not([disabled])');
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  async function handleMandatoryPasswordSubmit(e) {
+    e.preventDefault();
+    const overlay = document.getElementById('mandatory-change-password-modal');
+    if (!overlay) return;
+
+    const currInput = overlay.querySelector('#mandatory-curr-pass');
+    const newInput = overlay.querySelector('#mandatory-new-pass');
+    const confirmInput = overlay.querySelector('#mandatory-confirm-pass');
+    const errorBanner = overlay.querySelector('#mandatory-pwd-error');
+    const successBanner = overlay.querySelector('#mandatory-pwd-success');
+    const submitBtn = overlay.querySelector('#mandatory-pwd-submit');
+    const btnText = submitBtn.querySelector('.btn-text');
+    const spinner = submitBtn.querySelector('.mandatory-pwd-spinner');
+
+    errorBanner.style.display = 'none';
+    errorBanner.textContent = '';
+    successBanner.style.display = 'none';
+    successBanner.textContent = '';
+
+    const currentPassword = (currInput.value || '').trim();
+    const newPassword = (newInput.value || '').trim();
+    const confirmPassword = (confirmInput.value || '').trim();
+
+    // Client validations
+    if (!currentPassword) {
+      errorBanner.textContent = 'Please enter your current or temporary password.';
+      errorBanner.style.display = 'block';
+      currInput.focus();
+      return;
+    }
+    if (!newPassword || newPassword.length < 8) {
+      errorBanner.textContent = 'New password must be at least 8 characters long.';
+      errorBanner.style.display = 'block';
+      newInput.focus();
+      return;
+    }
+    if (currentPassword === newPassword) {
+      errorBanner.textContent = 'New password must be different from your current password.';
+      errorBanner.style.display = 'block';
+      newInput.focus();
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      errorBanner.textContent = 'New password and confirm password do not match.';
+      errorBanner.style.display = 'block';
+      confirmInput.focus();
+      return;
+    }
+
+    // Set loading state
+    submitBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+    if (btnText) btnText.textContent = 'Securing account...';
+
+    try {
+      const res = await window.ApiClient.post('/auth/change-password', {
+        currentPassword,
+        newPassword,
+        confirmPassword
+      });
+
+      // Success
+      submitBtn.disabled = true;
+      if (spinner) spinner.style.display = 'none';
+      if (btnText) btnText.textContent = '✓ Password Changed!';
+      successBanner.textContent = 'Password changed successfully! Unlocking platform...';
+      successBanner.style.display = 'block';
+
+      // Update local authenticated user state
+      if (window.ApiClient) {
+        const currentUser = window.ApiClient.getUser() || {};
+        const updated = {
+          ...currentUser,
+          ...(res.user || {}),
+          mustChangePassword: false,
+          must_change_password: false
+        };
+        window.ApiClient.setUser(updated);
+        if (res.token) {
+          window.ApiClient.setToken(res.token);
+        }
+      }
+
+      setTimeout(() => {
+        isMandatoryPasswordModalActive = false;
+        overlay.classList.remove('open');
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.style.display = 'none';
+        document.removeEventListener('keydown', handleMandatoryKeydown, true);
+
+        showToast('Password updated successfully. Full access unlocked!', 'success');
+
+        // Refresh balance and notify page
+        if (window.ApiClient && typeof window.ApiClient.refreshBalance === 'function') {
+          window.ApiClient.refreshBalance(true).catch(() => {});
+        }
+        window.dispatchEvent(new CustomEvent('itb:password-changed'));
+      }, 700);
+    } catch (err) {
+      submitBtn.disabled = false;
+      if (spinner) spinner.style.display = 'none';
+      if (btnText) btnText.textContent = 'Change Password & Continue →';
+
+      const errorMsg = (err.error && err.error.message) || err.message || 'Failed to update password. Please check your credentials.';
+      errorBanner.textContent = errorMsg;
+      errorBanner.style.display = 'block';
+    }
+  }
+
+  function checkMandatoryPasswordRequirement() {
+    if (!window.ApiClient || !window.ApiClient.isAuthenticated()) return;
+
+    // Fast check: check locally cached state
+    const cachedUser = window.ApiClient.getUser();
+    if (cachedUser && (cachedUser.mustChangePassword || cachedUser.must_change_password)) {
+      showMandatoryChangePasswordModal();
+    }
+
+    // Authoritative check: verify with backend /auth/me
+    window.ApiClient.get('/auth/me', { noDedupe: true })
+      .then(res => {
+        const u = res?.user || res?.data?.user;
+        if (u && (u.mustChangePassword || u.must_change_password)) {
+          showMandatoryChangePasswordModal();
+        } else if (isMandatoryPasswordModalActive) {
+          // If already changed in another tab
+          const overlay = document.getElementById('mandatory-change-password-modal');
+          if (overlay) {
+            overlay.classList.remove('open');
+            overlay.style.display = 'none';
+          }
+          isMandatoryPasswordModalActive = false;
+        }
+      })
+      .catch(() => {});
   }
 
   // Export to global window object
@@ -446,6 +753,8 @@
     formatDate,
     setButtonLoading,
     setupGlobalModalAccessibility,
+    showMandatoryChangePasswordModal,
+    checkMandatoryPasswordRequirement,
     escapeHtml
   };
 

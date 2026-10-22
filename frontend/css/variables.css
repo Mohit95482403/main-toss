@@ -1,88 +1,114 @@
 /**
- * DADDY TOSS BOOK - Ultra-Premium Light Pink Design System
- * Palette: Blush-pink canvases, pristine white surfaces, rose-pink brand accents,
- * soft pastel semantic feedback, and elegant micro-elevations.
+ * DADDY TOSS BOOK - Light Pistachio Green & White Premium Design System
+ * Palette: Pure white cards, soft pistachio canvas, deep pistachio brand accents,
+ * dark green typography, soft realistic green shadows, and modern glassmorphism.
  */
 
 :root {
   /* ==========================================================================
-     1. Exact Specified Light Pink Palette & Brand Tokens
+     1. Curated Light Pistachio Brand Identity & Semantic Palette
      ========================================================================== */
-  --bg-primary: #FFF7FA;
-  --bg-secondary: #FFF0F5;
-  --surface-primary: #FFFFFF;
-  --surface-secondary: #FFFAFC;
+  --primary: #B7D7A8;                 /* Primary Pistachio */
+  --primary-light: #DDEED4;           /* Light Pistachio */
+  --primary-dark: #789B69;            /* Deep Pistachio */
+  --accent: #476B40;                  /* Dark Green Accent */
 
-  --pink-bg: #FFF7FA;               /* Main page canvas */
-  --pink-bg-secondary: #FFF0F5;     /* Secondary / section canvas */
-  --pink-surface: #FFFFFF;          /* Pure white card surface */
-  --pink-surface-elevated: #FFFFFF; /* Elevated white card surface */
+  --background: #F7FAF5;              /* Main Background */
+  --surface: #FFFFFF;                 /* Card Background */
+  --surface-muted: #EEF3EA;           /* Muted Background */
 
-  --pink-primary: #E75480;          /* Primary action button & active highlights */
-  --pink-hover: #D94370;            /* Button hover alias */
-  --pink-primary-hover: #D94370;    /* Button hover state */
-  --pink-primary-dark: #C93768;     /* Button active/pressed state */
-  --pink-soft: #FCE4EC;             /* Soft pink highlight / chip background */
-  --pink-soft-hover: #F8D4E1;       /* Soft pink hover */
-  --pink-soft-subtle: #FFF3F7;      /* Very subtle pink wash */
-  --pink-light: #FFF0F5;            /* Primary light pink alias */
-  --pink-rose: #E879A5;             /* Primary rose pink */
+  --bg-primary: #F7FAF5;              /* Main Background */
+  --bg-secondary: #EEF3EA;            /* Muted Background / Wash */
+  --bg-subtle: #F4F8F0;               /* Pale Pistachio Background */
+  --surface-primary: #FFFFFF;         /* Pure white primary card surface */
+  --surface-secondary: #F7FAF5;       /* Subtle tinted card surface */
+  --surface-tertiary: #EAF3E4;        /* Soft Green Surface */
 
-  --border-primary: #F2D3DF;        /* Standard primary border */
-  --border-secondary: #F7E6ED;      /* Secondary subtle border */
-  --pink-border: #F2D3DF;           /* Subtle pink border */
-  --pink-border-strong: #EABCCF;    /* Stronger pink border for focus/hover */
+  /* Pistachio Theme Tokens */
+  --pistachio-primary: #789B69;
+  --pistachio-light: #B7D7A8;
+  --pistachio-soft: #EAF3E4;
+  --pistachio-pale: #F4F8F0;
+  --pistachio-accent: #476B40;
 
-  --text-primary: #352631;          /* Primary high-contrast text */
-  --text-secondary: #786875;        /* Secondary supporting text */
-  --text-muted: #9A8994;            /* Muted timestamps & captions */
-  --text-inverse: #FFFFFF;          /* Text on dark/rose backgrounds */
+  /* Aliased pink variables for complete backwards-compatibility */
+  --pink-bg: #F7FAF5;
+  --pink-bg-secondary: #EEF3EA;
+  --pink-bg-subtle: #F4F8F0;
+  --pink-surface: #FFFFFF;
+  --pink-surface-elevated: #FFFFFF;
 
-  /* Semantic Feedback (Soft & Restrained) */
-  --success: #16865C;
-  --success-bg: #E8F7EF;
-  --success-text: #0D573B;
-  --success-border: #B7E4CF;
+  /* Brand Scale */
+  --pink-primary: #789B69;            /* Deep Pistachio */
+  --pink-primary-hover: #476B40;      /* Dark Green Accent */
+  --pink-primary-dark: #3A5734;       /* Pressed / active dark green */
+  --pink-hover: #476B40;
+  --pink-rose: #B7D7A8;               /* Primary Pistachio */
+  --pink-soft: #EAF3E4;               /* Soft green surface / chip background */
+  --pink-soft-hover: #DDEED4;         /* Light Pistachio hover */
+  --pink-soft-subtle: #F4F8F0;        /* Pale Pistachio wash */
+  --pink-light: #DDEED4;              /* Light Pistachio */
 
-  --warning: #A96F16;
-  --warning-bg: #FFF4D8;
-  --warning-text: #6E4609;
-  --warning-border: #F9E0A2;
+  /* Borders & Dividers */
+  --border: #DCE7D6;
+  --border-primary: #DCE7D6;          /* Standard crisp border */
+  --border-secondary: #E8F0E4;        /* Subtle inner border */
+  --pink-border: #DCE7D6;
+  --pink-border-strong: #B7D7A8;      /* Strong border on focus/hover */
+  --border-focus: #789B69;
 
-  --danger: #D64550;
-  --danger-bg: #FDEBEC;
-  --danger-text: #9B2832;
-  --danger-border: #F7C0C5;
+  /* High-Contrast Readability Typography Colors */
+  --text-primary: #263328;            /* Primary Text */
+  --text-secondary: #687568;          /* Secondary Text */
+  --text-muted: #889688;              /* Captions, timestamps, disabled labels */
+  --text-inverse: #FFFFFF;            /* White text on dark/green backgrounds */
+  --text-brand: #476B40;              /* Dark Green Accent */
 
-  --info: #357ABD;
-  --info-bg: #EBF3FC;
-  --info-text: #1E4F80;
-  --info-border: #BFDAF7;
+  /* Functional Feedback Colors */
+  --success: #218653;
+  --success-bg: #EAF5EE;
+  --success-text: #19663F;
+  --success-border: #B2DEC4;
+
+  --warning: #C58A24;
+  --warning-bg: #FCF7ED;
+  --warning-text: #8C6014;
+  --warning-border: #F0D39B;
+
+  --danger: #D64545;
+  --danger-bg: #FDF1F1;
+  --danger-text: #962E2E;
+  --danger-border: #F3B3B3;
+
+  --info: #3977C3;
+  --info-bg: #EFF5FC;
+  --info-text: #24528D;
+  --info-border: #B7D3F3;
 
   /* ==========================================================================
      2. Standard Platform Semantic Color Mappings
      ========================================================================== */
-  --color-primary: var(--pink-primary);
-  --color-primary-hover: var(--pink-primary-hover);
-  --color-primary-active: var(--pink-primary-dark);
-  --color-primary-subtle: var(--pink-soft);
-  --color-primary-focus: rgba(231, 84, 128, 0.22);
+  --color-primary: #789B69;
+  --color-primary-hover: #476B40;
+  --color-primary-active: #3A5734;
+  --color-primary-subtle: #EAF3E4;
+  --color-primary-focus: rgba(120, 155, 105, 0.25);
 
-  --color-background: var(--pink-bg);
-  --color-surface: var(--pink-surface);
-  --color-surface-elevated: var(--pink-surface-elevated);
-  --color-surface-subtle: var(--pink-bg-secondary);
-  --color-surface-hover: var(--pink-soft);
+  --color-background: var(--bg-primary);
+  --color-surface: var(--surface-primary);
+  --color-surface-elevated: var(--surface-primary);
+  --color-surface-subtle: var(--bg-secondary);
+  --color-surface-hover: #EAF3E4;
 
   --color-text: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-text-inverse: var(--text-inverse);
 
-  --color-border: var(--pink-border);
-  --color-border-subtle: var(--pink-border);
-  --color-border-focus: var(--pink-primary);
-  --color-border-hover: var(--pink-border-strong);
+  --color-border: var(--border-primary);
+  --color-border-subtle: var(--border-secondary);
+  --color-border-focus: #789B69;
+  --color-border-hover: #B7D7A8;
 
   --color-success: var(--success);
   --color-success-bg: var(--success-bg);
@@ -100,24 +126,24 @@
   --color-info-bg: var(--info-bg);
   --color-info-text: var(--info-text);
 
-  /* Layered Shadows with subtle rose tint */
-  --shadow-xs: 0 1px 3px rgba(180, 70, 115, 0.05);
-  --shadow-sm: 0 2px 8px rgba(180, 70, 115, 0.06);
-  --shadow-card: 0 4px 18px rgba(130, 63, 91, 0.06);
-  --shadow-hover: 0 10px 28px rgba(130, 63, 91, 0.11);
-  --shadow-md: 0 8px 24px rgba(180, 70, 115, 0.08);
-  --shadow-lg: 0 16px 36px rgba(180, 70, 115, 0.12);
-  --shadow-xl: 0 24px 48px rgba(180, 70, 115, 0.16);
-  --shadow-glow: 0 4px 16px rgba(231, 84, 128, 0.28);
-  --shadow-bottom-nav: 0 -3px 16px rgba(180, 70, 115, 0.08);
+  /* Soft Realistic Green Elevation Shadows */
+  --shadow-xs: 0 1px 3px rgba(71, 107, 64, 0.04);
+  --shadow-sm: 0 2px 8px rgba(71, 107, 64, 0.06);
+  --shadow-card: 0 4px 20px rgba(71, 107, 64, 0.07);
+  --shadow-hover: 0 10px 30px rgba(71, 107, 64, 0.12);
+  --shadow-md: 0 8px 24px rgba(71, 107, 64, 0.09);
+  --shadow-lg: 0 16px 40px rgba(71, 107, 64, 0.12);
+  --shadow-xl: 0 24px 56px rgba(71, 107, 64, 0.16);
+  --shadow-glow: 0 4px 18px rgba(120, 155, 105, 0.35);
+  --shadow-bottom-nav: 0 -4px 20px rgba(71, 107, 64, 0.07);
 
-  /* Radii */
-  --radius-xs: 4px;
+  /* Precision Radii */
+  --radius-xs: 6px;
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-full: 9999px;
 
   --border-radius-xs: var(--radius-xs);
@@ -128,9 +154,9 @@
   --border-radius-full: var(--radius-full);
 
   /* ==========================================================================
-     3. Modern Typography Tokens
+     3. Modern Sports Book Typography
      ========================================================================== */
-  --font-family-base: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-base: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-family-display: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
@@ -155,7 +181,7 @@
   --line-height-relaxed: 1.625;
 
   /* ==========================================================================
-     4. Standardized Global Spacing System Scale
+     4. Standardized Global Spacing Scale
      ========================================================================== */
   --space-1: 4px;
   --space-2: 8px;
@@ -167,7 +193,6 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Mapped Spacing Aliases */
   --space-2xs: 2px;
   --space-xs: var(--space-1);   /* 4px */
   --space-sm: var(--space-2);   /* 8px */
@@ -190,17 +215,17 @@
   --admin-max-width: var(--content-max-width);
 
   /* Component Heights & Layout Offsets */
-  --header-height: 60px;
+  --header-height: 62px;
   --ticker-height: 34px;
-  --bottom-nav-height: 62px;
+  --bottom-nav-height: 64px;
   --sidebar-width: 260px;
   --admin-sidebar-width: 260px;
   --sidebar-collapsed-width: 76px;
   --layout-gap: 24px;
   --card-gap: 20px;
-  --btn-height-sm: 32px;
-  --btn-height-md: 40px;
-  --btn-height-lg: 48px;
+  --btn-height-sm: 34px;
+  --btn-height-md: 42px;
+  --btn-height-lg: 50px;
   --input-height: 44px;
 
   /* Z-Indices */
@@ -212,22 +237,24 @@
   --z-index-sticky: 100;
   --z-index-modal: 2000;
 
-  /* Transitions */
+  /* Micro-Interactions & Transitions */
   --transition-fast: 160ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 260ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 380ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Glassmorphism & Elevated Aesthetics */
-  --glass-bg: rgba(255, 255, 255, 0.88);
-  --glass-border: rgba(242, 211, 223, 0.7);
-  --glass-blur: blur(14px);
-  --glass-shadow: 0 8px 32px rgba(180, 70, 115, 0.08);
+  /* Glassmorphism & Translucency */
+  --glass-bg: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(220, 231, 214, 0.85);
+  --glass-blur: blur(16px);
+  --glass-shadow: 0 8px 32px rgba(71, 107, 64, 0.08);
 
-  /* Curated Premium Gradients */
-  --gradient-primary: linear-gradient(135deg, #E75480 0%, #D94370 100%);
-  --gradient-primary-hover: linear-gradient(135deg, #ED6590 0%, #D94370 100%);
-  --gradient-primary-soft: linear-gradient(135deg, #FFF0F5 0%, #FCE4EC 100%);
-  --gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #FFF7FA 100%);
-  --gradient-hero: linear-gradient(135deg, #C93768 0%, #E75480 60%, #E879A5 100%);
+  /* Curated Premium Brand Gradients */
+  --gradient-primary: linear-gradient(135deg, #789B69 0%, #476B40 100%);
+  --gradient-primary-hover: linear-gradient(135deg, #87AA78 0%, #476B40 100%);
+  --gradient-primary-soft: linear-gradient(135deg, #EAF3E4 0%, #DDEED4 100%);
+  --gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #F7FAF5 100%);
+  --gradient-hero: linear-gradient(135deg, #476B40 0%, #789B69 60%, #8FB37F 100%);
+  --gradient-gold: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
   --gradient-badge-live: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
 }

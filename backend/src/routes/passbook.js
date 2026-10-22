@@ -4,13 +4,14 @@
  */
 
 const express = require('express');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, enforcePasswordChange } = require('../middleware/auth');
 const walletService = require('../services/walletService');
 
 const router = express.Router();
 
-// Enforce authentication on passbook endpoints
+// Enforce authentication & mandatory password change guard on passbook endpoints
 router.use(authenticate);
+router.use(enforcePasswordChange);
 
 /**
  * GET /api/passbook/transactions

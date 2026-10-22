@@ -992,29 +992,8 @@
         }
 
         if (activeBets.length === 0) {
-          sectionEl.style.display = 'block';
-          containerEl.innerHTML = `
-            <div class="active-bets-empty-card">
-              <div class="active-bets-empty-icon" aria-hidden="true">
-                ${ICONS.empty}
-              </div>
-              <h3 class="active-bets-empty-title">No active bets yet</h3>
-              <p class="active-bets-empty-subtext">You haven't placed any toss wagers on current fixtures.</p>
-              <button type="button" class="btn btn-primary btn-sm active-bets-empty-action" id="browse-fixtures-btn">
-                BROWSE MATCH FIXTURES &rarr;
-              </button>
-            </div>
-          `;
-
-          const browseBtn = document.getElementById('browse-fixtures-btn');
-          if (browseBtn) {
-            browseBtn.addEventListener('click', () => {
-              const fixturesEl = document.getElementById('fixtures-heading') || document.getElementById('match-feed-container');
-              if (fixturesEl) {
-                fixturesEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            });
-          }
+          sectionEl.style.display = 'none';
+          containerEl.innerHTML = '';
           return;
         }
 
@@ -1024,17 +1003,8 @@
 
       } catch (err) {
         console.warn('[ACTIVE BETS] Failed to load active bets:', err.message);
-        sectionEl.style.display = 'block';
-        containerEl.innerHTML = `
-          <div class="active-bets-empty-card" style="border-style: solid; border-color: #fecdd3;">
-            <p class="text-xs text-secondary" style="margin: 0;">Unable to refresh active bets.</p>
-            <button type="button" class="btn btn-secondary btn-xs" id="retry-active-bets-btn" style="margin-top: 4px;">
-              Retry
-            </button>
-          </div>
-        `;
-        const retryBtn = document.getElementById('retry-active-bets-btn');
-        if (retryBtn) retryBtn.addEventListener('click', () => loadActiveBets());
+        sectionEl.style.display = 'none';
+        containerEl.innerHTML = '';
       }
     };
 

@@ -5,29 +5,81 @@
 
 const mysql = require('mysql2/promise');
 
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  database: process.env.DB_NAME || 'ironman_toss_book',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  waitForConnections: true,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
-  queueLimit: 0,
-  connectTimeout: 3000, // 3 seconds timeout for diagnostics
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10000,
-  maxIdle: 10,
-  idleTimeout: 60000,
-  ...(process.env.DB_SSL === 'true'
-    ? {
-        ssl: {
-          rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
-          ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {})
-        }
+/**
+ * Build database connection configuration from environment
+ * Supports discrete parameters (DB_HOST, etc.) or connection URI (DATABASE_URL / MYSQL_URL)
+ */
+function buildDbConfig() {
+  const connectionUri = (process.env.DATABASE_URL || process.env.MYSQL_URL || '').trim();
+
+  let sslConfig = undefined;
+  if (process.env.DB_SSL === 'true') {
+    let ca = undefined;
+    if (process.env.DB_SSL_CA) {
+      const rawCa = process.env.DB_SSL_CA.trim();
+      if (rawCa.includes('BEGIN CERTIFICATE')) {
+        ca = rawCa;
+      } else {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const caPath = path.resolve(rawCa);
+          if (fs.existsSync(caPath)) {
+            ca = fs.readFileSync(caPath, 'utf8');
+          }
+        } catch (_) {}
       }
-    : {})
-};
+    }
+    sslConfig = {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+      ...(ca ? { ca } : {})
+    };
+  }
+
+  // Parse connection URI if provided (common on Render / cloud MySQL)
+  if (connectionUri) {
+    try {
+      const parsed = new URL(connectionUri);
+      return {
+        host: parsed.hostname,
+        port: parseInt(parsed.port || '3306', 10),
+        database: (parsed.pathname || '').replace(/^\//, ''),
+        user: decodeURIComponent(parsed.username || 'root'),
+        password: decodeURIComponent(parsed.password || ''),
+        waitForConnections: true,
+        connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
+        queueLimit: 0,
+        connectTimeout: 10000,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+        maxIdle: 10,
+        idleTimeout: 60000,
+        ...(sslConfig ? { ssl: sslConfig } : {})
+      };
+    } catch (parseErr) {
+      console.warn('[DB CONFIG] Failed to parse DATABASE_URL, falling back to discrete parameters:', parseErr.message);
+    }
+  }
+
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306', 10),
+    database: process.env.DB_NAME || 'ironman_toss_book',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    waitForConnections: true,
+    connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
+    queueLimit: 0,
+    connectTimeout: 10000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    maxIdle: 10,
+    idleTimeout: 60000,
+    ...(sslConfig ? { ssl: sslConfig } : {})
+  };
+}
+
+const dbConfig = buildDbConfig();
 
 let pool = null;
 

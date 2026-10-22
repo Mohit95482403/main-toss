@@ -92,6 +92,7 @@ async function runTestSuite() {
       accountStatus: 'active'
     }, adminToken);
     assert(res.status === 201, `Created player ${username} with balance ${balance}`);
+    await pool.query('UPDATE users SET must_change_password = 0 WHERE id = ?', [res.data.data.user.id]);
     const token = generateToken({
       userId: res.data.data.user.id,
       username: res.data.data.user.username,

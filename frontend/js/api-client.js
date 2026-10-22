@@ -79,6 +79,11 @@
           };
         }
 
+        if (user.must_change_password !== undefined || user.mustChangePassword !== undefined) {
+          user.mustChangePassword = Boolean(user.must_change_password !== undefined ? user.must_change_password : user.mustChangePassword);
+          user.must_change_password = user.mustChangePassword;
+        }
+
         const str = JSON.stringify(user);
         localStorage.setItem(USER_KEY, str);
         syncBalancesFromUser(user);
@@ -555,6 +560,13 @@
             }
           }
 
+          // If 403 Forbidden with PASSWORD_CHANGE_REQUIRED, trigger mandatory change password UI
+          if (res.status === 403 && (code === 'PASSWORD_CHANGE_REQUIRED' || (errorObj && errorObj.code === 'PASSWORD_CHANGE_REQUIRED'))) {
+            try {
+              window.dispatchEvent(new CustomEvent('itb:password-change-required', { detail: { error } }));
+            } catch (evtErr) {}
+          }
+
           throw error;
         }
 
@@ -662,6 +674,10 @@
     setUser,
     clearUser,
     isAuthenticated,
+    mustChangePassword: () => {
+      const u = getUser();
+      return Boolean(u && (u.mustChangePassword || u.must_change_password));
+    },
     getBalance,
     refreshBalance,
     fetchBalance: refreshBalance,

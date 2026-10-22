@@ -1,112 +1,87 @@
 /**
  * DADDY TOSS BOOK - Announcement Ticker Styles
- * Pale blue background, deep blue text, seamless looping, pause on hover/focus, accessible.
+ * Continuous marquee marquee banner with gradient megaphone badge, subtle pink wash,
+ * and high-contrast smooth text.
  */
 
 .announcement-ticker-container {
-  position: relative;
-  width: 100%;
-  height: var(--ticker-height, 32px);
-  background-color: var(--pink-bg-secondary, #FFF0F5);
-  border-bottom: 1px solid var(--pink-border, #F3D5E0);
+  height: var(--ticker-height, 34px);
+  background: var(--bg-secondary, #EEF3EA);
+  border-bottom: 1px solid var(--border-primary, #DCE7D6);
   display: flex;
   align-items: center;
   overflow: hidden;
-  user-select: none;
+  position: relative;
   z-index: var(--z-ticker, 90);
+  user-select: none;
 }
 
-[data-theme="dark"] .announcement-ticker-container {
-  background-color: var(--color-surface-subtle);
-  border-bottom-color: var(--color-border);
+@media (min-width: 768px) {
+  .announcement-ticker-container {
+    border-left: 1px solid var(--border-primary, #DCE7D6);
+    border-right: 1px solid var(--border-primary, #DCE7D6);
+  }
 }
 
-/* Left pinned announcement icon/badge */
 .ticker-badge {
+  flex-shrink: 0;
+  height: 100%;
+  padding: 0 12px;
+  background: var(--gradient-primary, linear-gradient(135deg, #789B69 0%, #476B40 100%));
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 var(--space-sm, 8px);
-  height: 100%;
-  background-color: var(--pink-primary, #E75480);
-  color: #FFFFFF;
-  flex-shrink: 0;
   z-index: 2;
-  box-shadow: 2px 0 6px rgba(180, 80, 120, 0.15);
+  box-shadow: 2px 0 8px rgba(120, 155, 105, 0.25);
 }
 
 .ticker-badge svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   fill: currentColor;
 }
 
-/* Ticker Marquee Viewport & Tracks */
 .ticker-viewport {
-  position: relative;
   flex: 1;
+  overflow: hidden;
+  position: relative;
   height: 100%;
   display: flex;
   align-items: center;
-  overflow: hidden;
 }
 
 .ticker-track {
   display: flex;
   align-items: center;
   white-space: nowrap;
+  animation: itb-ticker-scroll 28s linear infinite;
   will-change: transform;
-  animation: ticker-slide 28s linear infinite;
 }
 
-/* Pause ticker on hover or keyboard focus */
 .announcement-ticker-container:hover .ticker-track,
 .announcement-ticker-container:focus-within .ticker-track {
   animation-play-state: paused;
 }
 
-.ticker-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs, 6px);
-  padding: 0 var(--space-lg, 16px);
-  font-size: 0.75rem; /* 12px */
-  font-weight: 600;
-  color: var(--text-primary, #30232B);
-  letter-spacing: 0.02em;
+@keyframes itb-ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
-[data-theme="dark"] .ticker-item {
-  color: var(--color-text);
+.ticker-item {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-2xs, 11px);
+  font-weight: var(--font-weight-bold, 700);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-primary, #263328);
+  padding: 0 8px;
 }
 
 .ticker-separator {
-  color: var(--pink-primary, #E75480);
-  font-size: 0.625rem;
-}
-
-[data-theme="dark"] .ticker-separator {
-  color: rgba(147, 197, 253, 0.4);
-}
-
-/* Smooth continuous marquee animation */
-@keyframes ticker-slide {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-/* ==========================================================================
-   Reduced Motion Accessibility Preference
-   ========================================================================== */
-
-@media (prefers-reduced-motion: reduce) {
-  .ticker-track {
-    animation: none;
-    overflow-x: auto;
-    scroll-behavior: auto;
-  }
+  color: var(--pink-primary, #789B69);
+  font-size: 8px;
+  padding: 0 8px;
+  opacity: 0.85;
 }

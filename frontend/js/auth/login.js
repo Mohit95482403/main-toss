@@ -101,9 +101,12 @@
       const persistSession = rememberCheckbox ? rememberCheckbox.checked : true;
 
       const apiClient = window.ApiClient;
+      const defaultApiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:5000/api'
+        : '/api';
       const apiPromise = apiClient
         ? apiClient.post('/auth/login', { identifier: identifierVal, password: passwordVal })
-        : fetch(`${(window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 'http://localhost:5000/api'}/auth/login`, {
+        : fetch(`${(window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || defaultApiBase}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ identifier: identifierVal, password: passwordVal })

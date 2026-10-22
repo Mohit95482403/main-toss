@@ -1,15 +1,43 @@
-/**
- * DADDY TOSS BOOK - Frontend Configuration
- */
+// ============================================================================
+// PRODUCTION BACKEND URL CONFIGURATION
+// If deploying frontend (Vercel) and backend (Render) separately,
+// paste your deployed Render backend URL here: (e.g. 'https://my-backend.onrender.com')
+// When set, all frontend API calls will route to this base URL + '/api'.
+// If left empty (''), it automatically uses the same-origin '/api' in production
+// or 'http://localhost:5000/api' when running locally.
+// ============================================================================
+const PRODUCTION_BACKEND_URL = '';
+
+function resolveApiBaseUrl() {
+  // 1. Explicit window override (e.g. injected script or environment snippet)
+  if (typeof window !== 'undefined' && (window.DTB_API_URL || window.ITB_API_URL)) {
+    const custom = (window.DTB_API_URL || window.ITB_API_URL).trim().replace(/\/+$/, '');
+    return custom.endsWith('/api') ? custom : `${custom}/api`;
+  }
+
+  // 2. Explicit production constant configured above
+  if (PRODUCTION_BACKEND_URL && PRODUCTION_BACKEND_URL.trim() !== '') {
+    const trimmed = PRODUCTION_BACKEND_URL.trim().replace(/\/+$/, '');
+    return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+  }
+
+  // 3. Localhost development environments (Live Server, Vite dev, port 3000/5500/5173)
+  if (typeof window !== 'undefined' && window.location) {
+    const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (isLocal) {
+      if (window.location.port === '5000') return '/api';
+      return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+    }
+  }
+
+  // 4. Default same-origin production fallback (/api)
+  return '/api';
+}
 
 const APP_CONFIG = Object.freeze({
   appName: 'DADDY TOSS BOOK',
   version: '1.0.0-day2',
-  apiBaseUrl: (typeof window !== 'undefined' && window.ITB_API_URL)
-    ? window.ITB_API_URL
-    : (['5500', '3000', '5173'].includes(window.location.port)
-        ? `${window.location.protocol}//${window.location.hostname}:5000/api`
-        : (window.location.port === '5000' ? '/api' : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000/api' : '/api'))),
+  apiBaseUrl: resolveApiBaseUrl(),
   endpoints: {
     health: '/health',
     authRegister: '/auth/register',

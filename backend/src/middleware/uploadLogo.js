@@ -13,7 +13,10 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 
-const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/team-logos');
+const baseUploadsDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.resolve(__dirname, '../../uploads');
+const UPLOADS_DIR = path.join(baseUploadsDir, 'team-logos');
 
 // Ensure destination exists
 if (!fs.existsSync(UPLOADS_DIR)) {
