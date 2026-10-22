@@ -58,23 +58,19 @@ git push origin main
 
 ---
 
-## Step 2 — Configure Existing MySQL Database
+## Step 2 — Configure Aiven MySQL 8.4 Database
 
-Your application works with your existing MySQL database. No tables will be deleted or dropped.
+Your Aiven MySQL database (`daddy_toss_book`) has been imported with all 10 tables, preserved balances, user accounts, and constraints.
 
-### 2.1 Gather Database Connection Details
-From your MySQL database provider dashboard, retrieve:
-- **Host**: e.g., `mysql-1234.provider.com`
-- **Port**: usually `3306`
-- **Database Name**: e.g., `daddy_toss_book`
-- **Username**: e.g., `db_user`
-- **Password**: e.g., `your_strong_password`
-- **Connection URL** (optional): `mysql://db_user:password@hostname:3306/daddy_toss_book?ssl-mode=REQUIRED`
-
-### 2.2 Verify SSL Requirements
-- Most cloud databases (Aiven, DigitalOcean, PlanetScale, AWS RDS) require TLS/SSL encryption.
-- The backend automatically supports `DB_SSL=true`.
-- If your provider uses a self-signed or internal CA certificate, you can set `DB_SSL_REJECT_UNAUTHORIZED=false` or provide the certificate via `DB_SSL_CA`.
+### 2.1 Aiven Database Credentials
+From your Aiven Console Overview tab:
+- **Host**: `daddytossbook-narendra-connectly.l.aivencloud.com`
+- **Port**: `20135`
+- **Database Name**: `daddy_toss_book`
+- **Username**: `avnadmin`
+- **Password**: `<YOUR_AIVEN_PASSWORD>`
+- **SSL / TLS**: **Required**
+- **CA Certificate**: Download `ca.pem` from the Aiven Console Overview tab.
 
 ---
 
@@ -108,25 +104,32 @@ Scroll down to **Advanced** settings:
 ### 3.4 Add Environment Variables on Render
 Under **Environment Variables**, click **Add Environment Variable** for each:
 
-| Key | Example Value | Description |
+| Key | Value for Aiven MySQL | Description |
 |---|---|---|
 | `NODE_ENV` | `production` | Enables production security checks |
 | `PORT` | `10000` | Render injects this automatically |
 | `HOST` | `0.0.0.0` | Binds to all network interfaces |
 | `TRUST_PROXY` | `true` | Required for secure HTTPS headers behind Render proxy |
 | `SERVE_STATIC_FRONTEND` | `false` | Frontend is hosted on Vercel |
-| `DB_HOST` | `your-db-host.com` | Your MySQL Host *(or use `DATABASE_URL`)* |
-| `DB_PORT` | `3306` | Your MySQL Port |
-| `DB_USER` | `your_db_username` | Your MySQL Username |
-| `DB_PASSWORD` | `your_db_password` | Your MySQL Password |
-| `DB_NAME` | `your_db_name` | Your MySQL Database Name |
-| `DB_SSL` | `true` | `true` for cloud MySQL, `false` if local/unencrypted |
+| `DB_HOST` | `daddytossbook-narendra-connectly.l.aivencloud.com` | Aiven MySQL Host |
+| `DB_PORT` | `20135` | Aiven MySQL Port |
+| `DB_USER` | `avnadmin` | Aiven MySQL Username |
+| `DB_PASSWORD` | `<YOUR_AIVEN_PASSWORD>` | Your Aiven password (never commit to Git) |
+| `DB_NAME` | `daddy_toss_book` | Database name |
+| `DB_SSL` | `true` | Enforces TLS encryption for Aiven |
+| `DB_SSL_REJECT_UNAUTHORIZED` | `true` | Enforces strict certificate verification |
 | `SESSION_SECRET` | *(Random 32+ characters)* | Generate using `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `FRONTEND_URL` | `https://placeholder.vercel.app` | *Temporary placeholder until Vercel URL is known (updated in Step 5)* |
 
-> **Note on Team Logo Uploads (Optional)**:
-> By default, Render Web Services have an ephemeral filesystem. If you want team logo uploads to persist across backend restarts and redeployments, click **Disks** in Render settings, attach a 1 GB Persistent Disk mounted at `/var/data/uploads`, and add the environment variable:
-> `UPLOADS_DIR=/var/data/uploads`
+> **Option A (Alternative Single Connection String)**:
+> Instead of discrete `DB_HOST`, `DB_USER`, `DB_PASSWORD`, you can simply set:
+> `DATABASE_URL` = `mysql://avnadmin:<YOUR_AIVEN_PASSWORD>@daddytossbook-narendra-connectly.l.aivencloud.com:20135/daddy_toss_book?ssl-mode=REQUIRED`
+
+> **Aiven CA Certificate Setup on Render (Certificate Verification)**:
+> Download `ca.pem` from your Aiven Console Overview tab.
+> In Render:
+> - **Method 1 (Secret File)**: Go to **Secret Files** tab in your Render service settings. Click **Add Secret File**, set the filename to `ca.pem`, and upload or paste the file contents. The backend automatically detects `/etc/secrets/ca.pem`!
+> - **Method 2 (Environment Variable)**: In **Environment Variables**, add `DB_SSL_CA` and paste the full PEM text (`-----BEGIN CERTIFICATE-----\n...`).
 
 ### 3.5 Deploy Backend
 Click **Create Web Service**. Wait 2–3 minutes for the build to finish.

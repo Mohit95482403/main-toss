@@ -9,47 +9,94 @@ const mysql = require('mysql2/promise');
  * Build database connection configuration from environment
  * Supports discrete parameters (DB_HOST, etc.) or connection URI (DATABASE_URL / MYSQL_URL)
  */
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Resolve CA certificate from environment variables or standard secret paths
+ */
+function resolveSslCa() {
+  const caEnv = process.env.DB_SSL_CA || process.env.AIVEN_CA_CERT || process.env.MYSQL_CA_CERT;
+  if (caEnv && caEnv.trim()) {
+    const raw = caEnv.trim();
+    // 1. Inline PEM certificate string
+    if (raw.includes('BEGIN CERTIFICATE')) {
+      return raw.replace(/\\n/g, '\n');
+    }
+    // 2. Base64-encoded PEM string
+    try {
+      const decoded = Buffer.from(raw, 'base64').toString('utf8');
+      if (decoded.includes('BEGIN CERTIFICATE')) {
+        return decoded;
+      }
+    } catch (_) {}
+    // 3. File path
+    try {
+      const caPath = path.resolve(raw);
+      if (fs.existsSync(caPath)) {
+        return fs.readFileSync(caPath, 'utf8');
+      }
+    } catch (_) {}
+  }
+
+  // 4. Standard Render secret files and project CA locations
+  const candidatePaths = [
+    '/etc/secrets/ca.pem',
+    '/etc/secrets/aiven-ca.pem',
+    path.resolve(__dirname, '../../../ca.pem'),
+    path.resolve(__dirname, '../../ca.pem'),
+    path.resolve(__dirname, '../ca.pem')
+  ];
+
+  for (const candidate of candidatePaths) {
+    try {
+      if (fs.existsSync(candidate)) {
+        const content = fs.readFileSync(candidate, 'utf8');
+        if (content.includes('BEGIN CERTIFICATE')) {
+          return content;
+        }
+      }
+    } catch (_) {}
+  }
+
+  return undefined;
+}
+
+/**
+ * Build database connection configuration from environment
+ * Supports discrete parameters (DB_HOST, etc.) or connection URI (DATABASE_URL / MYSQL_URL)
+ */
 function buildDbConfig() {
   const connectionUri = (process.env.DATABASE_URL || process.env.MYSQL_URL || '').trim();
 
-  let sslConfig = undefined;
-  if (process.env.DB_SSL === 'true') {
-    let ca = undefined;
-    if (process.env.DB_SSL_CA) {
-      const rawCa = process.env.DB_SSL_CA.trim();
-      if (rawCa.includes('BEGIN CERTIFICATE')) {
-        ca = rawCa;
-      } else {
-        try {
-          const fs = require('fs');
-          const path = require('path');
-          const caPath = path.resolve(rawCa);
-          if (fs.existsSync(caPath)) {
-            ca = fs.readFileSync(caPath, 'utf8');
-          }
-        } catch (_) {}
-      }
-    }
-    sslConfig = {
-      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
-      ...(ca ? { ca } : {})
-    };
-  }
-
-  // Parse connection URI if provided (common on Render / cloud MySQL)
+  // Parse connection URI if provided (common on Render / Aiven)
   if (connectionUri) {
     try {
       const parsed = new URL(connectionUri);
+      const host = parsed.hostname;
+      const isAiven = host.includes('aivencloud.com') || connectionUri.includes('ssl-mode');
+      const isSslRequested = process.env.DB_SSL === 'true' || isAiven;
+
+      let sslConfig = undefined;
+      if (isSslRequested) {
+        const ca = resolveSslCa();
+        sslConfig = {
+          rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+          ...(ca ? { ca } : {}),
+          ...(host ? { servername: host } : {})
+        };
+      }
+
       return {
-        host: parsed.hostname,
+        host,
         port: parseInt(parsed.port || '3306', 10),
-        database: (parsed.pathname || '').replace(/^\//, ''),
+        database: (parsed.pathname || '').replace(/^\//, '') || 'daddy_toss_book',
         user: decodeURIComponent(parsed.username || 'root'),
         password: decodeURIComponent(parsed.password || ''),
         waitForConnections: true,
         connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
         queueLimit: 0,
-        connectTimeout: 10000,
+        connectTimeout: 15000,
         enableKeepAlive: true,
         keepAliveInitialDelay: 10000,
         maxIdle: 10,
@@ -61,16 +108,30 @@ function buildDbConfig() {
     }
   }
 
+  const host = process.env.DB_HOST || 'localhost';
+  const isAiven = host.includes('aivencloud.com');
+  const isSslRequested = process.env.DB_SSL === 'true' || isAiven;
+
+  let sslConfig = undefined;
+  if (isSslRequested) {
+    const ca = resolveSslCa();
+    sslConfig = {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+      ...(ca ? { ca } : {}),
+      ...(host ? { servername: host } : {})
+    };
+  }
+
   return {
-    host: process.env.DB_HOST || 'localhost',
+    host,
     port: parseInt(process.env.DB_PORT || '3306', 10),
-    database: process.env.DB_NAME || 'ironman_toss_book',
+    database: process.env.DB_NAME || 'daddy_toss_book',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     waitForConnections: true,
     connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
     queueLimit: 0,
-    connectTimeout: 10000,
+    connectTimeout: 15000,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
     maxIdle: 10,

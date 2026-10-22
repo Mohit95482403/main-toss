@@ -28,7 +28,7 @@ function validateEnvironment(env = process.env) {
   const connectionUri = env.DATABASE_URL || env.MYSQL_URL;
   let dbHost = env.DB_HOST || 'localhost';
   let dbPort = parseInt(env.DB_PORT || '3306', 10);
-  let dbName = env.DB_NAME || 'ironman_toss_book';
+  let dbName = env.DB_NAME || 'daddy_toss_book';
   let dbUser = env.DB_USER || 'root';
   let hasPassword = Boolean(env.DB_PASSWORD);
 
