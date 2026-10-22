@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node backend/app.js",
     "build": "npm --prefix backend install",
+    "vercel-build": "echo 'Static frontend ready'",
+    "pre-publish": "node scripts/pre-publish.js",
     "start:backend": "cd backend && npm start",
     "dev:backend": "cd backend && npm run dev",
     "serve:frontend": "node ./scripts/serve-frontend.js",
