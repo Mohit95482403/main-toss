@@ -9,6 +9,25 @@
   <meta name="description"
     content="DADDY TOSS BOOK - Premium Cricket Toss Wagering &amp; Ledger Platform. Live match fixtures, toss odds, and account management.">
 
+  <!-- Authentication Gate: Redirect Unauthenticated Visitors to User Login -->
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem('itb_auth_token') || sessionStorage.getItem('itb_auth_token');
+        if (!token) {
+          var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          if (window.location.protocol === 'file:' || isLocal) {
+            window.location.replace('pages/login.html');
+          } else {
+            window.location.replace('/login');
+          }
+        }
+      } catch (e) {
+        window.location.replace('/login');
+      }
+    })();
+  </script>
+
   <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
