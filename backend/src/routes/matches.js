@@ -5,6 +5,7 @@
 
 const express = require('express');
 const { getPool } = require('../config/db');
+const { parseUtcTimestamp, isMatchSettled } = require('../utils/dateTime');
 
 const router = express.Router();
 
@@ -112,11 +113,11 @@ router.get('/', async (req, res, next) => {
       scheduledTime: m.scheduled_time || 'Schedule TBA',
       matchEndTime: m.match_end_time,
       match_end_time: m.match_end_time,
-      isExpired: Boolean(m.match_end_time && new Date(m.match_end_time).getTime() <= Date.now()),
+      isExpired: Boolean(m.match_end_time && parseUtcTimestamp(m.match_end_time) <= Date.now()),
       venue: m.venue || 'Venue TBA',
       status: m.status,
       tossWinner: m.toss_winner,
-      settled: Boolean(m.settled),
+      settled: isMatchSettled(m.settled),
       settledAt: m.settled_at,
       createdAt: m.created_at
     }));
@@ -187,11 +188,11 @@ router.get('/:id', async (req, res, next) => {
         scheduledTime: m.scheduled_time || 'Schedule TBA',
         matchEndTime: m.match_end_time,
         match_end_time: m.match_end_time,
-        isExpired: Boolean(m.match_end_time && new Date(m.match_end_time).getTime() <= Date.now()),
+        isExpired: Boolean(m.match_end_time && parseUtcTimestamp(m.match_end_time) <= Date.now()),
         venue: m.venue || 'Venue TBA',
         status: m.status,
         tossWinner: m.toss_winner,
-        settled: Boolean(m.settled),
+        settled: isMatchSettled(m.settled),
         settledAt: m.settled_at,
         createdAt: m.created_at
       }

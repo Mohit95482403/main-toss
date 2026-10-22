@@ -1,4 +1,4 @@
-const { getPool } = require('./backend/src/config/db');
+const { getPool } = require('../backend/src/config/db');
 
 async function inspect() {
   const pool = getPool();

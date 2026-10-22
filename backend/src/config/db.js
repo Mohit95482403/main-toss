@@ -101,6 +101,7 @@ function buildDbConfig() {
         keepAliveInitialDelay: 10000,
         maxIdle: 10,
         idleTimeout: 60000,
+        timezone: 'Z',
         ...(sslConfig ? { ssl: sslConfig } : {})
       };
     } catch (parseErr) {
@@ -136,6 +137,7 @@ function buildDbConfig() {
     keepAliveInitialDelay: 10000,
     maxIdle: 10,
     idleTimeout: 60000,
+    timezone: 'Z',
     ...(sslConfig ? { ssl: sslConfig } : {})
   };
 }

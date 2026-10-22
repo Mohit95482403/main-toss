@@ -444,7 +444,8 @@
 
         // Exclude completed, settled, or expired matches
         const eligibleMatches = (result.matches || []).filter(m => {
-          if (m.status === 'completed' || m.status === 'abandoned' || m.settled) return false;
+          const isSettled = m.settled === true || m.settled === 1 || m.settled === '1';
+          if (m.status === 'completed' || m.status === 'abandoned' || isSettled) return false;
           const rawEnd = m.matchEndTime || m.match_end_time;
           if (rawEnd) {
             const expiryMs = new Date(rawEnd).getTime();
@@ -1207,7 +1208,8 @@
         return;
       }
 
-      if (match.settled || match.status === 'completed' || match.status === 'abandoned') {
+      const isSettled = match.settled === true || match.settled === 1 || match.settled === '1';
+      if (isSettled || match.status === 'completed' || match.status === 'abandoned') {
         alert('Betting is closed for this match as it has already concluded.');
         loadMatchesData(true);
         return;
@@ -1362,7 +1364,8 @@
         return;
       }
 
-      if (activeMatch.settled || activeMatch.status === 'completed' || activeMatch.status === 'abandoned') {
+      const isSettled = activeMatch.settled === true || activeMatch.settled === 1 || activeMatch.settled === '1';
+      if (isSettled || activeMatch.status === 'completed' || activeMatch.status === 'abandoned') {
         showError('Betting is closed for this match.');
         return;
       }
@@ -1492,8 +1495,22 @@
         const errCode = errObj.code || err.code || '';
         const errMsg = err.message || errObj.message || 'Unable to place bet. Please try again.';
 
-        if (errCode === 'BETTING_CLOSED' || errMsg.toLowerCase().includes('closed') || errMsg.toLowerCase().includes('settled')) {
+        if (errCode === 'BETTING_CLOSED' || errCode === 'MATCH_SETTLED') {
           showError('⚠️ Betting is closed. This match has concluded and settled.');
+          if (confirmBtn) confirmBtn.disabled = true;
+          loadMatchesData(true);
+          setTimeout(() => {
+            closeBetModal();
+          }, 3000);
+        } else if (errCode === 'MATCH_EXPIRED') {
+          showError('⚠️ This match has reached its scheduled betting cutoff.');
+          if (confirmBtn) confirmBtn.disabled = true;
+          loadMatchesData(true);
+          setTimeout(() => {
+            closeBetModal();
+          }, 3000);
+        } else if (errCode === 'MATCH_STARTED') {
+          showError('⚠️ The match has already started. Betting cutoff has passed.');
           if (confirmBtn) confirmBtn.disabled = true;
           loadMatchesData(true);
           setTimeout(() => {
@@ -1513,11 +1530,14 @@
     checkActiveMatchEligibility = function (activeMatchesList) {
       if (!activeMatch || modal.style.display !== 'flex') return;
       const matchId = String(activeMatch.id);
-      const isStillEligible = (activeMatchesList || []).some(m => String(m.id) === matchId);
-      if (!isStillEligible) {
-        showError('⚠️ Betting is closed. This match has been concluded/settled by the administrator.');
-        if (confirmBtn) confirmBtn.disabled = true;
-        if (stakeInput) stakeInput.disabled = true;
+      const matchingItem = (activeMatchesList || []).find(m => String(m.id) === matchId);
+      if (matchingItem) {
+        const isSettled = matchingItem.settled === true || matchingItem.settled === 1 || matchingItem.settled === '1';
+        if (isSettled || matchingItem.status === 'completed' || matchingItem.status === 'abandoned') {
+          showError('⚠️ Betting is closed. This match has been concluded and settled.');
+          if (confirmBtn) confirmBtn.disabled = true;
+          if (stakeInput) stakeInput.disabled = true;
+        }
       }
     };
 

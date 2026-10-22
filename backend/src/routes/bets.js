@@ -13,6 +13,11 @@ const {
   executeWithRetry,
   sanitizeKey
 } = require('../utils/idempotency');
+const {
+  parseUtcTimestamp,
+  isMatchSettled,
+  isMatchConcluded
+} = require('../utils/dateTime');
 const walletService = require('../services/walletService');
 
 const router = express.Router();
@@ -144,10 +149,10 @@ router.get('/my-bets', async (req, res, next) => {
       // 4. Match start time (if set) must not have passed
       // 5. Match end time (if set) must not have passed
       const isPending = (r.status === 'pending' || r.status === 'live');
-      const isUnsettled = (r.settlement_status === 'pending') && !Boolean(r.match_settled);
-      const isNotClosed = !['completed', 'abandoned', 'closed'].includes(r.match_status);
-      const isStartTimeFuture = !r.match_start_time || (new Date(r.match_start_time).getTime() > now);
-      const isEndTimeFuture = !r.match_end_time || (new Date(r.match_end_time).getTime() > now);
+      const isUnsettled = (r.settlement_status === 'pending') && !isMatchSettled(r.match_settled);
+      const isNotClosed = !isMatchConcluded(r.match_status);
+      const isStartTimeFuture = !r.match_start_time || (parseUtcTimestamp(r.match_start_time) > now);
+      const isEndTimeFuture = !r.match_end_time || (parseUtcTimestamp(r.match_end_time) > now);
 
       const canCancel = Boolean(isPending && isUnsettled && isNotClosed && isStartTimeFuture && isEndTimeFuture);
 
@@ -255,10 +260,10 @@ router.get('/my-active-bets', async (req, res, next) => {
 
       // Cancellation eligibility checks:
       const isPending = (r.status === 'pending' || r.status === 'live');
-      const isUnsettled = (r.settlement_status === 'pending') && !Boolean(r.match_settled);
-      const isNotClosed = !['completed', 'abandoned', 'closed'].includes(r.match_status);
-      const isStartTimeFuture = !r.match_start_time || (new Date(r.match_start_time).getTime() > now);
-      const isEndTimeFuture = !r.match_end_time || (new Date(r.match_end_time).getTime() > now);
+      const isUnsettled = (r.settlement_status === 'pending') && !isMatchSettled(r.match_settled);
+      const isNotClosed = !isMatchConcluded(r.match_status);
+      const isStartTimeFuture = !r.match_start_time || (parseUtcTimestamp(r.match_start_time) > now);
+      const isEndTimeFuture = !r.match_end_time || (parseUtcTimestamp(r.match_end_time) > now);
 
       const canCancel = Boolean(isPending && isUnsettled && isNotClosed && isStartTimeFuture && isEndTimeFuture);
 
@@ -497,7 +502,10 @@ async function handlePlaceBet(req, res, next) {
 
         const match = matchRows[0];
 
-        if (match.settled || ['completed', 'abandoned', 'closed', 'settlement_reversed'].includes(match.status)) {
+        const isSettled = isMatchSettled(match.settled);
+        const isConcluded = isMatchConcluded(match.status);
+
+        if (isSettled || isConcluded) {
           await connection.rollback();
           if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
           return {
@@ -506,18 +514,13 @@ async function handlePlaceBet(req, res, next) {
           };
         }
 
-        if (match.status === 'live') {
-          await connection.rollback();
-          if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
-          return {
-            httpStatus: 400,
-            body: { success: false, error: { code: 'MATCH_STARTED', message: 'Match is already in progress. Toss betting is closed.' } }
-          };
-        }
+        const now = Date.now();
 
-        if (match.match_start_time) {
-          const matchStartTimeMs = new Date(match.match_start_time).getTime();
-          if (!isNaN(matchStartTimeMs) && matchStartTimeMs <= Date.now()) {
+        // Strict cutoff checks:
+        // 1. If match is in 'upcoming' status and match start time has passed
+        if (match.status === 'upcoming' && match.match_start_time) {
+          const matchStartTimeMs = parseUtcTimestamp(match.match_start_time);
+          if (matchStartTimeMs && matchStartTimeMs <= now) {
             await connection.rollback();
             if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
             return {
@@ -527,9 +530,10 @@ async function handlePlaceBet(req, res, next) {
           }
         }
 
+        // 2. Strict match end / auto-expiry cutoff (applies to both upcoming and live matches)
         if (match.match_end_time) {
-          const matchEndTimeMs = new Date(match.match_end_time).getTime();
-          if (!isNaN(matchEndTimeMs) && matchEndTimeMs <= Date.now()) {
+          const matchEndTimeMs = parseUtcTimestamp(match.match_end_time);
+          if (matchEndTimeMs && matchEndTimeMs <= now) {
             await connection.rollback();
             if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
             return {
@@ -853,7 +857,7 @@ async function handleCancelBet(req, res, next) {
         const match = matchRows[0];
 
         // Reject if match is settled
-        if (match.settled) {
+        if (isMatchSettled(match.settled)) {
           await connection.rollback();
           await releaseIdempotencyKey(pool, cancelIdempotencyKey);
           return {
@@ -863,7 +867,7 @@ async function handleCancelBet(req, res, next) {
         }
 
         // Reject if match has completed or abandoned
-        if (match.status === 'completed' || match.status === 'abandoned' || match.status === 'closed') {
+        if (isMatchConcluded(match.status)) {
           await connection.rollback();
           await releaseIdempotencyKey(pool, cancelIdempotencyKey);
           return {
@@ -874,10 +878,20 @@ async function handleCancelBet(req, res, next) {
 
         const now = Date.now();
 
+        // Reject cancellation if match is live (live toss underway)
+        if (match.status === 'live') {
+          await connection.rollback();
+          await releaseIdempotencyKey(pool, cancelIdempotencyKey);
+          return {
+            httpStatus: 400,
+            body: { success: false, error: { code: 'MATCH_STARTED', message: 'Cannot cancel bet. The match is already live.' }, message: 'Cannot cancel bet. The match is already live.' }
+          };
+        }
+
         // Reject if scheduled start time has arrived or passed
         if (match.match_start_time) {
-          const startTimeMs = new Date(match.match_start_time).getTime();
-          if (!isNaN(startTimeMs) && startTimeMs <= now) {
+          const startTimeMs = parseUtcTimestamp(match.match_start_time);
+          if (startTimeMs && startTimeMs <= now) {
             await connection.rollback();
             await releaseIdempotencyKey(pool, cancelIdempotencyKey);
             return {
@@ -889,8 +903,8 @@ async function handleCancelBet(req, res, next) {
 
         // Reject if match expiry has arrived or passed
         if (match.match_end_time) {
-          const endTimeMs = new Date(match.match_end_time).getTime();
-          if (!isNaN(endTimeMs) && endTimeMs <= now) {
+          const endTimeMs = parseUtcTimestamp(match.match_end_time);
+          if (endTimeMs && endTimeMs <= now) {
             await connection.rollback();
             await releaseIdempotencyKey(pool, cancelIdempotencyKey);
             return {

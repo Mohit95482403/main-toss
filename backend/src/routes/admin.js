@@ -12,6 +12,7 @@ const { createUserAccount } = require('../services/userService');
 const { uploadTeamLogos, deleteUploadedFile } = require('../middleware/uploadLogo');
 const { reserveIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey, executeWithRetry } = require('../utils/idempotency');
 const { reconcileUserWallet, reconcileAllWallets } = require('../services/reconciliation');
+const { parseExpiryDateTime, parseUtcTimestamp, isMatchSettled, isMatchConcluded } = require('../utils/dateTime');
 const walletService = require('../services/walletService');
 
 const router = express.Router();
@@ -1770,24 +1771,6 @@ router.get('/matches/:id/bets', async (req, res, next) => {
   }
 });
 
-function parseExpiryDateTime(input) {
-  if (!input) return null;
-  if (typeof input === 'number') return new Date(input);
-  const str = String(input).trim();
-  if (!str) return null;
-  if (/^\d+$/.test(str)) {
-    const n = parseInt(str, 10);
-    return new Date(n < 1e11 ? n * 1000 : n);
-  }
-  // If datetime-local without timezone (e.g. "2026-10-16T21:30" or "2026-10-16 21:30:00")
-  // Interpret as Indian Standard Time (IST, UTC+5:30)
-  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/.test(str)) {
-    return new Date(str.replace(' ', 'T') + '+05:30');
-  }
-  const d = new Date(str);
-  return isNaN(d.getTime()) ? null : d;
-}
-
 // =============================================================================
 // 9. MATCH MANAGEMENT: CREATE, SCHEDULE & DELETE MATCH
 // =============================================================================
@@ -2200,7 +2183,7 @@ router.put('/matches/:id/status', async (req, res, next) => {
     const match = matches[0];
 
     // CRITICAL SECURITY RULE: A settled match cannot be reopened to upcoming or live via simple status update
-    if (match.settled && (status === 'upcoming' || status === 'live')) {
+    if (isMatchSettled(match.settled) && (status === 'upcoming' || status === 'live')) {
       return res.status(409).json({
         success: false,
         error: {

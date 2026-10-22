@@ -309,14 +309,24 @@ async function runTests() {
   assert(resExpired.status === 400, 'Bet on match past end time rejected with HTTP 400');
   assert(resExpired.data.error.code === 'MATCH_EXPIRED', 'Identifies MATCH_EXPIRED');
 
-  // A.12 Live / in-progress match toss betting rejected
+  // A.12 Completed / settled match toss betting rejected
+  const matchCompleted = await createMatch({ status: 'completed' });
+  const resCompleted = await request('POST', '/bets/place', {
+    matchId: matchCompleted.id,
+    selection: matchCompleted.teamOne,
+    stake: 100
+  }, player1.token);
+  assert(resCompleted.status === 400, 'Bet on completed match rejected with HTTP 400');
+  assert(resCompleted.data.error.code === 'BETTING_CLOSED', 'Identifies BETTING_CLOSED');
+
+  // A.13 Live toss match betting accepted
   const matchLive = await createMatch({ status: 'live' });
   const resLive = await request('POST', '/bets/place', {
     matchId: matchLive.id,
     selection: matchLive.teamOne,
     stake: 100
   }, player1.token);
-  assert(resLive.status === 400, 'Bet on live in-progress match rejected with HTTP 400');
+  assert(resLive.status === 201, 'Bet on live toss match accepted with HTTP 201');
 
   // ============================================================================
   // SECTION B: BET TAMPERING & OWNERSHIP SECURITY TESTS
