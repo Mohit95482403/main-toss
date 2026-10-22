@@ -110,7 +110,21 @@
   }
 
   function isAuthenticated() {
-    return Boolean(getToken());
+    const token = getToken();
+    if (!token || typeof token !== 'string') return false;
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    try {
+      let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) { base64 += '='; }
+      const payload = JSON.parse(atob(base64));
+      if (!payload || !payload.exp || (payload.exp * 1000) <= Date.now()) {
+        return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   // Authoritative balance cache and in-flight promise tracker
@@ -551,12 +565,16 @@
           error.data = data;
           error.error = errorObj;
 
-          // If 401 Unauthorized and was authenticated, session might be expired
-          if (res.status === 401 && isAuthenticated()) {
+          // If 401 Unauthorized, session is invalid or expired: clear token and redirect protected pages
+          if (res.status === 401) {
             console.warn('[API CLIENT] Received 401 Unauthorized from', cleanEndpoint);
-            if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-              clearToken();
-              clearUser();
+            clearToken();
+            clearUser();
+            const page = document.body && document.body.dataset && document.body.dataset.page;
+            if (page === 'home' || page === 'bets' || page === 'passbook' || page === 'profile') {
+              const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+              const inPages = document.body && document.body.dataset && document.body.dataset.inPages === 'true';
+              window.location.replace(isLocal ? (inPages ? 'login.html' : 'pages/login.html') : '/login');
             }
           }
 
@@ -636,6 +654,12 @@
    */
   async function initSession() {
     if (!isAuthenticated()) {
+      const page = document.body && document.body.dataset && document.body.dataset.page;
+      if (page === 'home') {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        window.location.replace(isLocal ? 'pages/login.html' : '/login');
+        return null;
+      }
       updateAllBalanceDisplays(0, 0, 'loaded');
       return null;
     }

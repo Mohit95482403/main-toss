@@ -307,6 +307,13 @@
    * Main Initialization
    */
   async function initHomePage() {
+    // Defense-in-depth: Unauthenticated visitors must not load the homepage
+    if (window.ApiClient && typeof window.ApiClient.isAuthenticated === 'function' && !window.ApiClient.isAuthenticated()) {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      window.location.replace(isLocal ? 'pages/login.html' : '/login');
+      return;
+    }
+
     const feedContainer = document.getElementById('match-feed-container');
     const filterButtons = document.querySelectorAll('.match-filter-btn');
 
