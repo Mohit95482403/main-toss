@@ -44,12 +44,16 @@ app.use(requestLogger);
 // 4. CORS Configuration
 function buildAllowedOrigins() {
   const defaults = [
+    'https://daddy-toss-book.vercel.app',
+    'https://daddy-toss-book-backend.onrender.com',
     'http://localhost:5500',
     'http://127.0.0.1:5500',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:5173',
-    'http://127.0.0.1:5173'
+    'http://127.0.0.1:5173',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000'
   ];
   const list = [...defaults];
   const addOrigin = (raw) => {
@@ -73,7 +77,7 @@ function buildAllowedOrigins() {
 const allowedOrigins = buildAllowedOrigins();
 const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === 'true';
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     // Allow non-browser requests (e.g. curl, server-to-server, health checks)
     if (!origin) return callback(null, true);
@@ -85,8 +89,14 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Optional: allow *.vercel.app preview deployments if configured
-    if (allowVercelPreviews && /^https:\/\/[a-z0-9\-]+(\-[a-z0-9]+)?\.vercel\.app$/i.test(normalized)) {
+    // Allow production Vercel domain and preview deployments
+    if (/^https:\/\/(daddy-toss-book|main-toss)[a-z0-9\-]*\.vercel\.app$/i.test(normalized) ||
+        (allowVercelPreviews && /^https:\/\/[a-z0-9\-]+(\-[a-z0-9]+)?\.vercel\.app$/i.test(normalized))) {
+      return callback(null, true);
+    }
+
+    // Allow local development ports
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalized)) {
       return callback(null, true);
     }
 
@@ -100,8 +110,12 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control', 'x-access-token'],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // 5. Body Parsing & Compression Middleware
 app.use(express.json({ limit: '1mb' }));
