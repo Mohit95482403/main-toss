@@ -22,11 +22,12 @@ function notFoundHandler(req, res, next) {
 function centralErrorHandler(err, req, res, next) {
   const statusCode = err.status || err.statusCode || 500;
   const isProduction = process.env.NODE_ENV === 'production';
+  const correlationId = req.headers['x-request-id'] || req.headers['x-correlation-id'] || `req-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
-  // Log error internally for debugging
-  console.error(`[ERROR] ${new Date().toISOString()} - ${req.method} ${req.originalUrl}:`, err.message);
-  if (!isProduction && err.stack) {
-    console.error(err.stack);
+  // Log full error details and stack trace internally for server diagnostics
+  console.error(`[ERROR] [${correlationId}] ${new Date().toISOString()} - ${req.method} ${req.originalUrl}:`, err.message);
+  if (err.stack) {
+    console.error(`[STACK TRACE] [${correlationId}]:\n`, err.stack);
   }
 
   res.status(statusCode).json({

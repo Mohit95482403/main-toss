@@ -120,7 +120,9 @@ const TABLES_DDL = [
     odds DECIMAL(5, 2) NOT NULL,
     potential_return DECIMAL(12, 2) NOT NULL,
     status ENUM('pending', 'live', 'won', 'lost', 'no_result', 'cancelled') NOT NULL DEFAULT 'live',
-    settlement_status ENUM('pending', 'settled', 'cancelled') NOT NULL DEFAULT 'pending',
+    settlement_status ENUM('pending', 'settled', 'cancelled', 'reversed') NOT NULL DEFAULT 'pending',
+    settlement_version INT NULL DEFAULT NULL,
+    idempotency_key VARCHAR(150) NULL DEFAULT NULL UNIQUE,
     payout DECIMAL(12, 2) DEFAULT 0.00,
     refund_amount DECIMAL(12, 2) DEFAULT 0.00,
     settled_at TIMESTAMP NULL DEFAULT NULL,
@@ -135,6 +137,7 @@ const TABLES_DDL = [
     INDEX idx_bets_match (match_id),
     INDEX idx_bets_status (status),
     INDEX idx_bets_settlement (settlement_status),
+    INDEX idx_bets_idempotency (idempotency_key),
     INDEX idx_bets_cancelled (cancelled_at),
     INDEX idx_bets_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
@@ -420,6 +423,75 @@ async function initializeDatabase() {
       }
     } catch (cancelErr) {
       console.warn('[DB INIT] Bet cancellation schema verification notice:', cancelErr.message);
+    }
+
+    // 4. Ensure bets.idempotency_key column exists
+    try {
+      const [betIdempCols] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bets' AND COLUMN_NAME = 'idempotency_key'"
+      );
+      if (betIdempCols.length === 0) {
+        await pool.query('ALTER TABLE bets ADD COLUMN idempotency_key VARCHAR(150) NULL DEFAULT NULL AFTER settlement_version');
+        try {
+          await pool.query('ALTER TABLE bets ADD UNIQUE INDEX idx_bets_idempotency (idempotency_key)');
+        } catch (_) {}
+        console.log('[DB INIT] Successfully added idempotency_key column to bets table.');
+      }
+    } catch (bIdempErr) {
+      console.warn('[DB INIT] bets.idempotency_key verification notice:', bIdempErr.message);
+    }
+
+    // 5. Ensure coin_transactions correlation columns and index exist
+    try {
+      const [ctCols] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'coin_transactions'"
+      );
+      const existingCtCols = ctCols.map(c => c.COLUMN_NAME);
+
+      if (!existingCtCols.includes('metadata')) {
+        await pool.query('ALTER TABLE coin_transactions ADD COLUMN metadata LONGTEXT NULL DEFAULT NULL AFTER reason');
+        console.log('[DB INIT] Successfully added metadata column to coin_transactions.');
+      }
+      if (!existingCtCols.includes('bet_id')) {
+        await pool.query('ALTER TABLE coin_transactions ADD COLUMN bet_id VARCHAR(50) NULL DEFAULT NULL AFTER metadata');
+        try { await pool.query('ALTER TABLE coin_transactions ADD INDEX idx_coin_tx_bet (bet_id)'); } catch (_) {}
+        console.log('[DB INIT] Successfully added bet_id column to coin_transactions.');
+      }
+      if (!existingCtCols.includes('match_id')) {
+        await pool.query('ALTER TABLE coin_transactions ADD COLUMN match_id VARCHAR(50) NULL DEFAULT NULL AFTER bet_id');
+        try { await pool.query('ALTER TABLE coin_transactions ADD INDEX idx_coin_tx_match (match_id)'); } catch (_) {}
+        console.log('[DB INIT] Successfully added match_id column to coin_transactions.');
+      }
+      if (!existingCtCols.includes('settlement_uuid')) {
+        await pool.query('ALTER TABLE coin_transactions ADD COLUMN settlement_uuid VARCHAR(50) NULL DEFAULT NULL AFTER match_id');
+        try { await pool.query('ALTER TABLE coin_transactions ADD INDEX idx_coin_tx_settlement (settlement_uuid)'); } catch (_) {}
+        console.log('[DB INIT] Successfully added settlement_uuid column to coin_transactions.');
+      }
+      if (!existingCtCols.includes('related_transaction_id')) {
+        await pool.query('ALTER TABLE coin_transactions ADD COLUMN related_transaction_id VARCHAR(64) NULL DEFAULT NULL AFTER settlement_uuid');
+        try { await pool.query('ALTER TABLE coin_transactions ADD INDEX idx_coin_tx_related_tx (related_transaction_id)'); } catch (_) {}
+        console.log('[DB INIT] Successfully added related_transaction_id column to coin_transactions.');
+      }
+      if (!existingCtCols.includes('idempotency_key')) {
+        await pool.query('ALTER TABLE coin_transactions ADD COLUMN idempotency_key VARCHAR(100) NULL DEFAULT NULL UNIQUE AFTER related_transaction_id');
+        try { await pool.query('ALTER TABLE coin_transactions ADD INDEX idx_coin_tx_idempotency (idempotency_key)'); } catch (_) {}
+        console.log('[DB INIT] Successfully added idempotency_key column to coin_transactions.');
+      }
+    } catch (ctErr) {
+      console.warn('[DB INIT] coin_transactions columns verification notice:', ctErr.message);
+    }
+
+    // 6. Ensure idempotency_records.expires_at column exists
+    try {
+      const [idempCols] = await pool.query(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'idempotency_records' AND COLUMN_NAME = 'expires_at'"
+      );
+      if (idempCols.length === 0) {
+        await pool.query('ALTER TABLE idempotency_records ADD COLUMN expires_at TIMESTAMP NULL DEFAULT NULL AFTER updated_at');
+        console.log('[DB INIT] Successfully added expires_at column to idempotency_records table.');
+      }
+    } catch (idempExpErr) {
+      console.warn('[DB INIT] idempotency_records.expires_at verification notice:', idempExpErr.message);
     }
 
     // Schema verification complete (automatic demo data seeding disabled)

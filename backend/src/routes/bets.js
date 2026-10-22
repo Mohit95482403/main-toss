@@ -600,15 +600,33 @@ async function handlePlaceBet(req, res, next) {
         const potentialReturn = parseFloat((stake * rate).toFixed(2));
         const betId = `BET-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
 
-        // Insert Bet Ticket with idempotency_key
-        await connection.query(
-          `INSERT INTO bets (
-            id, user_id, match_id, market_name, selection,
-            stake, odds, potential_return, status, settlement_status,
-            idempotency_key, payout, settled_at, settled_by, created_at, updated_at
-          ) VALUES (?, ?, ?, 'Toss Winner', ?, ?, ?, ?, 'pending', 'pending', ?, 0.00, NULL, NULL, NOW(), NOW())`,
-          [betId, userId, match.id, selection, stake, rate, potentialReturn, cleanIdempotencyKey]
-        );
+        // Insert Bet Ticket with authoritative idempotency_key
+        try {
+          await connection.query(
+            `INSERT INTO bets (
+              id, user_id, match_id, market_name, selection,
+              stake, odds, potential_return, status, settlement_status,
+              idempotency_key, payout, settled_at, settled_by, created_at, updated_at
+            ) VALUES (?, ?, ?, 'Toss Winner', ?, ?, ?, ?, 'pending', 'pending', ?, 0.00, NULL, NULL, NOW(), NOW())`,
+            [betId, userId, match.id, selection, stake, rate, potentialReturn, cleanIdempotencyKey]
+          );
+        } catch (insertBetErr) {
+          if (insertBetErr.code === 'ER_DUP_ENTRY' || insertBetErr.errno === 1062) {
+            await connection.rollback();
+            if (cleanIdempotencyKey) await releaseIdempotencyKey(pool, cleanIdempotencyKey);
+            return {
+              httpStatus: 409,
+              body: {
+                success: false,
+                error: {
+                  code: 'DUPLICATE_BET_REJECTED',
+                  message: 'A bet with this idempotency key has already been placed.'
+                }
+              }
+            };
+          }
+          throw insertBetErr;
+        }
 
         // Deduct stake and record ledger entry atomically via centralized walletService
         const debitResult = await walletService.placeBetDebit({
@@ -678,6 +696,10 @@ async function handlePlaceBet(req, res, next) {
 
     return res.status(result.httpStatus).json(result.body);
   } catch (err) {
+    console.error(`[BET PLACEMENT FAILURE] matchId: ${matchId}, userId: ${userId}, selection: ${selection}, stake: ${stake}:`, err.message);
+    if (err.stack) {
+      console.error('[BET PLACEMENT STACK]:', err.stack);
+    }
     next(err);
   }
 }

@@ -88,47 +88,57 @@ async function recordLedgerTransaction({
   const transactionUuid = generateTransactionUuid();
   const serializedMetadata = metadata ? (typeof metadata === 'string' ? metadata : JSON.stringify(metadata)) : null;
 
-  await connection.query(
-    `INSERT INTO coin_transactions (
-      transaction_uuid,
-      user_id,
-      username,
-      admin_id,
-      admin_username,
-      action_type,
-      amount,
-      balance_before,
-      balance_after,
-      reason,
-      metadata,
-      bet_id,
-      match_id,
-      settlement_uuid,
-      related_transaction_id,
-      idempotency_key,
-      status,
-      created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-    [
-      transactionUuid,
-      userId,
-      username,
-      adminId,
-      adminUsername,
-      actionType,
-      roundCoin(amount),
-      roundCoin(balanceBefore),
-      roundCoin(balanceAfter),
-      reason,
-      serializedMetadata,
-      betId,
-      matchId,
-      settlementUuid,
-      relatedTransactionId,
-      idempotencyKey,
-      status
-    ]
-  );
+  try {
+    await connection.query(
+      `INSERT INTO coin_transactions (
+        transaction_uuid,
+        user_id,
+        username,
+        admin_id,
+        admin_username,
+        action_type,
+        amount,
+        balance_before,
+        balance_after,
+        reason,
+        metadata,
+        bet_id,
+        match_id,
+        settlement_uuid,
+        related_transaction_id,
+        idempotency_key,
+        status,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        transactionUuid,
+        userId,
+        username,
+        adminId,
+        adminUsername,
+        actionType,
+        roundCoin(amount),
+        roundCoin(balanceBefore),
+        roundCoin(balanceAfter),
+        reason,
+        serializedMetadata,
+        betId,
+        matchId,
+        settlementUuid,
+        relatedTransactionId,
+        idempotencyKey,
+        status
+      ]
+    );
+  } catch (ledgerErr) {
+    if (ledgerErr.code === 'ER_DUP_ENTRY' || ledgerErr.errno === 1062) {
+      const err = new Error('Duplicate ledger transaction key collision.');
+      err.status = 409;
+      err.code = 'DUPLICATE_TRANSACTION';
+      throw err;
+    }
+    throw ledgerErr;
+  }
 
   return {
     transactionUuid,
