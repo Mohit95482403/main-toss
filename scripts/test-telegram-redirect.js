@@ -1,8 +1,8 @@
 /**
  * Automated Verification Script for Deposit & Withdrawal Telegram Redirection
  * Tests:
- * 1. Home Page Deposit & Withdrawal Buttons Link to https://t.me/narendra_1306
- * 2. Passbook Page Deposit & Withdraw Buttons Link to https://t.me/narendra_1306
+ * 1. Home Page Deposit & Withdrawal Buttons Link to https://t.me/DaddyTossBook
+ * 2. Passbook Page Deposit & Withdraw Buttons Link to https://t.me/DaddyTossBook
  * 3. Security Attributes (target="_blank", rel="noopener noreferrer")
  * 4. Button Styling, Classes & Icons Preservation
  * 5. HomeController & JS Redirection Logic
@@ -36,7 +36,7 @@ const homeCssPath = path.join(root, 'frontend', 'css', 'home.css');
 const passbookHtmlPath = path.join(root, 'frontend', 'pages', 'passbook.html');
 const passbookJsPath = path.join(root, 'frontend', 'js', 'passbook.js');
 
-const TARGET_TELEGRAM_URL = 'https://t.me/narendra_1306';
+const TARGET_TELEGRAM_URL = 'https://t.me/DaddyTossBook';
 
 // 1. Home Page Verification
 const homeHtml = fs.readFileSync(indexHtmlPath, 'utf8');
@@ -66,11 +66,11 @@ assert(passbookHtml.includes('class="hero-btn hero-btn-withdraw"'), 'Passbook Wi
 
 // 3. JavaScript Redirection Logic Tests
 const homeJs = fs.readFileSync(homeJsPath, 'utf8');
-assert(homeJs.includes(TARGET_TELEGRAM_URL), 'home.js defines TARGET_TELEGRAM_URL "https://t.me/narendra_1306"');
+assert(homeJs.includes(TARGET_TELEGRAM_URL), 'home.js defines TARGET_TELEGRAM_URL "https://t.me/DaddyTossBook"');
 assert(homeJs.includes("window.open(TELEGRAM_PROFILE_URL, '_blank', 'noopener,noreferrer')"), 'home.js opens Telegram directly without popup dialog');
 
 const passbookJs = fs.readFileSync(passbookJsPath, 'utf8');
-assert(passbookJs.includes(TARGET_TELEGRAM_URL), 'passbook.js defines TARGET_TELEGRAM_URL "https://t.me/narendra_1306"');
+assert(passbookJs.includes(TARGET_TELEGRAM_URL), 'passbook.js defines TARGET_TELEGRAM_URL "https://t.me/DaddyTossBook"');
 assert(passbookJs.includes("window.open(TELEGRAM_PROFILE_URL, '_blank', 'noopener,noreferrer')"), 'passbook.js opens Telegram directly without popup dialog');
 
 // 4. CSS Styling Verification

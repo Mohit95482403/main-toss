@@ -106,12 +106,12 @@ assert(htmlContent.includes('>Withdrawal<'), 'Withdrawal button has exact label 
 assert(htmlContent.includes('id="home-wallet-balance"'), 'Home wallet balance display present');
 assert(htmlContent.includes('id="deposit-modal"'), 'Deposit modal dialog present in index.html');
 assert(htmlContent.includes('id="withdraw-modal"'), 'Withdrawal modal dialog present in index.html');
-assert(htmlContent.includes('href="https://t.me/narendra_1306"'), 'Telegram redirection link https://t.me/narendra_1306 configured on buttons');
+assert(htmlContent.includes('href="https://t.me/DaddyTossBook"'), 'Telegram redirection link https://t.me/DaddyTossBook configured on buttons');
 assert(htmlContent.includes('target="_blank"'), 'Target _blank configured for external redirection');
 assert(htmlContent.includes('rel="noopener noreferrer"'), 'Security attribute rel="noopener noreferrer" configured');
 
 assert(jsContent.includes('setupWalletActions'), 'setupWalletActions function defined in home.js');
-assert(jsContent.includes('https://t.me/narendra_1306'), 'Telegram profile URL defined in home.js');
+assert(jsContent.includes('https://t.me/DaddyTossBook'), 'Telegram profile URL defined in home.js');
 assert(jsContent.includes('home-deposit-btn'), 'home-deposit-btn event handlers in home.js');
 assert(jsContent.includes('home-withdraw-btn'), 'home-withdraw-btn event handlers in home.js');
 

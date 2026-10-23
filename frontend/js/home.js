@@ -659,7 +659,7 @@
       if (modalWithBal) modalWithBal.textContent = b.formattedAvailable;
     }
 
-    const TELEGRAM_PROFILE_URL = 'https://t.me/narendra_1306';
+    const TELEGRAM_PROFILE_URL = 'https://t.me/DaddyTossBook';
 
     if (depositBtn) {
       depositBtn.addEventListener('click', (e) => {
